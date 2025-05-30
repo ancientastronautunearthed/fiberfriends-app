@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A Genkit flow for expanding user-provided words into a detailed image prompt for a Morgellon Monster.
@@ -10,7 +11,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const MonsterWordsInputSchema = z.object({
+const MonsterWordsInputSchema = z.object({
   words: z
     .array(z.string())
     .length(5, { message: "Please provide exactly 5 words." })
@@ -18,7 +19,7 @@ export const MonsterWordsInputSchema = z.object({
 });
 export type MonsterWordsInput = z.infer<typeof MonsterWordsInputSchema>;
 
-export const MonsterPromptOutputSchema = z.object({
+const MonsterPromptOutputSchema = z.object({
   detailedPrompt: z.string().describe('A detailed and vivid image generation prompt based on the 5 words.'),
 });
 export type MonsterPromptOutput = z.infer<typeof MonsterPromptOutputSchema>;
@@ -68,3 +69,4 @@ const monsterPromptExpansionFlow = ai.defineFlow(
     return output;
   }
 );
+

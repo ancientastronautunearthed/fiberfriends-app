@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
@@ -9,7 +10,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Wand2, Sparkles, CheckCircle } from "lucide-react";
 import Image from "next/image";
 import { expandMonsterPromptAction, generateMonsterImageAction } from './actions';
-import { MonsterWordsInputSchema } from '@/ai/flows/monster-prompt-expansion-flow';
 import { useToast } from '@/hooks/use-toast';
 
 const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
@@ -46,10 +46,8 @@ export default function CreateMonsterPage() {
 
     const wordArray = words.trim().split(/\s+/).filter(w => w.length > 0);
     
-    try {
-      MonsterWordsInputSchema.parse({ words: wordArray }); // Validate input
-    } catch (validationError: any) {
-      setError(validationError.errors.map((e: any) => e.message).join(', '));
+    if (wordArray.length !== 5) {
+      setError("Please provide exactly 5 words.");
       return;
     }
 
@@ -74,11 +72,21 @@ export default function CreateMonsterPage() {
 
           } catch (e) {
             setError(e instanceof Error ? e.message : "Image generation failed.");
+            toast({
+              title: "Image Generation Error",
+              description: e instanceof Error ? e.message : "Could not conjure the monster image.",
+              variant: "destructive",
+            });
           }
         });
 
       } catch (e) {
         setError(e instanceof Error ? e.message : "Prompt expansion failed.");
+        toast({
+          title: "Prompt Expansion Error",
+          description: e instanceof Error ? e.message : "Could not craft the monster's description.",
+          variant: "destructive",
+        });
       }
     });
   };
@@ -182,14 +190,16 @@ export default function CreateMonsterPage() {
               {isExpanding ? 'Crafting Prompt...' : isGenerating ? 'Generating Image...' : 'Reveal My Monster'}
             </Button>
           )}
-          {imageUrl && !isGenerating && (
+          {/* The monster is now automatically accepted and set upon generation, so this button might not be needed */}
+          {/* {imageUrl && !isGenerating && (
              <Button onClick={handleAcceptMonster} className="w-full bg-green-600 hover:bg-green-700">
                 <CheckCircle className="mr-2 h-4 w-4" /> Monster Accepted & Profile Updated
             </Button>
-          )}
+          )} */}
           { hasGenerated && <p className="text-xs text-muted-foreground text-center">You have already generated your monster. This was your one opportunity.</p>}
         </CardFooter>
       </form>
     </Card>
   );
 }
+

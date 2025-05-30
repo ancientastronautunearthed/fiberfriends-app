@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A Genkit flow for generating an image of a Morgellon Monster based on a detailed prompt.
@@ -10,12 +11,12 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const MonsterImageInputSchema = z.object({
+const MonsterImageInputSchema = z.object({
   detailedPrompt: z.string().describe('A detailed and vivid image generation prompt for the Morgellon Monster.'),
 });
 export type MonsterImageInput = z.infer<typeof MonsterImageInputSchema>;
 
-export const MonsterImageOutputSchema = z.object({
+const MonsterImageOutputSchema = z.object({
   imageUrl: z.string().url().describe('The generated image as a data URI.'),
 });
 export type MonsterImageOutput = z.infer<typeof MonsterImageOutputSchema>;
@@ -53,3 +54,4 @@ const monsterImageGenerationFlow = ai.defineFlow(
     return { imageUrl: media.url };
   }
 );
+
