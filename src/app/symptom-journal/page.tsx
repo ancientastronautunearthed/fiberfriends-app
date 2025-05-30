@@ -7,18 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Paperclip, BarChartHorizontalBig } from "lucide-react";
+import { CalendarIcon, Paperclip, BarChartHorizontalBig, PlusCircle, X } from "lucide-react";
 import { format } from "date-fns";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell } from 'recharts';
 import Image from 'next/image';
+import { Badge } from '@/components/ui/badge';
 
 interface SymptomEntry {
   id: string;
   date: Date;
-  symptoms: string;
+  symptoms: string[]; // Changed from string to string[]
   notes: string;
   photoDataUri?: string;
   photoAiHint?: string;
@@ -29,9 +31,15 @@ interface ProcessedChartData {
   count: number;
 }
 
+const commonSymptomsList = [
+  "Itching", "Fatigue", "Brain Fog", "Crawling Sensation", 
+  "Skin Lesions", "Joint Pain", "Sleep Disturbance", "Headache", 
+  "Anxiety", "Muscle Aches"
+];
+
 const initialEntries: SymptomEntry[] = [
-  { id: '1', date: new Date(2024, 6, 15), symptoms: 'Itching, fatigue', notes: 'Skin felt particularly sensitive after shower.', photoDataUri: 'https://placehold.co/300x200.png', photoAiHint: 'skin rash' },
-  { id: '2', date: new Date(2024, 6, 16), symptoms: 'Crawling sensation, brain fog, Itching', notes: 'Difficult to concentrate at work.' },
+  { id: '1', date: new Date(2024, 6, 15), symptoms: ['Itching', 'Fatigue'], notes: 'Skin felt particularly sensitive after shower.', photoDataUri: 'https://placehold.co/300x200.png', photoAiHint: 'skin rash' },
+  { id: '2', date: new Date(2024, 6, 16), symptoms: ['Crawling Sensation', 'Brain Fog', 'Itching'], notes: 'Difficult to concentrate at work.' },
 ];
 
 const staticChartConfig = {
@@ -44,7 +52,8 @@ const staticChartConfig = {
 
 export default function SymptomJournalPage() {
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [symptoms, setSymptoms] = useState('');
+  const [currentSymptoms, setCurrentSymptoms] = useState<string[]>([]);
+  const [customSymptom, setCustomSymptom] = useState('');
   const [notes, setNotes] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -55,10 +64,11 @@ export default function SymptomJournalPage() {
 
   useEffect(() => {
     const symptomCounts: { [key: string]: number } = entries.reduce((acc, entry) => {
-      const individualSymptoms = entry.symptoms.split(',').map(s => s.trim().toLowerCase()).filter(s => s);
-      individualSymptoms.forEach(symptom => {
-        if (symptom) { // Ensure symptom string is not empty
-          acc[symptom] = (acc[symptom] || 0) + 1;
+      // entry.symptoms is now an array of strings
+      entry.symptoms.forEach(symptom => {
+        const s = symptom.trim().toLowerCase();
+        if (s) { 
+          acc[s] = (acc[s] || 0) + 1;
         }
       });
       return acc;
@@ -66,7 +76,7 @@ export default function SymptomJournalPage() {
 
     const newChartData = Object.entries(symptomCounts)
       .map(([name, count]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), count }))
-      .sort((a,b) => b.count - a.count); // Sort by count descending
+      .sort((a,b) => b.count - a.count); 
 
     setProcessedChartData(newChartData);
 
@@ -77,11 +87,7 @@ export default function SymptomJournalPage() {
             color: `hsl(var(--chart-${(index % 5) + 1}))`
         };
     });
-    // We primarily use staticChartConfig for the ChartContainer, 
-    // but dynamicChartConfig could be used if tooltip/legend needed per-symptom colors directly from config.
-    // For now, Cell handles bar colors.
     setDynamicChartConfig(newDynamicConfig);
-
 
   }, [entries]);
 
@@ -100,24 +106,43 @@ export default function SymptomJournalPage() {
     }
   };
 
+  const handleCommonSymptomChange = (symptom: string, checked: boolean) => {
+    setCurrentSymptoms(prev => 
+      checked ? [...prev, symptom] : prev.filter(s => s !== symptom)
+    );
+  };
+
+  const handleAddCustomSymptom = () => {
+    if (customSymptom.trim() && !currentSymptoms.includes(customSymptom.trim())) {
+      setCurrentSymptoms(prev => [...prev, customSymptom.trim()]);
+      setCustomSymptom('');
+    }
+  };
+
+  const handleRemoveSymptom = (symptomToRemove: string) => {
+    setCurrentSymptoms(prev => prev.filter(s => s !== symptomToRemove));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!date || !symptoms) {
-      alert("Date and symptoms are required.");
+    if (!date || currentSymptoms.length === 0) {
+      alert("Date and at least one symptom are required.");
       return;
     }
     const newEntry: SymptomEntry = {
       id: String(Date.now()),
       date,
-      symptoms,
+      symptoms: currentSymptoms,
       notes,
       photoDataUri: photoPreview || undefined,
       photoAiHint: photo ? 'medical symptom' : undefined,
     };
-    setEntries(prevEntries => [newEntry, ...prevEntries]);
+    setEntries(prevEntries => [newEntry, ...prevEntries].sort((a,b) => b.date.getTime() - a.date.getTime()));
+    
     // Reset form
     setDate(new Date());
-    setSymptoms('');
+    setCurrentSymptoms([]);
+    setCustomSymptom('');
     setNotes('');
     setPhoto(null);
     setPhotoPreview(null);
@@ -156,10 +181,62 @@ export default function SymptomJournalPage() {
                   </PopoverContent>
                 </Popover>
               </div>
+              
               <div>
-                <Label htmlFor="symptoms">Symptoms (comma-separated)</Label>
-                <Input id="symptoms" value={symptoms} onChange={(e) => setSymptoms(e.target.value)} placeholder="e.g., Itching, fatigue, skin lesions" />
+                <Label>Common Symptoms</Label>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  {commonSymptomsList.map(symptom => (
+                    <div key={symptom} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`symptom-${symptom.toLowerCase().replace(/\s+/g, '-')}`}
+                        checked={currentSymptoms.includes(symptom)}
+                        onCheckedChange={(checked) => handleCommonSymptomChange(symptom, !!checked)}
+                      />
+                      <Label htmlFor={`symptom-${symptom.toLowerCase().replace(/\s+/g, '-')}`} className="font-normal text-sm">
+                        {symptom}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
               </div>
+
+              <div>
+                <Label htmlFor="custom-symptom">Custom Symptom</Label>
+                <div className="flex items-center gap-2">
+                  <Input 
+                    id="custom-symptom" 
+                    value={customSymptom} 
+                    onChange={(e) => setCustomSymptom(e.target.value)} 
+                    placeholder="e.g., Tingling in hands" 
+                  />
+                  <Button type="button" variant="outline" size="icon" onClick={handleAddCustomSymptom} aria-label="Add custom symptom">
+                    <PlusCircle className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {currentSymptoms.length > 0 && (
+                <div>
+                  <Label className="text-sm">Selected Symptoms:</Label>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {currentSymptoms.map(symptom => (
+                      <Badge key={symptom} variant="secondary" className="flex items-center gap-1">
+                        {symptom}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-4 w-4 p-0.5 hover:bg-destructive/20"
+                          onClick={() => handleRemoveSymptom(symptom)}
+                          aria-label={`Remove ${symptom}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <Label htmlFor="notes">Notes</Label>
                 <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any observations, triggers, or context..." />
@@ -187,7 +264,7 @@ export default function SymptomJournalPage() {
           </CardHeader>
           <CardContent>
             {processedChartData.length > 0 ? (
-              <ChartContainer config={staticChartConfig} className="min-h-[250px] w-full">
+              <ChartContainer config={dynamicChartConfig} className="min-h-[250px] w-full">
                 <BarChart accessibilityLayer data={processedChartData} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
                   <CartesianGrid horizontal={false} />
                   <YAxis
@@ -197,7 +274,8 @@ export default function SymptomJournalPage() {
                     tickMargin={5}
                     axisLine={false}
                     className="text-xs"
-                    width={80} 
+                    width={100} // Increased width for longer symptom names
+                    interval={0} // Show all ticks
                   />
                   <XAxis dataKey="count" type="number" hide />
                   <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" nameKey="name" />} />
@@ -222,14 +300,19 @@ export default function SymptomJournalPage() {
         </CardHeader>
         <CardContent className="space-y-4 flex-grow overflow-y-auto">
           {entries.length === 0 && <p className="text-muted-foreground">No entries yet. Add your first one!</p>}
-          {entries.map(entry => (
+          {entries.sort((a,b) => b.date.getTime() - a.date.getTime()).map(entry => ( // Sort entries by date descending
             <Card key={entry.id} className="bg-card/50">
               <CardHeader className="pb-2 pt-4">
                 <CardTitle className="text-md">{format(entry.date, "PPP")}</CardTitle>
               </CardHeader>
               <CardContent className="text-sm space-y-1 pb-4">
-                <p><strong>Symptoms:</strong> {entry.symptoms}</p>
-                {entry.notes && <p><strong>Notes:</strong> {entry.notes}</p>}
+                <div>
+                  <strong>Symptoms:</strong>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {entry.symptoms.map(symptom => <Badge key={symptom} variant="secondary">{symptom}</Badge>)}
+                  </div>
+                </div>
+                {entry.notes && <p className="mt-1"><strong>Notes:</strong> {entry.notes}</p>}
                 {entry.photoDataUri && (
                   <div className="mt-2">
                      <Image src={entry.photoDataUri} alt="Symptom" width={100} height={100} className="rounded-md border object-cover" data-ai-hint={entry.photoAiHint || "medical condition"} />
@@ -244,3 +327,5 @@ export default function SymptomJournalPage() {
   );
 }
 
+
+    
