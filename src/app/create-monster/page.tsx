@@ -23,27 +23,15 @@ export default function CreateMonsterPage() {
   const [detailedPrompt, setDetailedPrompt] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [hasGenerated, setHasGenerated] = useState(false);
+  const [hasGeneratedInSession, setHasGeneratedInSession] = useState(false); // Tracks generation within the current page session
 
   const [isExpanding, startExpandingTransition] = useTransition();
   const [isGenerating, startGeneratingTransition] = useTransition();
 
   const { toast } = useToast();
 
-  useEffect(() => {
-    const previouslyGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
-    const storedImage = localStorage.getItem(MONSTER_IMAGE_KEY);
-    const storedName = localStorage.getItem(MONSTER_NAME_KEY);
-    if (previouslyGenerated === 'true') {
-      setHasGenerated(true);
-      if (storedImage) {
-        setImageUrl(storedImage);
-      }
-      if (storedName) {
-        setMonsterName(storedName);
-      }
-    }
-  }, []);
+  // Removed useEffect that checked localStorage for MONSTER_GENERATED_KEY on mount.
+  // This allows the form to be presented fresh on each page load/visit.
 
   const handleWordSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -74,8 +62,8 @@ export default function CreateMonsterPage() {
           try {
             const imageResult = await generateMonsterImageAction({ detailedPrompt: expansionResult.detailedPrompt });
             setImageUrl(imageResult.imageUrl);
-            setHasGenerated(true);
-            localStorage.setItem(MONSTER_GENERATED_KEY, 'true');
+            setHasGeneratedInSession(true); // Mark as generated for the current session
+            localStorage.setItem(MONSTER_GENERATED_KEY, 'true'); // Still set this for other parts of app that might use it
             localStorage.setItem(MONSTER_IMAGE_KEY, imageResult.imageUrl);
             localStorage.setItem(MONSTER_NAME_KEY, expansionResult.monsterName);
              toast({
@@ -105,7 +93,8 @@ export default function CreateMonsterPage() {
     });
   };
 
-  if (hasGenerated && imageUrl && monsterName) {
+  // This view shows after a monster is generated IN THE CURRENT SESSION
+  if (hasGeneratedInSession && imageUrl && monsterName) {
     return (
       <Card className="max-w-lg mx-auto">
         <CardHeader>
@@ -123,25 +112,21 @@ export default function CreateMonsterPage() {
                     Share Your Monster on the Forum!
                 </Link>
             </Button>
+             <Button onClick={() => {
+                setHasGeneratedInSession(false); // Allow re-generation
+                setImageUrl(null);
+                setMonsterName(null);
+                setWords('');
+             }} variant="secondary">
+                Create Another Monster
+            </Button>
         </CardFooter>
       </Card>
     );
   }
   
-  if (hasGenerated && (!imageUrl || !monsterName) && !isExpanding && !isGenerating) {
-     return (
-      <Card className="max-w-lg mx-auto">
-        <CardHeader>
-          <CardTitle className="font-headline flex items-center gap-2"><Sparkles className="h-6 w-6 text-primary"/>Monster Already Conjured</CardTitle>
-          <CardDescription>You've already brought your Morgellon Monster into existence. Check your profile!</CardDescription>
-        </CardHeader>
-        <CardContent>
-            <p className="text-center text-muted-foreground">If you don't see your monster or its name on your profile, there might have been an issue saving it. Unfortunately, the ritual allows only one conjuring.</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
+  // This logic path for pre-generated monsters being loaded from localStorage is no longer hit on initial load
+  // because the useEffect that set hasGenerated based on localStorage was removed.
 
   return (
     <Card className="max-w-lg mx-auto">
@@ -162,7 +147,7 @@ export default function CreateMonsterPage() {
               value={words}
               onChange={(e) => setWords(e.target.value)}
               placeholder="e.g., Shadow, Whispers, Crystal, Chains, Deep"
-              disabled={isExpanding || isGenerating || hasGenerated}
+              disabled={isExpanding || isGenerating || hasGeneratedInSession}
             />
             <p className="text-xs text-muted-foreground mt-1">Separate words with spaces. Exactly 5 words required.</p>
           </div>
@@ -187,21 +172,22 @@ export default function CreateMonsterPage() {
             </Alert>
           )}
 
-          {imageUrl && monsterName && !isGenerating && (
+          {/* This section is now covered by the `if (hasGeneratedInSession && imageUrl && monsterName)` block above */}
+          {/* {imageUrl && monsterName && !isGenerating && (
             <div className="mt-6 text-center">
               <h3 className="text-xl font-headline mb-2 text-primary">Behold! Your Morgellon Monster, {monsterName}!</h3>
               <Image src={imageUrl} alt={`Generated Morgellon Monster: ${monsterName}`} width={400} height={400} className="rounded-lg border object-cover mx-auto shadow-lg" data-ai-hint="generated monster" />
             </div>
-          )}
+          )} */}
         </CardContent>
         <CardFooter className="flex flex-col gap-3">
-          {!imageUrl && (
-            <Button type="submit" disabled={isExpanding || isGenerating || hasGenerated} className="w-full">
+          {!hasGeneratedInSession && ( // Button shown if no monster generated in current session
+            <Button type="submit" disabled={isExpanding || isGenerating} className="w-full">
               {(isExpanding || isGenerating) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
               {isExpanding ? 'Crafting Essence...' : isGenerating ? 'Conjuring Monster...' : 'Reveal My Monster'}
             </Button>
           )}
-          { hasGenerated && <p className="text-xs text-muted-foreground text-center">You have already generated your monster. This was your one opportunity.</p>}
+          { hasGeneratedInSession && <p className="text-xs text-muted-foreground text-center">You have generated your monster for this session. Click "Create Another Monster" above if you wish to try again.</p>}
         </CardFooter>
       </form>
     </Card>
