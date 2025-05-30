@@ -18,7 +18,7 @@ interface ProductEntry {
 }
 
 const POINTS_PER_PRODUCT = 10;
-const PREMIUM_GOAL = 500;
+const PREMIUM_GOAL = 1000; // Updated Goal
 
 export default function ProductTrackerPage() {
   const [workingProducts, setWorkingProducts] = useState<ProductEntry[]>([]);
@@ -118,7 +118,10 @@ export default function ProductTrackerPage() {
       <Card>
         <CardHeader>
           <CardTitle className="font-headline flex items-center gap-2"><Target className="h-6 w-6 text-primary"/>Your Contribution Score</CardTitle>
-          <CardDescription>Log products you've tried to earn points. Reach {PREMIUM_GOAL} points for a reward!</CardDescription>
+          <CardDescription>
+            Log products you've tried, and other community contributions (like forum posts or sharing stories), to earn points. 
+            Reach {PREMIUM_GOAL} points for a reward (e.g., a free premium month)! You can also earn other rewards like e-books for continued participation.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex justify-between items-center mb-1">
@@ -126,7 +129,7 @@ export default function ProductTrackerPage() {
             {goalReached && <Badge className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-1"><Award className="h-4 w-4"/>Reward Unlocked!</Badge>}
           </div>
           <Progress value={progressPercentage} aria-label={`${progressPercentage}% towards premium reward`} />
-          <p className="text-xs text-muted-foreground">Each product logged (working or not) earns {POINTS_PER_PRODUCT} points.</p>
+          <p className="text-xs text-muted-foreground">Each product logged (working or not) earns {POINTS_PER_PRODUCT} points. Other contributions help too!</p>
         </CardContent>
       </Card>
 
@@ -232,4 +235,3 @@ export default function ProductTrackerPage() {
     </div>
   );
 }
-

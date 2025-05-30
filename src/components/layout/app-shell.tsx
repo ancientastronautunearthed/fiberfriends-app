@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -17,7 +17,7 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Smile, HeartPulse, LogOut, ListChecks } from 'lucide-react';
+import { HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Smile, HeartPulse, LogOut, ListChecks, PiggyBank, Info } from 'lucide-react';
 
 const navItems = [
   { href: '/', label: 'Belief Circle', icon: HeartHandshake, pageTitle: 'Belief Circle' },
@@ -28,7 +28,40 @@ const navItems = [
   { href: '/provider-directory', label: 'Provider Directory', icon: Stethoscope, pageTitle: 'Provider Directory' },
   { href: '/doctor-forum', label: 'Doctor Forum', icon: MessageSquareQuote, pageTitle: 'Doctor Forum' },
   { href: '/humor-hub', label: 'Humor Hub', icon: Smile, pageTitle: 'Humor Hub' },
+  { href: '/support-us', label: 'Support Us', icon: PiggyBank, pageTitle: 'Support Us' },
 ];
+
+const infoTips = [
+  "Tip: Staying hydrated can sometimes help with skin-related symptoms.",
+  "Fact: Morgellons is a complex condition that researchers are still working to understand.",
+  "Reminder: You are not alone in this journey. This community is here for you.",
+  "Tip: Gentle skincare routines may be beneficial. Avoid harsh scrubbing.",
+  "Fact: Sharing your experiences can help others feel less isolated.",
+];
+
+function InfoBar() {
+  const [currentTip, setCurrentTip] = useState(infoTips[0]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setCurrentTip(prevTip => {
+        const currentIndex = infoTips.indexOf(prevTip);
+        const nextIndex = (currentIndex + 1) % infoTips.length;
+        return infoTips[nextIndex];
+      });
+    }, 7000); // Change tip every 7 seconds
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 bg-accent text-accent-foreground p-2 text-xs text-center shadow-md z-20 flex items-center justify-center gap-2">
+      <Info className="h-4 w-4 shrink-0" />
+      <span>{currentTip}</span>
+    </div>
+  );
+}
+
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -46,7 +79,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <HeartPulse className="h-8 w-8 text-primary transition-transform group-hover:scale-110" />
               <h1 className="text-xl font-headline font-semibold text-sidebar-primary-foreground group-data-[collapsible=icon]:hidden">Fiber Friends</h1>
             </Link>
-            {/* Desktop trigger can be part of header if needed, handled by collapsible=icon here */}
           </SidebarHeader>
           <SidebarContent className="flex-1 overflow-y-auto">
             <SidebarMenu className="p-2 space-y-1">
@@ -80,12 +112,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {currentPage?.pageTitle || 'Fiber Friends'}
             </h1>
           </header>
-          <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto">
+          <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto pb-12"> {/* Added padding-bottom for info bar */}
             {children}
           </main>
         </SidebarInset>
       </div>
+      <InfoBar />
     </SidebarProvider>
   );
 }
-
