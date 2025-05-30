@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, BrainCircuit, UploadCloud, MapPin } from "lucide-react";
+import { Loader2, BrainCircuit, UploadCloud, MapPin, LocateFixed } from "lucide-react";
 import type { SymptomPatternAnalysisInput, SymptomPatternAnalysisOutput, SymptomEntry } from "@/ai/flows/symptom-pattern-analysis";
 import { analyzeSymptomPatternsAction } from './actions';
 import Image from 'next/image';
@@ -53,6 +53,36 @@ export default function PatternRecognitionPage() {
     }
   };
 
+  const handleDetectLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setLatitude(position.coords.latitude.toFixed(4).toString());
+          setLongitude(position.coords.longitude.toFixed(4).toString());
+          setError(null); 
+        },
+        (geoError) => {
+          switch (geoError.code) {
+            case geoError.PERMISSION_DENIED:
+              setError("Location access denied. Please enable location services or enter coordinates manually.");
+              break;
+            case geoError.POSITION_UNAVAILABLE:
+              setError("Location information is unavailable. Please enter coordinates manually.");
+              break;
+            case geoError.TIMEOUT:
+              setError("The request to get user location timed out. Please try again or enter coordinates manually.");
+              break;
+            default:
+              setError("An unknown error occurred while fetching location. Please enter coordinates manually.");
+              break;
+          }
+        }
+      );
+    } else {
+      setError("Geolocation is not supported by this browser. Please enter coordinates manually.");
+    }
+  };
+
   const handleSubmit = async () => {
     setError(null);
     setAnalysisResult(null);
@@ -68,7 +98,6 @@ export default function PatternRecognitionPage() {
             return;
         }
     }
-
 
     const inputData: SymptomPatternAnalysisInput = {
       userSymptomEntries: userSymptomEntries.filter(entry => entry.symptoms.length > 0 || (entry.notes && entry.notes.trim() !== '') || entry.photoDataUri),
@@ -103,7 +132,13 @@ export default function PatternRecognitionPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <Card className="p-4 space-y-3 bg-card/30 border border-dashed">
-             <h3 className="font-semibold text-md flex items-center gap-2"><MapPin className="h-5 w-5 text-muted-foreground"/>Your Location (Optional for Weather Correlation)</h3>
+            <div className="flex justify-between items-center">
+                 <h3 className="font-semibold text-md flex items-center gap-2"><MapPin className="h-5 w-5 text-muted-foreground"/>Your Location (Optional)</h3>
+                 <Button type="button" variant="outline" size="sm" onClick={handleDetectLocation} className="ml-auto">
+                    <LocateFixed className="mr-1 h-4 w-4" />
+                    Detect
+                </Button>
+            </div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <Label htmlFor="latitude">Latitude</Label>
@@ -114,7 +149,7 @@ export default function PatternRecognitionPage() {
                     <Input id="longitude" type="text" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="e.g., -118.2437" />
                 </div>
              </div>
-             <p className="text-xs text-muted-foreground">Providing your location allows the AI to consider local weather patterns (temperature, humidity) in its analysis.</p>
+             <p className="text-xs text-muted-foreground">Click "Detect" or manually enter your coordinates. This allows the AI to consider local weather patterns (temperature, humidity) for analysis.</p>
           </Card>
 
           {userSymptomEntries.map((entry, index) => (
@@ -161,7 +196,7 @@ export default function PatternRecognitionPage() {
 
       {error && (
         <Alert variant="destructive">
-          <AlertTitle>Analysis Error</AlertTitle>
+          <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
