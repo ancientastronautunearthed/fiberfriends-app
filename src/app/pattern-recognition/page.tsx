@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useTransition } from 'react';
@@ -8,9 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, BrainCircuit, UploadCloud } from "lucide-react";
+import { Loader2, BrainCircuit, UploadCloud, MapPin } from "lucide-react";
 import type { SymptomPatternAnalysisInput, SymptomPatternAnalysisOutput, SymptomEntry } from "@/ai/flows/symptom-pattern-analysis";
-import { analyzeSymptomPatternsAction } from './actions'; // Server action
+import { analyzeSymptomPatternsAction } from './actions';
 import Image from 'next/image';
 
 export default function PatternRecognitionPage() {
@@ -21,6 +22,8 @@ export default function PatternRecognitionPage() {
   const [analysisResult, setAnalysisResult] = useState<SymptomPatternAnalysisOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [latitude, setLatitude] = useState<string>('');
+  const [longitude, setLongitude] = useState<string>('');
 
   const handleAddEntry = () => {
     setUserSymptomEntries([
@@ -54,14 +57,27 @@ export default function PatternRecognitionPage() {
     setError(null);
     setAnalysisResult(null);
 
+    let userLocationInput: { latitude: number; longitude: number } | undefined = undefined;
+    if (latitude && longitude) {
+        const latNum = parseFloat(latitude);
+        const lonNum = parseFloat(longitude);
+        if (!isNaN(latNum) && !isNaN(lonNum)) {
+            userLocationInput = { latitude: latNum, longitude: lonNum };
+        } else {
+            setError("Invalid latitude or longitude. Please enter valid numbers or leave them blank.");
+            return;
+        }
+    }
+
+
     const inputData: SymptomPatternAnalysisInput = {
-      userSymptomEntries: userSymptomEntries.filter(entry => entry.symptoms.length > 0 || entry.notes), // Filter out empty entries
+      userSymptomEntries: userSymptomEntries.filter(entry => entry.symptoms.length > 0 || (entry.notes && entry.notes.trim() !== '') || entry.photoDataUri),
       includeCommunityData,
-      // communitySymptomEntries: includeCommunityData ? [] : undefined, // Placeholder for actual community data
+      userLocation: userLocationInput,
     };
 
     if (inputData.userSymptomEntries.length === 0) {
-      setError("Please add at least one symptom entry.");
+      setError("Please add at least one symptom entry with symptoms, notes, or a photo.");
       return;
     }
 
@@ -70,7 +86,7 @@ export default function PatternRecognitionPage() {
         const result = await analyzeSymptomPatternsAction(inputData);
         setAnalysisResult(result);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "An unknown error occurred.");
+        setError(e instanceof Error ? e.message : "An unknown error occurred during analysis.");
       }
     });
   };
@@ -82,10 +98,25 @@ export default function PatternRecognitionPage() {
           <CardTitle className="font-headline flex items-center gap-2"><BrainCircuit className="h-6 w-6 text-primary"/>AI-Powered Pattern Recognition</CardTitle>
           <CardDescription>
             Analyze your symptom journal entries to identify potential patterns, triggers, or correlations. 
-            Optionally, include anonymized community data for broader insights.
+            Optionally, include anonymized community data or your location for weather-based insights.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          <Card className="p-4 space-y-3 bg-card/30 border border-dashed">
+             <h3 className="font-semibold text-md flex items-center gap-2"><MapPin className="h-5 w-5 text-muted-foreground"/>Your Location (Optional for Weather Correlation)</h3>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <Label htmlFor="latitude">Latitude</Label>
+                    <Input id="latitude" type="text" value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="e.g., 34.0522" />
+                </div>
+                <div>
+                    <Label htmlFor="longitude">Longitude</Label>
+                    <Input id="longitude" type="text" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="e.g., -118.2437" />
+                </div>
+             </div>
+             <p className="text-xs text-muted-foreground">Providing your location allows the AI to consider local weather patterns (temperature, humidity) in its analysis.</p>
+          </Card>
+
           {userSymptomEntries.map((entry, index) => (
             <Card key={index} className="p-4 space-y-3 bg-card/50">
               <h3 className="font-semibold text-md">Symptom Entry {index + 1}</h3>
@@ -102,8 +133,11 @@ export default function PatternRecognitionPage() {
                 <Textarea id={`notes-${index}`} value={entry.notes || ''} onChange={(e) => handleEntryChange(index, 'notes', e.target.value)} placeholder="Describe sensations, activities, food, etc." />
               </div>
               <div>
-                <Label htmlFor={`photo-${index}`}>Photo (optional)</Label>
-                <Input id={`photo-${index}`} type="file" accept="image/*" onChange={(e) => handleFileChange(index, e)} />
+                <Label htmlFor={`photo-${index}`} className="flex items-center gap-1">
+                  <UploadCloud className="h-4 w-4 text-muted-foreground" />
+                  Photo (optional)
+                </Label>
+                <Input id={`photo-${index}`} type="file" accept="image/*" onChange={(e) => handleFileChange(index, e)} className="mt-1"/>
                 {entry.photoDataUri && <Image src={entry.photoDataUri} alt={`Preview ${index}`} width={100} height={100} className="mt-2 rounded border object-cover" data-ai-hint="medical symptom" />}
               </div>
             </Card>
@@ -140,7 +174,7 @@ export default function PatternRecognitionPage() {
           <CardContent className="space-y-4">
             <div>
               <h3 className="font-semibold text-lg">Summary</h3>
-              <p className="text-sm text-muted-foreground">{analysisResult.patternAnalysis.summary}</p>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{analysisResult.patternAnalysis.summary}</p>
             </div>
             <div>
               <h3 className="font-semibold text-lg">Identified Patterns</h3>
