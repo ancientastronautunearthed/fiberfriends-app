@@ -1,9 +1,9 @@
 
 'use server';
 /**
- * @fileOverview A Genkit flow for expanding user-provided words into a detailed image prompt for a Morgellon Monster.
+ * @fileOverview A Genkit flow for expanding user-provided words into a detailed image prompt and a name for a Morgellon Monster.
  *
- * - expandMonsterPrompt - Takes 5 words and generates a detailed image prompt.
+ * - expandMonsterPrompt - Takes 5 words and generates a detailed image prompt and a monster name.
  * - MonsterWordsInput - The input type for the expandMonsterPrompt function.
  * - MonsterPromptOutput - The return type for the expandMonsterPrompt function.
  */
@@ -20,6 +20,7 @@ const MonsterWordsInputSchema = z.object({
 export type MonsterWordsInput = z.infer<typeof MonsterWordsInputSchema>;
 
 const MonsterPromptOutputSchema = z.object({
+  monsterName: z.string().describe('A cool, thematic, and unchangeable name for the Morgellon Monster based on the 5 words and dungeon-like vibe.'),
   detailedPrompt: z.string().describe('A detailed and vivid image generation prompt based on the 5 words.'),
 });
 export type MonsterPromptOutput = z.infer<typeof MonsterPromptOutputSchema>;
@@ -32,9 +33,11 @@ const prompt = ai.definePrompt({
   name: 'monsterPromptExpansion',
   input: {schema: MonsterWordsInputSchema},
   output: {schema: MonsterPromptOutputSchema},
-  prompt: `You are a highly creative AI assistant specializing in crafting vivid image generation prompts.
+  prompt: `You are a highly creative AI assistant specializing in crafting vivid image generation prompts and thematic names.
 A user will provide 5 words to describe their personal, metaphorical 'Morgellon Monster'.
-Your task is to take these 5 words and expand them into a single, detailed, and evocative paragraph that can be used as a prompt for an image generation model.
+Your tasks are:
+1. Generate a cool, thematic, and unchangeable name for the Morgellon Monster. The name should evoke a 'dungeon-like, but really cool vibe', reflecting its unique nature based on the 5 words.
+2. Take these 5 words and expand them into a single, detailed, and evocative paragraph that can be used as a prompt for an image generation model.
 
 The image should have a 'dungeon-like, but really cool vibe'. This means:
 - Atmosphere: Dark, mysterious, ancient, possibly with a sense of confinement but also awe.
@@ -48,10 +51,10 @@ User's 5 words:
 - {{{this}}}
 {{/each}}
 
-Based on these words, generate a single paragraph prompt. The prompt should be rich in sensory details and descriptive language to inspire a unique and compelling image. Focus on translating the essence of the 5 words into this specific aesthetic.
-Example of a good prompt structure: "An immense, shadowy beast composed of [word1-inspired material] and [word2-inspired feature], its eyes glowing with [word3-inspired color] light. It lurks within a [word4-inspired dungeon element] chamber, where ancient [word5-inspired symbols/textures] cover the damp stone walls. Ethereal mist clings to the ground, and a cool, otherworldly luminescence emanates from strange crystals embedded in the rock."
+Based on these words, generate a monsterName and a detailedPrompt.
+Example of a good detailed prompt structure: "An immense, shadowy beast composed of [word1-inspired material] and [word2-inspired feature], its eyes glowing with [word3-inspired color] light. It lurks within a [word4-inspired dungeon element] chamber, where ancient [word5-inspired symbols/textures] cover the damp stone walls. Ethereal mist clings to the ground, and a cool, otherworldly luminescence emanates from strange crystals embedded in the rock."
 
-Do not add any preamble or explanation, just the detailed prompt.
+Return the monsterName and the detailedPrompt. Do not add any preamble or explanation, just the JSON output with monsterName and detailedPrompt fields.
 `,
 });
 
@@ -63,10 +66,9 @@ const monsterPromptExpansionFlow = ai.defineFlow(
   },
   async (input) => {
     const {output} = await prompt(input);
-    if (!output) {
-      throw new Error("The AI model did not return a detailed prompt.");
+    if (!output || !output.detailedPrompt || !output.monsterName) {
+      throw new Error("The AI model did not return a detailed prompt and/or a monster name.");
     }
     return output;
   }
 );
-

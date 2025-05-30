@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -9,14 +10,18 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
+const MONSTER_NAME_KEY = 'morgellonMonsterName';
 
 export default function MyProfilePage() {
   const [monsterImageUrl, setMonsterImageUrl] = useState<string | null>(null);
+  const [monsterName, setMonsterName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const storedImage = localStorage.getItem(MONSTER_IMAGE_KEY);
+    const storedName = localStorage.getItem(MONSTER_NAME_KEY);
     setMonsterImageUrl(storedImage);
+    setMonsterName(storedName);
     setIsLoading(false);
   }, []);
 
@@ -32,8 +37,8 @@ export default function MyProfilePage() {
             ) : monsterImageUrl ? (
               <Image 
                 src={monsterImageUrl} 
-                alt="My Morgellon Monster" 
-                width={192} // 48 * 4 = 192px, for a larger display
+                alt={monsterName ? `My Morgellon Monster: ${monsterName}` : "My Morgellon Monster"} 
+                width={192} 
                 height={192} 
                 className="rounded-full border-4 border-primary shadow-lg object-cover mx-auto"
                 data-ai-hint="profile monster"
@@ -46,15 +51,19 @@ export default function MyProfilePage() {
               </Avatar>
             )}
           </div>
-          <CardTitle className="font-headline text-3xl">My Profile</CardTitle>
-          <CardDescription>This is your personal space within Fiber Friends.</CardDescription>
+          <CardTitle className="font-headline text-3xl">
+            {isLoading ? "My Profile" : monsterName ? monsterName : "My Profile"}
+          </CardTitle>
+          <CardDescription>
+            {isLoading ? "Loading your identity..." : monsterName ? `Your unique, unchangeable Morgellon Monster.` : "This is your personal space within Fiber Friends."}
+          </CardDescription>
         </CardHeader>
         <CardContent className="text-center">
           {isLoading ? (
              <p className="text-muted-foreground">Loading your profile...</p>
           ): monsterImageUrl ? (
             <p className="text-lg text-foreground">
-              Behold your unique Morgellon Monster, your chosen emblem in this community.
+              {monsterName ? `Behold ${monsterName}, your chosen emblem in this community.` : "Behold your unique Morgellon Monster, your chosen emblem in this community."}
             </p>
           ) : (
             <div className="p-4 bg-accent/20 border border-accent rounded-md text-accent-foreground">
@@ -63,7 +72,7 @@ export default function MyProfilePage() {
                  <h3 className="text-lg font-semibold">Your Monster Awaits!</h3>
               </div>
               <p className="text-sm mb-3">
-                You haven't created your Morgellon Monster profile picture yet. 
+                You haven't created your Morgellon Monster profile picture and name yet. 
                 This is a special, one-time opportunity for members.
               </p>
               <Button asChild>
@@ -74,7 +83,6 @@ export default function MyProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Placeholder for other profile information */}
       <Card>
         <CardHeader>
           <CardTitle className="font-headline text-xl">My Contributions</CardTitle>
