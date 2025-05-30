@@ -17,7 +17,7 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Smile, HeartPulse, LogOut, ListChecks, PiggyBank, Info } from 'lucide-react';
+import { HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Smile, HeartPulse, LogOut, ListChecks, PiggyBank, Info, Wand2, UserCircle } from 'lucide-react';
 
 const navItems = [
   { href: '/', label: 'Belief Circle', icon: HeartHandshake, pageTitle: 'Belief Circle' },
@@ -28,6 +28,8 @@ const navItems = [
   { href: '/provider-directory', label: 'Provider Directory', icon: Stethoscope, pageTitle: 'Provider Directory' },
   { href: '/doctor-forum', label: 'Doctor Forum', icon: MessageSquareQuote, pageTitle: 'Doctor Forum' },
   { href: '/humor-hub', label: 'Humor Hub', icon: Smile, pageTitle: 'Humor Hub' },
+  { href: '/create-monster', label: 'Create Monster', icon: Wand2, pageTitle: 'Create Your Monster' },
+  { href: '/my-profile', label: 'My Profile', icon: UserCircle, pageTitle: 'My Profile' },
   { href: '/support-us', label: 'Support Us', icon: PiggyBank, pageTitle: 'Support Us' },
 ];
 
@@ -37,6 +39,8 @@ const infoTips = [
   "Reminder: You are not alone in this journey. This community is here for you.",
   "Tip: Gentle skincare routines may be beneficial. Avoid harsh scrubbing.",
   "Fact: Sharing your experiences can help others feel less isolated.",
+  "Vibe: Embrace the mystery, find your strength within the enigma.",
+  "Coolness: Even in darkness, there's a unique light. Find yours.",
 ];
 
 function InfoBar() {
@@ -49,7 +53,7 @@ function InfoBar() {
         const nextIndex = (currentIndex + 1) % infoTips.length;
         return infoTips[nextIndex];
       });
-    }, 7000); // Change tip every 7 seconds
+    }, 7000); 
 
     return () => clearInterval(intervalId);
   }, []);
@@ -67,8 +71,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const currentPage = navItems.find(item => {
     if (item.href === '/') return pathname === '/';
-    return pathname.startsWith(item.href);
+    // Ensure deeper paths still match their parent nav item for title
+    return pathname.startsWith(item.href) && (pathname.length === item.href.length || pathname[item.href.length] === '/');
   });
+
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -76,8 +82,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Sidebar collapsible="icon" variant="sidebar" side="left" className="border-r bg-sidebar text-sidebar-foreground">
           <SidebarHeader className="p-4 flex items-center justify-between border-b border-sidebar-border">
             <Link href="/" className="flex items-center gap-2 group">
-              <HeartPulse className="h-8 w-8 text-primary transition-transform group-hover:scale-110" />
-              <h1 className="text-xl font-headline font-semibold text-sidebar-primary-foreground group-data-[collapsible=icon]:hidden">Fiber Friends</h1>
+              <HeartPulse className="h-8 w-8 text-sidebar-primary transition-transform group-hover:scale-110" />
+              <h1 className="text-xl font-headline font-semibold text-sidebar-foreground group-data-[collapsible=icon]:hidden">Fiber Friends</h1>
             </Link>
           </SidebarHeader>
           <SidebarContent className="flex-1 overflow-y-auto">
@@ -107,12 +113,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Sidebar>
         <SidebarInset className="flex-1 flex flex-col">
           <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-6">
-            <SidebarTrigger className="md:hidden" /> {/* Mobile trigger */}
+            <SidebarTrigger className="md:hidden" /> {}
             <h1 className="text-lg font-semibold font-headline text-foreground">
               {currentPage?.pageTitle || 'Fiber Friends'}
             </h1>
           </header>
-          <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto pb-12"> {/* Added padding-bottom for info bar */}
+          <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto pb-12"> {}
             {children}
           </main>
         </SidebarInset>
