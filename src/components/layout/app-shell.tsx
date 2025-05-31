@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -17,13 +18,14 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Smile, HeartPulse, LogOut, ListChecks, PiggyBank, Info, Wand2, UserCircle } from 'lucide-react';
+import { HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Smile, HeartPulse, LogOut, ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple } from 'lucide-react';
 
 const navItems = [
   { href: '/', label: 'Belief Circle', icon: HeartHandshake, pageTitle: 'Belief Circle' },
   { href: '/symptom-journal', label: 'Symptom Journal', icon: BookText, pageTitle: 'Symptom Journal' },
   { href: '/pattern-recognition', label: 'Pattern Recognition', icon: BrainCircuit, pageTitle: 'Pattern Recognition' },
   { href: '/product-tracker', label: 'Product Tracker', icon: ListChecks, pageTitle: 'Product Tracker' },
+  { href: '/food-log', label: 'Food Log', icon: Apple, pageTitle: 'Daily Food Log' },
   { href: '/matching', label: 'Find Friends', icon: Users, pageTitle: 'Find Friends' },
   { href: '/provider-directory', label: 'Provider Directory', icon: Stethoscope, pageTitle: 'Provider Directory' },
   { href: '/doctor-forum', label: 'Doctor Forum', icon: MessageSquareQuote, pageTitle: 'Doctor Forum' },
@@ -41,6 +43,8 @@ const infoTips = [
   "Fact: Sharing your experiences can help others feel less isolated.",
   "Vibe: Embrace the mystery, find your strength within the enigma.",
   "Coolness: Even in darkness, there's a unique light. Find yours.",
+  "Food Tip: Whole, unprocessed foods are generally a good foundation for health.",
+  "Monster Wisdom: Understanding your inner monster can be a source of power.",
 ];
 
 function InfoBar() {
