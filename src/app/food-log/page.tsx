@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Apple, ThumbsUp, ThumbsDown, MinusCircle, Info, Sparkles, Skull } from "lucide-react";
+import { Loader2, Apple, ThumbsUp, ThumbsDown, MinusCircle, Info, Sparkles, Skull, Ghost } from "lucide-react";
 import Image from "next/image";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -16,6 +16,8 @@ import { gradeFoodItemAction } from './actions';
 import type { FoodGradingOutput } from '@/ai/flows/food-grading-flow';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import MonsterRiddleModal from '@/components/features/monster-riddle-modal';
+
 
 const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
 const MONSTER_NAME_KEY = 'morgellonMonsterName';
@@ -23,11 +25,15 @@ const MONSTER_HEALTH_KEY = 'morgellonMonsterHealth';
 const MONSTER_GENERATED_KEY = 'morgellonMonsterGenerated';
 const FOOD_LOG_KEY = 'morgellonFoodLogEntries';
 const MONSTER_TOMB_KEY = 'morgellonMonsterTomb';
+const MONSTER_HAS_SPOKEN_KEY = 'monsterHasSpokenFirstTime';
+const USER_POINTS_KEY = 'userPoints'; // Key for product tracker points
 
 const MONSTER_DEATH_THRESHOLD = -50;
 const MAX_MONSTER_HEALTH = 200;
 const INITIAL_HEALTH_MIN = 80;
 const INITIAL_HEALTH_MAX = 100;
+const RIDDLE_HEALTH_IMPACT = 25;
+const FIRST_SPEAK_BONUS_POINTS = 50;
 
 interface FoodLogEntry extends FoodGradingOutput {
   id: string;
@@ -55,6 +61,9 @@ export default function FoodLogPage() {
   const [showDamageEffect, setShowDamageEffect] = useState(false);
   const router = useRouter();
 
+  const [isRiddleModalOpen, setIsRiddleModalOpen] = useState(false);
+
+
   useEffect(() => {
     const storedImage = localStorage.getItem(MONSTER_IMAGE_KEY);
     const storedName = localStorage.getItem(MONSTER_NAME_KEY);
@@ -67,13 +76,11 @@ export default function FoodLogPage() {
       if (storedHealth) {
         setMonsterHealth(parseFloat(storedHealth));
       } else {
-        // This case should ideally be handled at monster creation
         const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
         setMonsterHealth(initialHealth);
         localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
       }
     } else {
-      // No monster exists or hasn't been fully set up
       setMonsterImageUrl(null);
       setMonsterName(null);
       setMonsterHealth(null);
@@ -88,6 +95,7 @@ export default function FoodLogPage() {
   useEffect(() => {
     if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true') {
       localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
+      checkMonsterDeath(monsterHealth, "Initial health check");
     }
   }, [monsterHealth]);
 
@@ -96,6 +104,35 @@ export default function FoodLogPage() {
       localStorage.setItem(FOOD_LOG_KEY, JSON.stringify(foodLogEntries));
     }
   }, [foodLogEntries]);
+
+  const checkMonsterDeath = (currentHealth: number, foodNameForToast: string) => {
+     if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterName && monsterImageUrl) {
+        const tomb: TombEntry[] = JSON.parse(localStorage.getItem(MONSTER_TOMB_KEY) || '[]');
+        tomb.unshift({ name: monsterName, imageUrl: monsterImageUrl, diedAt: new Date().toISOString() });
+        localStorage.setItem(MONSTER_TOMB_KEY, JSON.stringify(tomb.slice(0, 50)));
+
+        localStorage.removeItem(MONSTER_IMAGE_KEY);
+        localStorage.removeItem(MONSTER_NAME_KEY);
+        localStorage.removeItem(MONSTER_HEALTH_KEY);
+        localStorage.removeItem(MONSTER_GENERATED_KEY);
+        // Keep MONSTER_HAS_SPOKEN_KEY and USER_POINTS_KEY as they are user-specific, not monster-specific.
+        
+        setMonsterImageUrl(null);
+        setMonsterName(null);
+        setMonsterHealth(null); // This will trigger the "Monster Not Found" UI
+
+        toast({
+          title: "Your Monster Has Perished!",
+          description: `${foodNameForToast} contributed to its demise. ${monsterName} has fallen with ${currentHealth.toFixed(1)}% health. Visit the Tomb of Monsters. You can now create a new monster.`,
+          variant: "destructive",
+          duration: Number.MAX_SAFE_INTEGER,
+        });
+        router.push('/create-monster'); // Redirect to create a new one
+        return true; // Monster died
+      }
+      return false; // Monster is alive
+  };
+
 
   const handleFoodSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -115,7 +152,7 @@ export default function FoodLogPage() {
         
         const healthBefore = monsterHealth;
         let newHealth = healthBefore + result.healthImpactPercentage;
-        newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth); // Cap at max health, min is handled by death threshold
+        newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth); 
         
         setMonsterHealth(newHealth);
         setFoodInput('');
@@ -134,30 +171,7 @@ export default function FoodLogPage() {
         };
         setFoodLogEntries(prev => [newLogEntry, ...prev].slice(0, 20)); 
 
-        if (newHealth <= MONSTER_DEATH_THRESHOLD) {
-          // Monster dies
-          const tomb: TombEntry[] = JSON.parse(localStorage.getItem(MONSTER_TOMB_KEY) || '[]');
-          tomb.unshift({ name: monsterName, imageUrl: monsterImageUrl, diedAt: new Date().toISOString() });
-          localStorage.setItem(MONSTER_TOMB_KEY, JSON.stringify(tomb.slice(0, 50))); // Keep last 50 dead monsters
-
-          localStorage.removeItem(MONSTER_IMAGE_KEY);
-          localStorage.removeItem(MONSTER_NAME_KEY);
-          localStorage.removeItem(MONSTER_HEALTH_KEY);
-          localStorage.removeItem(MONSTER_GENERATED_KEY);
-          
-          setMonsterImageUrl(null);
-          setMonsterName(null);
-          setMonsterHealth(null);
-
-          toast({
-            title: "Your Monster Has Perished!",
-            description: `${result.foodName} was the final blow. ${monsterName} has fallen with ${newHealth.toFixed(1)}% health. Visit the Tomb of Monsters. You can now create a new monster.`,
-            variant: "destructive",
-            duration: Number.MAX_SAFE_INTEGER,
-          });
-          router.push('/create-monster');
-
-        } else {
+        if (!checkMonsterDeath(newHealth, result.foodName)) {
           toast({
             title: `${result.foodName} Logged!`,
             description: `Monster health changed by ${result.healthImpactPercentage.toFixed(1)}%. Current: ${newHealth.toFixed(1)}%. Reason: ${result.reasoning}`,
@@ -179,6 +193,40 @@ export default function FoodLogPage() {
     });
   };
 
+  const handleRiddleChallengeComplete = (wasCorrect: boolean) => {
+    if (monsterHealth === null) return;
+
+    let healthChangeDescription = "";
+    let newHealth = monsterHealth;
+
+    if (wasCorrect) {
+      newHealth -= RIDDLE_HEALTH_IMPACT;
+      healthChangeDescription = `Correct! Monster health decreased by ${RIDDLE_HEALTH_IMPACT}%.`;
+      toast({ title: "Riddle Solved!", description: healthChangeDescription, variant: "default", duration: 5000});
+    } else {
+      newHealth += RIDDLE_HEALTH_IMPACT;
+      healthChangeDescription = `Incorrect! Monster health increased by ${RIDDLE_HEALTH_IMPACT}%.`;
+      toast({ title: "Riddle Failed!", description: healthChangeDescription, variant: "destructive", duration: 5000});
+    }
+    newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth);
+    setMonsterHealth(newHealth);
+
+    const hasSpoken = localStorage.getItem(MONSTER_HAS_SPOKEN_KEY);
+    if (hasSpoken === 'false') {
+      const currentPoints = parseInt(localStorage.getItem(USER_POINTS_KEY) || '0');
+      localStorage.setItem(USER_POINTS_KEY, String(currentPoints + FIRST_SPEAK_BONUS_POINTS));
+      localStorage.setItem(MONSTER_HAS_SPOKEN_KEY, 'true');
+      toast({
+        title: "Bonus Points!",
+        description: `Your monster spoke for the first time! You earned ${FIRST_SPEAK_BONUS_POINTS} contribution points.`,
+        variant: "default",
+        duration: 7000,
+      });
+    }
+    checkMonsterDeath(newHealth, "a riddle's outcome");
+  };
+
+
   const getMonsterStatusMessage = () => {
     if (monsterHealth === null) return "";
     if (monsterHealth <= MONSTER_DEATH_THRESHOLD) return "Your monster has perished!";
@@ -193,8 +241,6 @@ export default function FoodLogPage() {
   
   const getHealthBarValue = () => {
       if (monsterHealth === null) return 0;
-      // Progress bar visually shows 0 if health is negative or 0.
-      // It scales from 0 to MAX_MONSTER_HEALTH for positive values.
       return Math.max(0, monsterHealth) / MAX_MONSTER_HEALTH * 100;
   }
 
@@ -220,6 +266,7 @@ export default function FoodLogPage() {
   }
 
   return (
+    <>
     <div className="grid lg:grid-cols-3 gap-6">
       <div className="lg:col-span-1 space-y-6">
         <Card className={cn(showDamageEffect && 'animate-damage-flash')}>
@@ -236,6 +283,11 @@ export default function FoodLogPage() {
                 aria-label={`Monster health: ${monsterHealth.toFixed(1)}%`} />
              <p className="text-xs text-muted-foreground text-center mt-1">Dies at: {MONSTER_DEATH_THRESHOLD}%</p>
           </CardContent>
+           <CardFooter className="flex-col gap-2">
+            <Button variant="outline" onClick={() => setIsRiddleModalOpen(true)} className="w-full">
+              <Ghost className="mr-2 h-4 w-4"/> My Monster Has a Riddle!
+            </Button>
+          </CardFooter>
         </Card>
       </div>
 
@@ -303,5 +355,11 @@ export default function FoodLogPage() {
         </Card>
       </div>
     </div>
+    <MonsterRiddleModal
+        isOpen={isRiddleModalOpen}
+        onClose={() => setIsRiddleModalOpen(false)}
+        onChallengeComplete={handleRiddleChallengeComplete}
+    />
+    </>
   );
 }

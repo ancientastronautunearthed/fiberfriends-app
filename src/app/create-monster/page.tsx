@@ -15,8 +15,11 @@ import { useToast } from '@/hooks/use-toast';
 
 const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
 const MONSTER_NAME_KEY = 'morgellonMonsterName';
-const MONSTER_GENERATED_KEY = 'morgellonMonsterGenerated'; // Tracks if monster exists for profile
-const MONSTER_HEALTH_KEY = 'morgellonMonsterHealth'; // For food log integration
+const MONSTER_GENERATED_KEY = 'morgellonMonsterGenerated';
+const MONSTER_HEALTH_KEY = 'morgellonMonsterHealth';
+const MONSTER_VOICE_CONFIG_KEY = 'monsterVoiceConfig';
+const MONSTER_HAS_SPOKEN_KEY = 'monsterHasSpokenFirstTime';
+
 
 const INITIAL_HEALTH_MIN = 80;
 const INITIAL_HEALTH_MAX = 100;
@@ -33,6 +36,37 @@ export default function CreateMonsterPage() {
   const [isGenerating, startGeneratingTransition] = useTransition();
 
   const { toast } = useToast();
+
+  const selectAndStoreVoice = () => {
+    const voices = speechSynthesis.getVoices();
+    let selectedVoiceURI: string | null = null;
+    let pitch = 0.8; // Default monster pitch
+    let rate = 0.9;  // Default monster rate
+
+    // Try to find a "monster-like" voice (this is heuristic and browser-dependent)
+    // Prefer male voices if available, or voices with lower default pitch
+    const maleVoices = voices.filter(v => v.name.toLowerCase().includes('male') || v.gender === 'male');
+    const nonEnglishVoices = voices.filter(v => !v.lang.startsWith('en-')); // Sometimes non-standard voices are interesting
+    
+    let candidateVoice = null;
+
+    if (maleVoices.length > 0) {
+        candidateVoice = maleVoices.find(v => v.lang.startsWith('en-')) || maleVoices[0];
+    } else if (voices.length > 0) {
+        // Fallback: try to find a non-standard English voice or just the first available English one.
+        candidateVoice = nonEnglishVoices.find(v => v.lang.startsWith('en-')) || voices.find(v => v.lang.startsWith('en-')) || voices[0];
+    }
+
+    if (candidateVoice) {
+      selectedVoiceURI = candidateVoice.voiceURI;
+      // If a specific voice is chosen, we might use its default pitch/rate or slightly adjust
+      // For simplicity, we'll stick to our defaults unless the voice is clearly very different
+    }
+    
+    localStorage.setItem(MONSTER_VOICE_CONFIG_KEY, JSON.stringify({ voiceURI: selectedVoiceURI, pitch, rate }));
+    localStorage.setItem(MONSTER_HAS_SPOKEN_KEY, 'false'); // Reset flag for new monster
+  };
+
 
   const handleWordSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -65,18 +99,28 @@ export default function CreateMonsterPage() {
             setImageUrl(imageResult.imageUrl);
             setHasGeneratedInSession(true);
             
-            // Save monster details to localStorage
             localStorage.setItem(MONSTER_GENERATED_KEY, 'true');
             localStorage.setItem(MONSTER_IMAGE_KEY, imageResult.imageUrl);
             localStorage.setItem(MONSTER_NAME_KEY, expansionResult.monsterName);
             
-            // Initialize monster health
             const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
             localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
+            
+            // Ensure voices are loaded before selecting - might need a slight delay or a more robust check
+            if (speechSynthesis.getVoices().length === 0) {
+                speechSynthesis.onvoiceschanged = () => {
+                    selectAndStoreVoice();
+                    // Remove the event listener once voices are loaded to prevent multiple calls
+                    speechSynthesis.onvoiceschanged = null; 
+                };
+            } else {
+                selectAndStoreVoice();
+            }
+
 
              toast({
                 title: "Monster Revealed!",
-                description: `Your unique Morgellon Monster, ${expansionResult.monsterName}, has been generated with ${initialHealth}% health. It is now your profile identity.`,
+                description: `Your unique Morgellon Monster, ${expansionResult.monsterName}, has been generated with ${initialHealth}% health. It is now your profile identity. It may even speak to you...`,
                 variant: "default",
             });
 
@@ -112,7 +156,7 @@ export default function CreateMonsterPage() {
         </CardHeader>
         <CardContent className="text-center">
             <Image src={imageUrl} alt={`Your Morgellon Monster: ${monsterName}`} width={512} height={512} className="rounded-lg border object-cover mx-auto shadow-lg" data-ai-hint="generated monster" />
-            <p className="text-sm text-muted-foreground mt-4">You can view it on your profile page and track its health in the Food Log.</p>
+            <p className="text-sm text-muted-foreground mt-4">You can view it on your profile page and track its health in the Food Log. It might even have a riddle for you...</p>
         </CardContent>
         <CardFooter className="flex-col sm:flex-row justify-center gap-2 pt-4">
              <Button asChild variant="outline">
@@ -126,7 +170,6 @@ export default function CreateMonsterPage() {
                 setImageUrl(null);
                 setMonsterName(null);
                 setWords('');
-                // Note: We don't clear localStorage here to allow profile to persist until next generation
              }} variant="secondary">
                 Create Another Monster
             </Button>
@@ -141,8 +184,8 @@ export default function CreateMonsterPage() {
         <CardTitle className="font-headline flex items-center gap-2"><Wand2 className="h-6 w-6 text-primary"/>Create Your Morgellon Monster</CardTitle>
         <CardDescription>
           This is a special one-time ritual for our valued members.
-          Describe your inner Morgellon Monster in exactly 5 words. Our AI will then conjure its image and reveal its name.
-          This image, name, and its initial health will become your unique profile identity. Choose your words wisely, for the monster, once revealed, cannot be changed until you create a new one.
+          Describe your inner Morgellon Monster in exactly 5 words. Our AI will then conjure its image, reveal its name, and give it a voice.
+          This image, name, voice, and its initial health will become your unique profile identity. Choose your words wisely.
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleWordSubmit}>
@@ -164,7 +207,7 @@ export default function CreateMonsterPage() {
               <Loader2 className="h-12 w-12 animate-spin text-primary mb-3" />
               <p className="text-sm text-foreground">
                 {isExpanding && !isGenerating && "Expanding your vision, discovering its name..."}
-                {isGenerating && "The AI is conjuring your monster from the æther... be patient!"}
+                {isGenerating && "The AI is conjuring your monster... and finding its voice..."}
               </p>
               {detailedPrompt && !isGenerating && monsterName && (
                 <p className="text-xs text-muted-foreground mt-2 italic">Initial vision for {monsterName}: "{detailedPrompt.substring(0,100)}..."</p>
