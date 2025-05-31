@@ -9,3 +9,5 @@ import '@/ai/flows/food-grading-flow.ts';
 import '@/ai/flows/monster-riddle-flow.ts';
 import '@/ai/flows/product-effect-grading-flow.ts';
 import '@/ai/flows/exercise-grading-flow.ts';
+import '@/ai/flows/meal-suggestion-flow.ts';
+import '@/ai/flows/recipe-generation-flow.ts';

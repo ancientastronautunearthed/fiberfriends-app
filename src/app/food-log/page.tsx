@@ -8,15 +8,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Apple, ThumbsUp, ThumbsDown, MinusCircle, Info, Sparkles, Skull, Ghost } from "lucide-react";
+import { Loader2, Apple, ThumbsUp, ThumbsDown, MinusCircle, Info, Sparkles, Skull, Ghost, Sunrise, Sun, Moon, Coffee, ChefHat, ShoppingCart } from "lucide-react";
 import Image from "next/image";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { gradeFoodItemAction } from './actions';
+import { gradeFoodItemAction, suggestMealAction, generateRecipeAction } from './actions';
 import type { FoodGradingOutput } from '@/ai/flows/food-grading-flow';
+import type { MealSuggestionOutput } from '@/ai/flows/meal-suggestion-flow';
+import type { RecipeGenerationOutput, RecipeGenerationInput } from '@/ai/flows/recipe-generation-flow';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import MonsterRiddleModal from '@/components/features/monster-riddle-modal';
+import { Separator } from '@/components/ui/separator';
 
 
 const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
@@ -60,12 +63,18 @@ export default function FoodLogPage() {
   
   const [foodInput, setFoodInput] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [isGrading, startGradingTransition] = useTransition();
+  const [isGradingFood, startGradingFoodTransition] = useTransition();
   const { toast } = useToast();
   const [showDamageEffect, setShowDamageEffect] = useState(false);
   const router = useRouter();
 
   const [isRiddleModalOpen, setIsRiddleModalOpen] = useState(false);
+
+  const [suggestedMeal, setSuggestedMeal] = useState<MealSuggestionOutput | null>(null);
+  const [isSuggestingMeal, startSuggestingMealTransition] = useTransition();
+  const [generatedRecipe, setGeneratedRecipe] = useState<RecipeGenerationOutput | null>(null);
+  const [isGeneratingRecipe, startGeneratingRecipeTransition] = useTransition();
+
 
   const performNightlyRecovery = useCallback(() => {
     const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
@@ -156,6 +165,8 @@ export default function FoodLogPage() {
         setMonsterImageUrl(null);
         setMonsterName(null);
         setMonsterHealth(null); 
+        setSuggestedMeal(null);
+        setGeneratedRecipe(null);
 
         toast({
           title: `${monsterName} Has Perished!`,
@@ -182,7 +193,7 @@ export default function FoodLogPage() {
     }
     setError(null);
 
-    startGradingTransition(async () => {
+    startGradingFoodTransition(async () => {
       try {
         const result = await gradeFoodItemAction({ foodItem: foodInput });
         
@@ -193,13 +204,12 @@ export default function FoodLogPage() {
         setMonsterHealth(newHealth);
         setFoodInput('');
 
-        if (result.grade === 'bad' || result.healthImpactPercentage > 0) { // Monster is pleased
-          // No damage flash for bad food (monster likes it)
-        } else if (result.grade === 'good' || result.healthImpactPercentage < 0) { // Monster is hurt
+        if (result.grade === 'bad' || result.healthImpactPercentage > 0) {
+          // No damage flash for bad food
+        } else if (result.grade === 'good' || result.healthImpactPercentage < 0) {
           setShowDamageEffect(true);
           setTimeout(() => setShowDamageEffect(false), 700);
         }
-
 
         const newLogEntry: FoodLogEntry = {
           ...result,
@@ -213,16 +223,15 @@ export default function FoodLogPage() {
         let toastTitle = "";
         let monsterQuote = result.reasoning;
         let toastVariant: "default" | "destructive" = "default";
+        let toastDescription = "";
 
-        // Modify monster quote based on health
-        if (newHealth < 0) {
+        if (newHealth < 0 && result.grade === 'good') {
             monsterQuote = `No... please... ${result.reasoning} It's too much... I'm fading...`;
-        } else if (newHealth < 25) {
+        } else if (newHealth < 25 && result.grade === 'good') {
             monsterQuote = `Why are you doing this to me?! ${result.reasoning} I feel so weak...`;
         } else if (newHealth < 50 && result.grade === 'good') {
             monsterQuote = `Stop! ${result.reasoning} That actually hurts, you know!`;
         }
-
 
         if (result.grade === "good") {
           toastTitle = `${monsterName} wails!`;
@@ -238,14 +247,12 @@ export default function FoodLogPage() {
           toastVariant = "default";
         }
         
-        // Specific reaction for garlic
-        if (result.foodName.toLowerCase().includes('garlic') && result.grade === 'good') {
+        if (result.foodName && result.foodName.toLowerCase().includes('garlic') && result.grade === 'good') {
             toastTitle = `${monsterName} HISSES about the Garlic!`;
             toastDescription = `THAT STUFF AGAIN?! My health is now ${newHealth.toFixed(1)}%! ${monsterName} shrieks: "${monsterQuote}"`;
         }
 
-
-        if (!checkMonsterDeath(newHealth, result.foodName)) {
+        if (!checkMonsterDeath(newHealth, result.foodName || "unknown food")) {
           toast({
             title: toastTitle,
             description: toastDescription,
@@ -286,7 +293,7 @@ export default function FoodLogPage() {
       toast({ title: toastTitle, description: healthChangeDescription, variant: "destructive", duration: Number.MAX_SAFE_INTEGER});
     }
     newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth);
-    newHealth = Math.max(MONSTER_DEATH_THRESHOLD - 1, newHealth); // Prevent going too far below death for toast logic
+    newHealth = Math.max(MONSTER_DEATH_THRESHOLD -1 , newHealth); 
     setMonsterHealth(newHealth);
 
     const hasSpoken = localStorage.getItem(MONSTER_HAS_SPOKEN_KEY);
@@ -304,6 +311,51 @@ export default function FoodLogPage() {
     checkMonsterDeath(newHealth, "a riddle's outcome");
   };
 
+  const handleSuggestMeal = (mealType: "breakfast" | "lunch" | "dinner" | "snack") => {
+    if (!monsterName) {
+        toast({ title: "Monster Needed", description: "Create your monster first to get meal suggestions!", variant: "destructive"});
+        return;
+    }
+    setError(null);
+    setSuggestedMeal(null);
+    setGeneratedRecipe(null);
+    startSuggestingMealTransition(async () => {
+      try {
+        const result = await suggestMealAction({ mealType });
+        setSuggestedMeal(result);
+        toast({
+            title: `Meal Suggestion: ${result.suggestedMealName}`,
+            description: `${monsterName} sneers: "${result.monsterImpactStatement}"`,
+            duration: Number.MAX_SAFE_INTEGER
+        });
+      } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : "Failed to suggest meal.";
+        setError(errorMessage);
+        toast({ title: "Meal Suggestion Error", description: `${monsterName} scoffs: "My AI chefs are on strike! ${errorMessage}"`, variant: "destructive", duration: Number.MAX_SAFE_INTEGER });
+      }
+    });
+  };
+
+  const handleGenerateRecipe = (mealName: string) => {
+    if (!monsterName) return;
+    setError(null);
+    setGeneratedRecipe(null);
+    startGeneratingRecipeTransition(async () => {
+      try {
+        const result = await generateRecipeAction({ mealName });
+        setGeneratedRecipe(result);
+         toast({
+            title: `Recipe Ready for ${result.recipeName}!`,
+            description: `${monsterName} groans: "More 'healthy' plans? Fine, here's how to make that wretched ${result.recipeName}..."`,
+            duration: Number.MAX_SAFE_INTEGER
+        });
+      } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : "Failed to generate recipe.";
+        setError(errorMessage);
+        toast({ title: "Recipe Error", description: `${monsterName} grumbles: "The recipe scroll turned to dust! Typical. ${errorMessage}"`, variant: "destructive", duration: Number.MAX_SAFE_INTEGER});
+      }
+    });
+  };
 
   const getMonsterStatusMessage = () => {
     if (monsterHealth === null || !monsterName) return "Awaiting its creation...";
@@ -387,10 +439,10 @@ export default function FoodLogPage() {
                   value={foodInput}
                   onChange={(e) => setFoodInput(e.target.value)}
                   placeholder="e.g., Spinach, Chocolate Croissant, Garlic"
-                  disabled={isGrading}
+                  disabled={isGradingFood}
                 />
               </div>
-              {error && (
+              {error && !suggestedMeal && !generatedRecipe && ( // Only show general error if not showing meal/recipe specific errors
                 <Alert variant="destructive">
                   <AlertTitle>Error</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
@@ -398,13 +450,109 @@ export default function FoodLogPage() {
               )}
             </CardContent>
             <CardFooter>
-              <Button type="submit" disabled={isGrading || !foodInput.trim()} className="w-full sm:w-auto">
-                {isGrading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Apple className="mr-2 h-4 w-4" />}
-                {isGrading ? `Asking ${monsterName} about ${foodInput}...` : `Log Food & See ${monsterName}'s Reaction`}
+              <Button type="submit" disabled={isGradingFood || !foodInput.trim()} className="w-full sm:w-auto">
+                {isGradingFood ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Apple className="mr-2 h-4 w-4" />}
+                {isGradingFood ? `Asking ${monsterName} about ${foodInput}...` : `Log Food & See ${monsterName}'s Reaction`}
               </Button>
             </CardFooter>
           </form>
         </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-headline">"Monster-Killing" Meal Ideas</CardTitle>
+            <CardDescription>Let {monsterName}'s AI chefs suggest a meal that's good for you (and bad for it!).</CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {(["breakfast", "lunch", "dinner", "snack"] as const).map((mealType) => {
+              const Icon = mealType === "breakfast" ? Sunrise : mealType === "lunch" ? Sun : mealType === "dinner" ? Moon : Coffee;
+              return (
+                <Button key={mealType} variant="outline" onClick={() => handleSuggestMeal(mealType)} disabled={isSuggestingMeal || isGeneratingRecipe}>
+                  <Icon className="mr-2 h-4 w-4" />
+                  {mealType.charAt(0).toUpperCase() + mealType.slice(1)}
+                </Button>
+              );
+            })}
+          </CardContent>
+          {isSuggestingMeal && (
+            <CardContent className="flex items-center justify-center p-4">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin"/> Searching for a terrible meal for {monsterName}...
+            </CardContent>
+          )}
+          {error && (suggestedMeal || generatedRecipe) && ( // Show specific errors if they occurred during these actions
+            <CardContent>
+                <Alert variant="destructive">
+                <AlertTitle>Suggestion/Recipe Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+                </Alert>
+            </CardContent>
+          )}
+        </Card>
+
+        {suggestedMeal && !generatedRecipe && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-headline">Suggested Meal: {suggestedMeal.suggestedMealName}</CardTitle>
+              <CardDescription>{suggestedMeal.shortDescription}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="italic text-sm text-muted-foreground p-3 bg-accent/10 rounded-md border-l-4 border-accent">
+                {monsterName} says: "{suggestedMeal.monsterImpactStatement}"
+              </p>
+            </CardContent>
+            <CardFooter>
+              <Button onClick={() => handleGenerateRecipe(suggestedMeal.suggestedMealName)} disabled={isGeneratingRecipe}>
+                {isGeneratingRecipe ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ChefHat className="mr-2 h-4 w-4" />}
+                {isGeneratingRecipe ? `Conjuring Recipe for ${suggestedMeal.suggestedMealName}...` : "Get Recipe"}
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
+
+        {generatedRecipe && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-headline">Recipe: {generatedRecipe.recipeName}</CardTitle>
+              {generatedRecipe.prepTime && <CardDescription>Prep: {generatedRecipe.prepTime} | Cook: {generatedRecipe.cookTime} | Servings: {generatedRecipe.servings}</CardDescription>}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <h4 className="font-semibold text-md mb-1">Ingredients:</h4>
+                <ul className="list-disc list-inside space-y-1 text-sm">
+                  {generatedRecipe.ingredients.map((ing, idx) => (
+                    <li key={idx}>
+                      {ing.quantity} {ing.unit} {ing.name}
+                      {ing.notes && <span className="text-xs text-muted-foreground"> ({ing.notes})</span>}
+                      {ing.isLinkable && <ShoppingCart className="inline-block ml-1 h-3 w-3 text-primary/70" title="Potentially linkable item"/>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <Separator />
+              <div>
+                <h4 className="font-semibold text-md mb-1">Instructions:</h4>
+                <ol className="list-decimal list-inside space-y-1 text-sm">
+                  {generatedRecipe.instructions.map((step, idx) => <li key={idx}>{step}</li>)}
+                </ol>
+              </div>
+              {generatedRecipe.recipeNotes && (
+                <>
+                <Separator />
+                <div>
+                    <h4 className="font-semibold text-md mb-1">Chef's Notes:</h4>
+                    <p className="text-sm italic text-muted-foreground">{generatedRecipe.recipeNotes}</p>
+                </div>
+                </>
+              )}
+            </CardContent>
+            <CardFooter>
+                 <Button variant="outline" onClick={() => { setSuggestedMeal(null); setGeneratedRecipe(null); setError(null); }}>
+                    Clear Suggestion & Recipe
+                </Button>
+            </CardFooter>
+          </Card>
+        )}
+
 
         <Card>
           <CardHeader>
