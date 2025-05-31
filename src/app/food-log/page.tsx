@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { gradeFoodItemAction } from './actions';
 import type { FoodGradingOutput } from '@/ai/flows/food-grading-flow';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
 const MONSTER_NAME_KEY = 'morgellonMonsterName';
@@ -42,6 +43,7 @@ export default function FoodLogPage() {
   const [error, setError] = useState<string | null>(null);
   const [isGrading, startGradingTransition] = useTransition();
   const { toast } = useToast();
+  const [showDamageEffect, setShowDamageEffect] = useState(false);
 
   useEffect(() => {
     const storedImage = localStorage.getItem(MONSTER_IMAGE_KEY);
@@ -49,12 +51,11 @@ export default function FoodLogPage() {
     setMonsterImageUrl(storedImage);
     setMonsterName(storedName);
 
-    if (storedName && storedImage) { // Only initialize health if monster exists
+    if (storedName && storedImage) { 
       const storedHealth = localStorage.getItem(MONSTER_HEALTH_KEY);
       if (storedHealth) {
         setMonsterHealth(parseFloat(storedHealth));
       } else {
-        // Monster exists but no health - initialize it
         const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
         setMonsterHealth(initialHealth);
         localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
@@ -99,6 +100,11 @@ export default function FoodLogPage() {
         
         setMonsterHealth(newHealth);
 
+        if (result.grade === 'bad') {
+          setShowDamageEffect(true);
+          setTimeout(() => setShowDamageEffect(false), 700); // Animation duration
+        }
+
         const newLogEntry: FoodLogEntry = {
           ...result,
           id: Date.now().toString(),
@@ -106,12 +112,13 @@ export default function FoodLogPage() {
           healthBefore,
           healthAfter: newHealth,
         };
-        setFoodLogEntries(prev => [newLogEntry, ...prev].slice(0, 20)); // Keep last 20 entries
+        setFoodLogEntries(prev => [newLogEntry, ...prev].slice(0, 20)); 
         setFoodInput('');
         toast({
           title: `${result.foodName} Logged!`,
           description: `Monster health changed by ${result.healthImpactPercentage.toFixed(1)}%. Current: ${newHealth.toFixed(1)}%. Reason: ${result.reasoning}`,
-          variant: result.grade === "good" ? "default" : result.grade === "bad" ? "destructive" : "default"
+          variant: result.grade === "good" ? "default" : result.grade === "bad" ? "destructive" : "default",
+          duration: Number.MAX_SAFE_INTEGER, // Make toast persistent until manually closed
         });
 
       } catch (e) {
@@ -121,6 +128,7 @@ export default function FoodLogPage() {
           title: "Error Grading Food",
           description: errorMessage,
           variant: "destructive",
+          duration: Number.MAX_SAFE_INTEGER,
         });
       }
     });
@@ -162,7 +170,7 @@ export default function FoodLogPage() {
   return (
     <div className="grid lg:grid-cols-3 gap-6">
       <div className="lg:col-span-1 space-y-6">
-        <Card>
+        <Card className={cn(showDamageEffect && 'animate-damage-flash')}>
           <CardHeader className="items-center text-center">
             {monsterImageUrl && monsterName && (
               <Image src={monsterImageUrl} alt={monsterName} width={128} height={128} className="rounded-full border-2 border-primary shadow-md mx-auto" data-ai-hint="generated monster" />
@@ -242,7 +250,6 @@ export default function FoodLogPage() {
                     </h4>
                     <p className="text-xs text-muted-foreground">
                       Logged: {new Date(entry.loggedAt).toLocaleTimeString()} - Health Impact: <span className={entry.healthImpactPercentage > 0 ? "text-red-500" : entry.healthImpactPercentage < 0 ? "text-green-500" : ""}>{entry.healthImpactPercentage.toFixed(1)}%</span>
-                      {/* (Before: {entry.healthBefore.toFixed(1)}% -> After: {entry.healthAfter.toFixed(1)}%) */}
                     </p>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5 text-right flex-shrink-0">Now: {entry.healthAfter.toFixed(1)}%</p>
