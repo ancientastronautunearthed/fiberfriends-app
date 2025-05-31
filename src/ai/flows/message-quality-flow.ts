@@ -11,12 +11,12 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const MessageQualityInputSchema = z.object({
+const MessageQualityInputSchema = z.object({
   messageText: z.string().describe('The chat message text to be analyzed.'),
 });
 export type MessageQualityInput = z.infer<typeof MessageQualityInputSchema>;
 
-export const MessageQualityOutputSchema = z.object({
+const MessageQualityOutputSchema = z.object({
   score: z.number().min(-5).max(10).describe('A score from -5 (poor/negative) to +10 (excellent/engaging), representing the quality of the message for fostering connection.'),
   reasoning: z.string().optional().describe('A brief justification for the score, if applicable.'),
 });
@@ -69,3 +69,4 @@ const messageQualityFlow = ai.defineFlow(
     return output;
   }
 );
+

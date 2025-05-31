@@ -11,7 +11,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const RomanticMonsterWordsInputSchema = z.object({
+const RomanticMonsterWordsInputSchema = z.object({
   words: z
     .array(z.string())
     .length(5, { message: "Please provide exactly 5 words." })
@@ -19,7 +19,7 @@ export const RomanticMonsterWordsInputSchema = z.object({
 });
 export type RomanticMonsterWordsInput = z.infer<typeof RomanticMonsterWordsInputSchema>;
 
-export const RomanticMonsterPromptOutputSchema = z.object({
+const RomanticMonsterPromptOutputSchema = z.object({
   monsterName: z.string().describe('A charming, whimsical, or alluring name for the Romantic Monster, based on the 5 words and a romantic vibe.'),
   detailedPrompt: z.string().describe('A detailed and vivid image generation prompt for a Romantic Monster, based on the 5 words. The style should be more whimsical, charming, or alluring than a typical dungeon monster.'),
 });
@@ -72,3 +72,4 @@ const romanticMonsterPromptExpansionFlow = ai.defineFlow(
     return output;
   }
 );
+

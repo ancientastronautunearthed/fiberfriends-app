@@ -12,7 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Send, Sparkles, Heart, MessageCircle, ArrowLeft } from "lucide-react";
 import Image from "next/image";
 import { useToast } from '@/hooks/use-toast';
-import { analyzeMessageQualityAction } from '../actions';
+import { analyzeMessageQualityAction } from '../../actions'; // Updated path
 import Link from 'next/link';
 
 const ROMANTIC_MONSTER_IMAGE_KEY = 'romanticMonsterImageUrl';

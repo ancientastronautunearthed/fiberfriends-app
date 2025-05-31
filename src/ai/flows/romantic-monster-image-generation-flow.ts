@@ -11,12 +11,12 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const RomanticMonsterImageInputSchema = z.object({
+const RomanticMonsterImageInputSchema = z.object({
   detailedPrompt: z.string().describe('A detailed and vivid image generation prompt for the Romantic Monster.'),
 });
 export type RomanticMonsterImageInput = z.infer<typeof RomanticMonsterImageInputSchema>;
 
-export const RomanticMonsterImageOutputSchema = z.object({
+const RomanticMonsterImageOutputSchema = z.object({
   imageUrl: z.string().url().describe('The generated image as a data URI.'),
 });
 export type RomanticMonsterImageOutput = z.infer<typeof RomanticMonsterImageOutputSchema>;
@@ -55,3 +55,4 @@ const romanticMonsterImageGenerationFlow = ai.defineFlow(
     return { imageUrl: media.url };
   }
 );
+
