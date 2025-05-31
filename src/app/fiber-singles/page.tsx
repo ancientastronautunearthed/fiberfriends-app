@@ -120,7 +120,7 @@ export default function FiberSinglesPage() {
             <Card className="mb-6 p-4 bg-gradient-to-r from-pink-100 via-purple-100 to-indigo-100 dark:from-pink-900/30 dark:via-purple-900/30 dark:to-indigo-900/30 border-pink-300 dark:border-pink-700">
                 <CardHeader className="p-0 pb-2 flex flex-row items-center gap-3">
                      {userRomanticMonsterImageUrl && (
-                        <Image src={userRomanticMonsterImageUrl} alt={userRomanticMonsterName || "Your Romantic Monster"} width={64} height={64} className="rounded-full border-2 border-pink-400 shadow-md object-cover" data-ai-hint="romantic monster user"/>
+                        <Image src={userRomanticMonsterImageUrl} alt={userRomanticMonsterName || "Your Romantic Monster"} width={128} height={128} className="rounded-lg border-2 border-pink-400 shadow-md object-cover" data-ai-hint="romantic monster user"/>
                      )}
                     <div>
                         <CardTitle className="text-xl text-pink-700 dark:text-pink-300">{userRomanticMonsterName}</CardTitle>
@@ -177,7 +177,7 @@ export default function FiberSinglesPage() {
                   </Avatar>
                   <CardTitle className="text-lg">{user.name}</CardTitle>
                   <div className="mt-1 text-center">
-                    <Image src={user.romanticMonsterImageUrl} alt={user.romanticMonsterName} width={60} height={60} className="mx-auto rounded-full border-2 border-pink-400 object-cover shadow" data-ai-hint={user.romanticMonsterAiHint}/>
+                    <Image src={user.romanticMonsterImageUrl} alt={user.romanticMonsterName} width={100} height={100} className="mx-auto rounded-lg border-2 border-pink-400 object-cover shadow" data-ai-hint={user.romanticMonsterAiHint}/>
                     <p className="text-xs text-pink-600 dark:text-pink-400 mt-1">as "{user.romanticMonsterName}"</p>
                   </div>
                   <CardDescription className="text-xs text-muted-foreground mt-1">{user.onlineStatus}</CardDescription>

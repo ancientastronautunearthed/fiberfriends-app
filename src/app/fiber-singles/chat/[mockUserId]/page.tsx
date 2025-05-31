@@ -177,7 +177,7 @@ export default function SimulatedChatPage() {
         {/* User's Monster Card */}
         <Card className="md:col-span-1">
           <CardHeader className="items-center text-center">
-            <Image src={userRomanticMonsterImageUrl} alt={userRomanticMonsterName} width={100} height={100} className="rounded-full border-2 border-pink-500 shadow-lg object-cover" data-ai-hint="user romantic monster"/>
+            <Image src={userRomanticMonsterImageUrl} alt={userRomanticMonsterName} width={128} height={128} className="rounded-lg border-2 border-pink-500 shadow-lg object-cover" data-ai-hint="user romantic monster"/>
             <CardTitle className="text-lg mt-2">{userRomanticMonsterName}</CardTitle>
             <CardDescription>Your Persona</CardDescription>
           </CardHeader>
@@ -190,7 +190,7 @@ export default function SimulatedChatPage() {
         {/* Opponent's Monster Card */}
         <Card className="md:col-span-1">
           <CardHeader className="items-center text-center">
-            <Image src={mockOpponent.romanticMonsterImageUrl} alt={mockOpponent.romanticMonsterName} width={100} height={100} className="rounded-full border-2 border-purple-500 shadow-lg object-cover" data-ai-hint={mockOpponent.romanticMonsterAiHint}/>
+            <Image src={mockOpponent.romanticMonsterImageUrl} alt={mockOpponent.romanticMonsterName} width={128} height={128} className="rounded-lg border-2 border-purple-500 shadow-lg object-cover" data-ai-hint={mockOpponent.romanticMonsterAiHint}/>
             <CardTitle className="text-lg mt-2">{mockOpponent.romanticMonsterName}</CardTitle>
             <CardDescription>{mockOpponent.name}'s Persona</CardDescription>
           </CardHeader>
