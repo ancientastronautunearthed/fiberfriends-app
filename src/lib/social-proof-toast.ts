@@ -5,12 +5,12 @@ import { toast } from '@/hooks/use-toast';
 import { Award, Zap, TrendingUp } from 'lucide-react';
 
 const mockUsernames = [
-  "StarlightSeeker", 
-  "FiberFighterX", 
-  "ResilientSoul", 
-  "QuantumHealer", 
-  "SymptomSlayer77", 
-  "BioHackerZen", 
+  "StarlightSeeker",
+  "FiberFighterX",
+  "ResilientSoul",
+  "QuantumHealer",
+  "SymptomSlayer77",
+  "BioHackerZen",
   "ChronoWarrior",
   "WellnessGuru23",
   "DataDrivenUser",
@@ -39,25 +39,25 @@ export function showSocialProofToast(
 
   const randomUsername = mockUsernames[Math.floor(Math.random() * mockUsernames.length)];
   let message: string;
-  let title = "Community Achievement!";
-  let icon = Award;
+  let toastTitle = "Community Achievement!";
+  let IconComponent: React.ElementType = Award; // Explicitly type IconComponent
 
   if (pointsAwarded) {
     message = `${randomUsername} +${pointsAwarded} points! For ${achievementDescription}.`;
-    icon = Zap; // Using Zap for points
+    IconComponent = Zap;
   } else {
     message = `${randomUsername} achieved: ${achievementDescription}!`;
-    icon = TrendingUp; // Using TrendingUp for general achievements/streaks
+    IconComponent = TrendingUp;
   }
 
   toast({
     title: (
       <div className="flex items-center gap-2">
-        <icon className="h-5 w-5 text-primary" />
-        <span>{title}</span>
+        <IconComponent className="h-5 w-5 text-primary" />
+        <span>{toastTitle}</span>
       </div>
     ),
     description: message,
-    duration: 6000, // Show for 6 seconds
+    duration: 6000,
   });
 }

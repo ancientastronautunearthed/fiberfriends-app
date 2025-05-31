@@ -18,12 +18,12 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Image from "next/image";
-import { showSocialProofToast } from '@/lib/social-proof-toast';
+import { showSocialProofToast } from '@/lib/social-proof-toast'; // Ensure this path is correct after rename
 
 
 interface ProductEntryClient extends ProductEffectGradingOutput {
   id: string;
-  clientNotes?: string; 
+  clientNotes?: string;
   loggedAt: string;
   isGraded: boolean;
 }
@@ -72,13 +72,13 @@ interface StreakData {
 export default function ProductTrackerPage() {
   const [workingProducts, setWorkingProducts] = useState<ProductEntryClient[]>([]);
   const [notWorkingProducts, setNotWorkingProducts] = useState<ProductEntryClient[]>([]);
-  
+
   const [currentProductName, setCurrentProductName] = useState('');
   const [currentProductNotes, setCurrentProductNotes] = useState('');
-  
+
   const [pastProductName, setPastProductName] = useState('');
   const [pastProductNotes, setPastProductNotes] = useState('');
-  
+
   const [userPoints, setUserPoints] = useState(0);
   const [currentTier, setCurrentTier] = useState(TIERS.NONE);
 
@@ -102,7 +102,7 @@ export default function ProductTrackerPage() {
       currentStreak = JSON.parse(storedStreak);
       const lastDate = new Date(currentStreak.date);
       const currentDate = new Date(today);
-      
+
       const diffTime = Math.abs(currentDate.getTime() - lastDate.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
@@ -132,7 +132,7 @@ export default function ProductTrackerPage() {
     const storedName = localStorage.getItem(MONSTER_NAME_KEY);
     const storedHealthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
     if (!storedHealthStr || !storedName) return;
-    
+
     let currentHealthVal = parseFloat(storedHealthStr);
     if (isNaN(currentHealthVal) || currentHealthVal <= MONSTER_DEATH_THRESHOLD) return;
 
@@ -142,11 +142,11 @@ export default function ProductTrackerPage() {
     if (lastRecoveryDate !== todayDateStr) {
       const recoveryAmount = Math.floor(Math.random() * (MAX_RECOVERY - MIN_RECOVERY + 1)) + MIN_RECOVERY;
       const newHealth = Math.min(currentHealthVal + recoveryAmount, MAX_MONSTER_HEALTH);
-      
-      setMonsterHealth(newHealth); 
+
+      setMonsterHealth(newHealth);
       localStorage.setItem(MONSTER_HEALTH_KEY, String(newHealth));
       localStorage.setItem(MONSTER_LAST_RECOVERY_DATE_KEY, todayDateStr);
-      
+
       toast({
         title: `${storedName} Stirs...`,
         description: `Heh. While you slept, I regained ${recoveryAmount} health. I'm now at ${newHealth.toFixed(1)}%.`,
@@ -177,10 +177,10 @@ export default function ProductTrackerPage() {
 
     const savedWorkingProducts = localStorage.getItem(WORKING_PRODUCTS_KEY);
     if (savedWorkingProducts) setWorkingProducts(JSON.parse(savedWorkingProducts));
-    
+
     const savedNotWorkingProducts = localStorage.getItem(NOT_WORKING_PRODUCTS_KEY);
     if (savedNotWorkingProducts) setNotWorkingProducts(JSON.parse(savedNotWorkingProducts));
-    
+
     const savedUserPoints = localStorage.getItem(USER_POINTS_KEY);
     if (savedUserPoints) setUserPoints(parseInt(savedUserPoints, 10));
 
@@ -193,7 +193,7 @@ export default function ProductTrackerPage() {
   useEffect(() => {
     if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true' && monsterName) {
       localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
-      checkMonsterDeath(monsterHealth, "its own frail constitution"); 
+      checkMonsterDeath(monsterHealth, "its own frail constitution");
     }
   }, [monsterHealth, monsterName]);
 
@@ -221,23 +221,23 @@ export default function ProductTrackerPage() {
       productName: currentProductName.trim(),
       clientNotes: currentProductNotes.trim(),
       loggedAt: new Date().toISOString(),
-      benefitScore: 0, 
+      benefitScore: 0,
       reasoning: "Awaiting assessment...",
       isGraded: false,
     };
     setWorkingProducts(prev => [newProductPending, ...prev]);
-    
+
     startGradingProductTransition(async () => {
       try {
-        const aiResult = await gradeProductEffectAction({ 
-          productName: newProductPending.productName, 
-          notes: newProductPending.clientNotes 
+        const aiResult = await gradeProductEffectAction({
+          productName: newProductPending.productName,
+          notes: newProductPending.clientNotes
         });
         setWorkingProducts(prev => prev.map(p => p.id === tempId ? {
           ...p,
           benefitScore: aiResult.benefitScore,
           reasoning: aiResult.reasoning,
-          productName: aiResult.productName, 
+          productName: aiResult.productName,
           isGraded: true,
         } : p));
         addPoints();
@@ -247,7 +247,7 @@ export default function ProductTrackerPage() {
           duration: Number.MAX_SAFE_INTEGER
         });
 
-        const totalProductsLogged = workingProducts.length + notWorkingProducts.length; 
+        const totalProductsLogged = workingProducts.length + notWorkingProducts.length;
         if (totalProductsLogged > 0 && totalProductsLogged % PRODUCT_LOG_MILESTONE_INTERVAL === 0) {
             showSocialProofToast(`${totalProductsLogged} product insights shared`, POINTS_PER_PRODUCT, true);
         }
@@ -255,12 +255,12 @@ export default function ProductTrackerPage() {
 
       } catch (e) {
         const errorMsg = e instanceof Error ? e.message : "AI grading failed.";
-        setWorkingProducts(prev => prev.filter(p => p.id !== tempId)); 
-        toast({ 
-            title: "Grading Error", 
-            description: `${monsterName} cackles: 'The AI couldn't handle assessing ${newProductPending.productName}! Pathetic! Error: ${errorMsg}'`, 
-            variant: "destructive", 
-            duration: Number.MAX_SAFE_INTEGER 
+        setWorkingProducts(prev => prev.filter(p => p.id !== tempId));
+        toast({
+            title: "Grading Error",
+            description: `${monsterName} cackles: 'The AI couldn't handle assessing ${newProductPending.productName}! Pathetic! Error: ${errorMsg}'`,
+            variant: "destructive",
+            duration: Number.MAX_SAFE_INTEGER
         });
       }
     });
@@ -279,14 +279,14 @@ export default function ProductTrackerPage() {
       productName: pastProductName.trim(),
       clientNotes: pastProductNotes.trim(),
       loggedAt: new Date().toISOString(),
-      benefitScore: 0, 
-      reasoning: 'User marked as "Did not work or had adverse effects".', 
-      isGraded: true, 
+      benefitScore: 0,
+      reasoning: 'User marked as "Did not work or had adverse effects".',
+      isGraded: true,
     };
     setNotWorkingProducts(prev => [newProduct, ...prev]);
     addPoints();
 
-    const totalProductsLogged = workingProducts.length + notWorkingProducts.length + 1; 
+    const totalProductsLogged = workingProducts.length + notWorkingProducts.length + 1;
     if (totalProductsLogged > 0 && totalProductsLogged % PRODUCT_LOG_MILESTONE_INTERVAL === 0) {
         showSocialProofToast(`${totalProductsLogged} product insights shared`, POINTS_PER_PRODUCT, true);
     }
@@ -322,16 +322,16 @@ export default function ProductTrackerPage() {
 
   const handleUseProduct = (product: ProductEntryClient) => {
     if (!monsterGenerated || monsterHealth === null || !product.isGraded || !monsterName) return;
-    
+
     const STREAK_BONUS_PER_DAY = 0.02;
     const MAX_STREAK_MODIFIER = 0.50;
 
     const currentStreakCount = updateStreak(POSITIVE_PRODUCT_USAGE_STREAK_KEY, setPositiveProductUsageStreak);
     const streakModifier = Math.min(currentStreakCount * STREAK_BONUS_PER_DAY, MAX_STREAK_MODIFIER);
     const finalBenefitScore = product.benefitScore * (1 + streakModifier);
-    
+
     const healthBefore = monsterHealth;
-    let newHealth = healthBefore - finalBenefitScore; 
+    let newHealth = healthBefore - finalBenefitScore;
     newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth);
 
     setMonsterHealth(newHealth);
@@ -342,7 +342,7 @@ export default function ProductTrackerPage() {
     if (streakModifier > 0) {
         monsterReact += ` Your ${currentStreakCount}-day consistency (+${(streakModifier * 100).toFixed(0)}% effect) makes it even WORSE!`;
     }
-    
+
     if (newHealth <= 0 && newHealth > MONSTER_DEATH_THRESHOLD) monsterReact += " I'm... fading...";
     else if (newHealth <= MONSTER_DEATH_THRESHOLD / 2 && newHealth > MONSTER_DEATH_THRESHOLD) monsterReact += " Please... stop...";
 
@@ -359,16 +359,16 @@ export default function ProductTrackerPage() {
       }
     }
   };
-  
+
   const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
 
   const nextTierPoints = () => {
     if (currentTier.points < TIERS.BRONZE.points) return TIERS.BRONZE.points;
     if (currentTier.points < TIERS.SILVER.points) return TIERS.SILVER.points;
     if (currentTier.points < TIERS.GOLD.points) return TIERS.GOLD.points;
-    return TIERS.GOLD.points; 
+    return TIERS.GOLD.points;
   };
-  
+
   const progressToNextTier = () => {
     if (currentTier === TIERS.GOLD) return 100;
     const pointsForNext = nextTierPoints();
@@ -377,7 +377,7 @@ export default function ProductTrackerPage() {
     const earnedTowardsNext = userPoints - pointsForCurrent;
     return Math.max(0, Math.min((earnedTowardsNext / neededForNext) * 100, 100));
   };
-  
+
   const getHealthBarValue = () => {
       if (monsterHealth === null) return 0;
       const range = MAX_MONSTER_HEALTH - MONSTER_DEATH_THRESHOLD;
@@ -395,7 +395,7 @@ export default function ProductTrackerPage() {
             Your Contribution Score & Tier
           </CardTitle>
           <CardDescription>
-            Log products and make other community contributions to earn points and unlock rewards. 
+            Log products and make other community contributions to earn points and unlock rewards.
             Higher tiers grant benefits like site-wide discounts!
           </CardDescription>
         </CardHeader>
@@ -420,7 +420,7 @@ export default function ProductTrackerPage() {
                 {currentTier !== TIERS.GOLD && <p className="text-xs text-muted-foreground">Next Tier: {nextTierPoints()} Points</p>}
             </div>
             <Progress value={progressToNextTier()} aria-label={`${progressToNextTier()}% towards next tier`} className="h-3"/>
-            {currentTier !== TIERS.GOLD ? 
+            {currentTier !== TIERS.GOLD ?
                 <p className="text-xs text-muted-foreground">Progress towards {TIERS.BRONZE.points > currentTier.points ? TIERS.BRONZE.name : TIERS.SILVER.points > currentTier.points ? TIERS.SILVER.name : TIERS.GOLD.name}.</p>
                 : <p className="text-xs text-green-500">You've reached the highest tier! Congratulations!</p>
             }
@@ -473,21 +473,21 @@ export default function ProductTrackerPage() {
             <div className="space-y-2">
               <div>
                 <Label htmlFor="current-product-name">Product Name</Label>
-                <Input 
+                <Input
                   id="current-product-name"
-                  value={currentProductName} 
-                  onChange={(e) => setCurrentProductName(e.target.value)} 
-                  placeholder="e.g., Specific Vitamin C Serum" 
+                  value={currentProductName}
+                  onChange={(e) => setCurrentProductName(e.target.value)}
+                  placeholder="e.g., Specific Vitamin C Serum"
                   disabled={isGradingProduct}
                 />
               </div>
               <div>
                 <Label htmlFor="current-product-notes">Notes (Brand, Dosage, etc.)</Label>
-                <Textarea 
+                <Textarea
                   id="current-product-notes"
-                  value={currentProductNotes} 
-                  onChange={(e) => setCurrentProductNotes(e.target.value)} 
-                  placeholder="e.g., Brand X, 500mg daily" 
+                  value={currentProductNotes}
+                  onChange={(e) => setCurrentProductNotes(e.target.value)}
+                  placeholder="e.g., Brand X, 500mg daily"
                   className="min-h-[60px]"
                   disabled={isGradingProduct}
                 />
@@ -550,20 +550,20 @@ export default function ProductTrackerPage() {
             <div className="space-y-2">
               <div>
                 <Label htmlFor="past-product-name">Product Name</Label>
-                <Input 
+                <Input
                   id="past-product-name"
-                  value={pastProductName} 
-                  onChange={(e) => setPastProductName(e.target.value)} 
-                  placeholder="e.g., Common Pain Reliever" 
+                  value={pastProductName}
+                  onChange={(e) => setPastProductName(e.target.value)}
+                  placeholder="e.g., Common Pain Reliever"
                 />
               </div>
               <div>
                 <Label htmlFor="past-product-notes">Notes (Reason, Side Effects, etc.)</Label>
-                <Textarea 
+                <Textarea
                   id="past-product-notes"
-                  value={pastProductNotes} 
-                  onChange={(e) => setPastProductNotes(e.target.value)} 
-                  placeholder="e.g., Caused mild nausea" 
+                  value={pastProductNotes}
+                  onChange={(e) => setPastProductNotes(e.target.value)}
+                  placeholder="e.g., Caused mild nausea"
                   className="min-h-[60px]"
                 />
               </div>
