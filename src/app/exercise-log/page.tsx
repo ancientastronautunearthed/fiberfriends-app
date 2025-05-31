@@ -5,43 +5,39 @@ import React, { useState, useEffect, useTransition, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Apple, ThumbsUp, ThumbsDown, MinusCircle, Info, Sparkles, Skull, Ghost } from "lucide-react";
+import { Loader2, Dumbbell, Activity, Info, Sparkles, Skull, HeartPulse } from "lucide-react";
 import Image from "next/image";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { gradeFoodItemAction } from './actions';
-import type { FoodGradingOutput } from '@/ai/flows/food-grading-flow';
+import { gradeExerciseAction } from './actions';
+import type { ExerciseGradingOutput } from '@/ai/flows/exercise-grading-flow';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import MonsterRiddleModal from '@/components/features/monster-riddle-modal';
-
 
 const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
 const MONSTER_NAME_KEY = 'morgellonMonsterName';
 const MONSTER_HEALTH_KEY = 'morgellonMonsterHealth';
 const MONSTER_GENERATED_KEY = 'morgellonMonsterGenerated';
-const FOOD_LOG_KEY = 'morgellonFoodLogEntries';
+const EXERCISE_LOG_KEY = 'morgellonExerciseLogEntries';
 const MONSTER_TOMB_KEY = 'morgellonMonsterTomb';
-const MONSTER_HAS_SPOKEN_KEY = 'monsterHasSpokenFirstTime';
-const USER_POINTS_KEY = 'userPoints'; 
 const MONSTER_LAST_RECOVERY_DATE_KEY = 'monsterLastRecoveryDate';
-
 
 const MONSTER_DEATH_THRESHOLD = -50;
 const MAX_MONSTER_HEALTH = 200;
 const INITIAL_HEALTH_MIN = 80;
 const INITIAL_HEALTH_MAX = 100;
-const RIDDLE_HEALTH_IMPACT = 25;
-const FIRST_SPEAK_BONUS_POINTS = 50;
 const MIN_RECOVERY = 10;
 const MAX_RECOVERY = 20;
 
-interface FoodLogEntry extends FoodGradingOutput {
+
+interface ExerciseLogEntry extends ExerciseGradingOutput {
   id: string;
   loggedAt: string;
+  durationMinutes: number;
   healthBefore: number;
   healthAfter: number;
 }
@@ -52,20 +48,19 @@ interface TombEntry {
   diedAt: string;
 }
 
-export default function FoodLogPage() {
+export default function ExerciseLogPage() {
   const [monsterImageUrl, setMonsterImageUrl] = useState<string | null>(null);
   const [monsterName, setMonsterName] = useState<string | null>(null);
   const [monsterHealth, setMonsterHealth] = useState<number | null>(null);
-  const [foodLogEntries, setFoodLogEntries] = useState<FoodLogEntry[]>([]);
+  const [exerciseLogEntries, setExerciseLogEntries] = useState<ExerciseLogEntry[]>([]);
   
-  const [foodInput, setFoodInput] = useState('');
+  const [exerciseInput, setExerciseInput] = useState('');
+  const [durationInput, setDurationInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isGrading, startGradingTransition] = useTransition();
   const { toast } = useToast();
   const [showDamageEffect, setShowDamageEffect] = useState(false);
   const router = useRouter();
-
-  const [isRiddleModalOpen, setIsRiddleModalOpen] = useState(false);
 
   const performNightlyRecovery = useCallback(() => {
     const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
@@ -76,7 +71,7 @@ export default function FoodLogPage() {
     if (!storedHealthStr || !storedName) return;
     
     let currentHealth = parseFloat(storedHealthStr);
-     if (isNaN(currentHealth) || currentHealth <= MONSTER_DEATH_THRESHOLD) return;
+    if (isNaN(currentHealth) || currentHealth <= MONSTER_DEATH_THRESHOLD) return;
 
 
     const lastRecoveryDate = localStorage.getItem(MONSTER_LAST_RECOVERY_DATE_KEY);
@@ -86,7 +81,7 @@ export default function FoodLogPage() {
       const recoveryAmount = Math.floor(Math.random() * (MAX_RECOVERY - MIN_RECOVERY + 1)) + MIN_RECOVERY;
       const newHealth = Math.min(currentHealth + recoveryAmount, MAX_MONSTER_HEALTH);
       
-      setMonsterHealth(newHealth); 
+      setMonsterHealth(newHealth); // Update state
       localStorage.setItem(MONSTER_HEALTH_KEY, String(newHealth));
       localStorage.setItem(MONSTER_LAST_RECOVERY_DATE_KEY, todayDateStr);
       
@@ -116,33 +111,33 @@ export default function FoodLogPage() {
         setMonsterHealth(initialHealth);
         localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
       }
-      performNightlyRecovery();
+      performNightlyRecovery(); 
     } else {
       setMonsterImageUrl(null);
       setMonsterName(null);
       setMonsterHealth(null);
     }
 
-    const storedFoodLog = localStorage.getItem(FOOD_LOG_KEY);
-    if (storedFoodLog) {
-      setFoodLogEntries(JSON.parse(storedFoodLog));
+    const storedExerciseLog = localStorage.getItem(EXERCISE_LOG_KEY);
+    if (storedExerciseLog) {
+      setExerciseLogEntries(JSON.parse(storedExerciseLog));
     }
   }, [performNightlyRecovery]);
 
   useEffect(() => {
     if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true') {
       localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
-      checkMonsterDeath(monsterHealth, "Initial health check");
+      checkMonsterDeath(monsterHealth, "Recent activity");
     }
   }, [monsterHealth]);
 
   useEffect(() => {
-    if (foodLogEntries.length > 0 || localStorage.getItem(FOOD_LOG_KEY)) {
-      localStorage.setItem(FOOD_LOG_KEY, JSON.stringify(foodLogEntries));
+    if (exerciseLogEntries.length > 0 || localStorage.getItem(EXERCISE_LOG_KEY)) {
+      localStorage.setItem(EXERCISE_LOG_KEY, JSON.stringify(exerciseLogEntries));
     }
-  }, [foodLogEntries]);
+  }, [exerciseLogEntries]);
 
-  const checkMonsterDeath = (currentHealth: number, foodNameForToast: string) => {
+  const checkMonsterDeath = (currentHealth: number, cause: string) => {
      if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterName && monsterImageUrl) {
         const tomb: TombEntry[] = JSON.parse(localStorage.getItem(MONSTER_TOMB_KEY) || '[]');
         tomb.unshift({ name: monsterName, imageUrl: monsterImageUrl, diedAt: new Date().toISOString() });
@@ -155,11 +150,11 @@ export default function FoodLogPage() {
         
         setMonsterImageUrl(null);
         setMonsterName(null);
-        setMonsterHealth(null); 
+        setMonsterHealth(null);
 
         toast({
           title: "Your Monster Has Perished!",
-          description: `${foodNameForToast} contributed to its demise. ${monsterName} has fallen with ${currentHealth.toFixed(1)}% health. Visit the Tomb of Monsters. You can now create a new monster.`,
+          description: `${monsterName} has fallen due to ${cause}, with ${currentHealth.toFixed(1)}% health. Visit the Tomb of Monsters. You can now create a new monster.`,
           variant: "destructive",
           duration: Number.MAX_SAFE_INTEGER,
         });
@@ -170,10 +165,15 @@ export default function FoodLogPage() {
   };
 
 
-  const handleFoodSubmit = async (event: React.FormEvent) => {
+  const handleExerciseSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!foodInput.trim()) {
-      setError("Please enter a food item.");
+    if (!exerciseInput.trim() || !durationInput.trim()) {
+      setError("Please enter an exercise description and duration.");
+      return;
+    }
+    const duration = parseInt(durationInput, 10);
+    if (isNaN(duration) || duration <= 0) {
+      setError("Please enter a valid positive number for duration.");
       return;
     }
     if (monsterHealth === null || !monsterName || !monsterImageUrl) {
@@ -184,43 +184,43 @@ export default function FoodLogPage() {
 
     startGradingTransition(async () => {
       try {
-        const result = await gradeFoodItemAction({ foodItem: foodInput });
+        const result = await gradeExerciseAction({ exerciseDescription: exerciseInput, durationMinutes: duration });
         
         const healthBefore = monsterHealth;
-        let newHealth = healthBefore + result.healthImpactPercentage;
-        newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth); 
+        let newHealth = healthBefore - result.benefitScore; // Benefit score reduces health
+        newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth); // Cannot exceed max health even if it was negative
         
         setMonsterHealth(newHealth);
-        setFoodInput('');
+        setExerciseInput('');
+        setDurationInput('');
 
-        if (result.grade === 'bad') {
-          setShowDamageEffect(true);
-          setTimeout(() => setShowDamageEffect(false), 700);
-        }
+        setShowDamageEffect(true);
+        setTimeout(() => setShowDamageEffect(false), 700);
 
-        const newLogEntry: FoodLogEntry = {
+        const newLogEntry: ExerciseLogEntry = {
           ...result,
+          durationMinutes: duration,
           id: Date.now().toString(),
           loggedAt: new Date().toISOString(),
           healthBefore,
           healthAfter: newHealth,
         };
-        setFoodLogEntries(prev => [newLogEntry, ...prev].slice(0, 20)); 
+        setExerciseLogEntries(prev => [newLogEntry, ...prev].slice(0, 20)); 
 
-        if (!checkMonsterDeath(newHealth, result.foodName)) {
+        if (!checkMonsterDeath(newHealth, result.exerciseName)) {
           toast({
-            title: `${result.foodName} Logged!`,
-            description: `Monster health changed by ${result.healthImpactPercentage.toFixed(1)}%. Current: ${newHealth.toFixed(1)}%. Reason: ${result.reasoning}`,
-            variant: result.grade === "good" ? "default" : result.grade === "bad" ? "destructive" : "default",
+            title: `${result.exerciseName} Logged!`,
+            description: `Monster health reduced by ${result.benefitScore.toFixed(1)}%. Current: ${newHealth.toFixed(1)}%. AI says: ${result.reasoning}`,
+            variant: "default", 
             duration: Number.MAX_SAFE_INTEGER, 
           });
         }
 
       } catch (e) {
-        const errorMessage = e instanceof Error ? e.message : "Failed to grade food item.";
+        const errorMessage = e instanceof Error ? e.message : "Failed to grade exercise.";
         setError(errorMessage);
         toast({
-          title: "Error Grading Food",
+          title: "Error Grading Exercise",
           description: errorMessage,
           variant: "destructive",
           duration: Number.MAX_SAFE_INTEGER,
@@ -228,41 +228,7 @@ export default function FoodLogPage() {
       }
     });
   };
-
-  const handleRiddleChallengeComplete = (wasCorrect: boolean) => {
-    if (monsterHealth === null) return;
-
-    let healthChangeDescription = "";
-    let newHealth = monsterHealth;
-
-    if (wasCorrect) {
-      newHealth -= RIDDLE_HEALTH_IMPACT;
-      healthChangeDescription = `Correct! Monster health decreased by ${RIDDLE_HEALTH_IMPACT}%.`;
-      toast({ title: "Riddle Solved!", description: healthChangeDescription, variant: "default", duration: 5000});
-    } else {
-      newHealth += RIDDLE_HEALTH_IMPACT;
-      healthChangeDescription = `Incorrect! Monster health increased by ${RIDDLE_HEALTH_IMPACT}%.`;
-      toast({ title: "Riddle Failed!", description: healthChangeDescription, variant: "destructive", duration: 5000});
-    }
-    newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth);
-    setMonsterHealth(newHealth);
-
-    const hasSpoken = localStorage.getItem(MONSTER_HAS_SPOKEN_KEY);
-    if (hasSpoken === 'false') {
-      const currentPoints = parseInt(localStorage.getItem(USER_POINTS_KEY) || '0');
-      localStorage.setItem(USER_POINTS_KEY, String(currentPoints + FIRST_SPEAK_BONUS_POINTS));
-      localStorage.setItem(MONSTER_HAS_SPOKEN_KEY, 'true');
-      toast({
-        title: "Bonus Points!",
-        description: `Your monster spoke for the first time! You earned ${FIRST_SPEAK_BONUS_POINTS} contribution points.`,
-        variant: "default",
-        duration: 7000,
-      });
-    }
-    checkMonsterDeath(newHealth, "a riddle's outcome");
-  };
-
-
+  
   const getMonsterStatusMessage = () => {
     if (monsterHealth === null) return "";
     if (monsterHealth <= MONSTER_DEATH_THRESHOLD) return "Your monster has perished!";
@@ -305,7 +271,6 @@ export default function FoodLogPage() {
   }
 
   return (
-    <>
     <div className="grid lg:grid-cols-3 gap-6">
       <div className="lg:col-span-1 space-y-6">
         <Card className={cn(showDamageEffect && 'animate-damage-flash')}>
@@ -320,32 +285,39 @@ export default function FoodLogPage() {
             </Label>
             <Progress id="monster-health-progress" value={getHealthBarValue()} className="w-full h-3" 
                 aria-label={`Monster health: ${monsterHealth.toFixed(1)}%`} />
-             <p className="text-xs text-muted-foreground text-center mt-1">Bad foods strengthen your monster. Good foods weaken it.</p>
+             <p className="text-xs text-muted-foreground text-center mt-1">Positive activities help weaken your monster.</p>
           </CardContent>
-           <CardFooter className="flex-col gap-2">
-            <Button variant="outline" onClick={() => setIsRiddleModalOpen(true)} className="w-full">
-              <Ghost className="mr-2 h-4 w-4"/> My Monster Has a Riddle!
-            </Button>
-          </CardFooter>
         </Card>
       </div>
 
       <div className="lg:col-span-2 space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline flex items-center gap-2"><Apple className="h-6 w-6 text-primary"/>Log Food Item</CardTitle>
-            <CardDescription>Enter a food item to see how it affects your monster's health. The AI will grade it.</CardDescription>
+            <CardTitle className="font-headline flex items-center gap-2"><Dumbbell className="h-6 w-6 text-primary"/>Log Exercise</CardTitle>
+            <CardDescription>Enter your exercise. The AI will gauge its impact on your monster's health.</CardDescription>
           </CardHeader>
-          <form onSubmit={handleFoodSubmit}>
+          <form onSubmit={handleExerciseSubmit}>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="food-item">Food Item</Label>
+                <Label htmlFor="exercise-description">Exercise Description</Label>
                 <Input
-                  id="food-item"
-                  value={foodInput}
-                  onChange={(e) => setFoodInput(e.target.value)}
-                  placeholder="e.g., Spinach, Chocolate Croissant, Apple"
+                  id="exercise-description"
+                  value={exerciseInput}
+                  onChange={(e) => setExerciseInput(e.target.value)}
+                  placeholder="e.g., Brisk 30-minute walk, Yoga session, Weightlifting"
                   disabled={isGrading}
+                />
+              </div>
+              <div>
+                <Label htmlFor="duration-minutes">Duration (minutes)</Label>
+                <Input
+                  id="duration-minutes"
+                  type="number"
+                  value={durationInput}
+                  onChange={(e) => setDurationInput(e.target.value)}
+                  placeholder="e.g., 30"
+                  disabled={isGrading}
+                  min="1"
                 />
               </div>
               {error && (
@@ -356,9 +328,9 @@ export default function FoodLogPage() {
               )}
             </CardContent>
             <CardFooter>
-              <Button type="submit" disabled={isGrading || !foodInput.trim()} className="w-full sm:w-auto">
-                {isGrading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Apple className="mr-2 h-4 w-4" />}
-                {isGrading ? 'Analyzing Food...' : 'Log Food & See Impact'}
+              <Button type="submit" disabled={isGrading || !exerciseInput.trim() || !durationInput.trim()} className="w-full sm:w-auto">
+                {isGrading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Activity className="mr-2 h-4 w-4" />}
+                {isGrading ? 'Analyzing Exercise...' : 'Log Exercise & See Impact'}
               </Button>
             </CardFooter>
           </form>
@@ -366,23 +338,21 @@ export default function FoodLogPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline">Recent Food Log</CardTitle>
-            <CardDescription>Your last 20 food entries and their impact.</CardDescription>
+            <CardTitle className="font-headline">Recent Exercise Log</CardTitle>
+            <CardDescription>Your last 20 exercise entries and their impact.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 max-h-96 overflow-y-auto">
-            {foodLogEntries.length === 0 && <p className="text-sm text-muted-foreground">No food items logged yet.</p>}
-            {foodLogEntries.map(entry => (
+            {exerciseLogEntries.length === 0 && <p className="text-sm text-muted-foreground">No exercises logged yet.</p>}
+            {exerciseLogEntries.map(entry => (
               <Card key={entry.id} className="p-3 bg-card/60">
                 <div className="flex justify-between items-start gap-2">
                   <div>
                     <h4 className="font-semibold text-foreground flex items-center gap-1.5">
-                      {entry.grade === 'good' && <ThumbsUp className="h-4 w-4 text-green-500" />}
-                      {entry.grade === 'bad' && <ThumbsDown className="h-4 w-4 text-red-500" />}
-                      {entry.grade === 'neutral' && <MinusCircle className="h-4 w-4 text-muted-foreground" />}
-                      {entry.foodName}
+                      <HeartPulse className="h-4 w-4 text-green-500" />
+                      {entry.exerciseName} ({entry.durationMinutes} min)
                     </h4>
                     <p className="text-xs text-muted-foreground">
-                      Logged: {new Date(entry.loggedAt).toLocaleTimeString()} - Health Impact: <span className={entry.healthImpactPercentage > 0 ? "text-red-500" : entry.healthImpactPercentage < 0 ? "text-green-500" : ""}>{entry.healthImpactPercentage.toFixed(1)}%</span>
+                      Logged: {new Date(entry.loggedAt).toLocaleTimeString()} - Health Impact: <span className="text-green-500">-{entry.benefitScore.toFixed(1)}%</span>
                     </p>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5 text-right flex-shrink-0">Now: {entry.healthAfter.toFixed(1)}%</p>
@@ -394,11 +364,5 @@ export default function FoodLogPage() {
         </Card>
       </div>
     </div>
-    <MonsterRiddleModal
-        isOpen={isRiddleModalOpen}
-        onClose={() => setIsRiddleModalOpen(false)}
-        onChallengeComplete={handleRiddleChallengeComplete}
-    />
-    </>
   );
 }

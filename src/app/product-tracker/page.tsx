@@ -1,20 +1,29 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useTransition, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Trash2, Target, Award, ListChecks, ShieldCheck, Gem, Star } from "lucide-react";
+import { PlusCircle, Trash2, Target, Award, ListChecks, ShieldCheck, Gem, Star, Info, Sparkles, Skull, HeartPulse, HelpCircle } from "lucide-react";
 import { Label } from '@/components/ui/label';
+import { gradeProductEffectAction } from './actions';
+import type { ProductEffectGradingOutput } from '@/ai/flows/product-effect-grading-flow';
+import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-interface ProductEntry {
+
+interface ProductEntryClient extends ProductEffectGradingOutput {
   id: string;
-  name: string;
-  notes?: string;
+  clientNotes?: string; // Notes entered by user on client, not sent to AI
+  loggedAt: string;
+  isGraded: boolean;
 }
 
 const POINTS_PER_PRODUCT = 10;
@@ -26,10 +35,34 @@ const TIERS = {
   GOLD: { name: "Gold Tier", points: 1000, icon: Award, benefits: "10% site-wide discount + FREE Premium Month!" },
 };
 
+const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
+const MONSTER_NAME_KEY = 'morgellonMonsterName';
+const MONSTER_HEALTH_KEY = 'morgellonMonsterHealth';
+const MONSTER_GENERATED_KEY = 'morgellonMonsterGenerated';
+const MONSTER_TOMB_KEY = 'morgellonMonsterTomb';
+const WORKING_PRODUCTS_KEY = 'workingProducts';
+const NOT_WORKING_PRODUCTS_KEY = 'notWorkingProducts';
+const USER_POINTS_KEY = 'userPoints';
+const MONSTER_LAST_RECOVERY_DATE_KEY = 'monsterLastRecoveryDate';
+
+
+const MONSTER_DEATH_THRESHOLD = -50;
+const MAX_MONSTER_HEALTH = 200;
+const INITIAL_HEALTH_MIN = 80;
+const INITIAL_HEALTH_MAX = 100;
+const MIN_RECOVERY = 10;
+const MAX_RECOVERY = 20;
+
+interface TombEntry {
+  name: string;
+  imageUrl: string;
+  diedAt: string;
+}
+
 
 export default function ProductTrackerPage() {
-  const [workingProducts, setWorkingProducts] = useState<ProductEntry[]>([]);
-  const [notWorkingProducts, setNotWorkingProducts] = useState<ProductEntry[]>([]);
+  const [workingProducts, setWorkingProducts] = useState<ProductEntryClient[]>([]);
+  const [notWorkingProducts, setNotWorkingProducts] = useState<ProductEntryClient[]>([]);
   
   const [currentProductName, setCurrentProductName] = useState('');
   const [currentProductNotes, setCurrentProductNotes] = useState('');
@@ -40,63 +73,134 @@ export default function ProductTrackerPage() {
   const [userPoints, setUserPoints] = useState(0);
   const [currentTier, setCurrentTier] = useState(TIERS.NONE);
 
-  // Load data from localStorage on mount
-  useEffect(() => {
-    const savedWorkingProducts = localStorage.getItem('workingProducts');
-    if (savedWorkingProducts) {
-      setWorkingProducts(JSON.parse(savedWorkingProducts));
-    }
-    const savedNotWorkingProducts = localStorage.getItem('notWorkingProducts');
-    if (savedNotWorkingProducts) {
-      setNotWorkingProducts(JSON.parse(savedNotWorkingProducts));
-    }
-    const savedUserPoints = localStorage.getItem('userPoints');
-    if (savedUserPoints) {
-      const points = parseInt(savedUserPoints, 10);
-      setUserPoints(points);
-    }
-  }, []);
+  const [isGradingProduct, startGradingProductTransition] = useTransition();
+  const { toast } = useToast();
+  const router = useRouter();
 
-  // Update tier whenever userPoints change
-  useEffect(() => {
-    if (userPoints >= TIERS.GOLD.points) {
-      setCurrentTier(TIERS.GOLD);
-    } else if (userPoints >= TIERS.SILVER.points) {
-      setCurrentTier(TIERS.SILVER);
-    } else if (userPoints >= TIERS.BRONZE.points) {
-      setCurrentTier(TIERS.BRONZE);
-    } else {
-      setCurrentTier(TIERS.NONE);
+  const [monsterImageUrl, setMonsterImageUrl] = useState<string | null>(null);
+  const [monsterName, setMonsterName] = useState<string | null>(null);
+  const [monsterHealth, setMonsterHealth] = useState<number | null>(null);
+  const [showDamageEffect, setShowDamageEffect] = useState(false);
+
+  const performNightlyRecovery = useCallback(() => {
+    const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
+    if (monsterGenerated !== 'true') return;
+
+    const storedName = localStorage.getItem(MONSTER_NAME_KEY);
+    const storedHealthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
+    if (!storedHealthStr || !storedName) return;
+    
+    let currentHealthVal = parseFloat(storedHealthStr);
+    if (isNaN(currentHealthVal) || currentHealthVal <= MONSTER_DEATH_THRESHOLD) return;
+
+    const lastRecoveryDate = localStorage.getItem(MONSTER_LAST_RECOVERY_DATE_KEY);
+    const todayDateStr = new Date().toDateString();
+
+    if (lastRecoveryDate !== todayDateStr) {
+      const recoveryAmount = Math.floor(Math.random() * (MAX_RECOVERY - MIN_RECOVERY + 1)) + MIN_RECOVERY;
+      const newHealth = Math.min(currentHealthVal + recoveryAmount, MAX_MONSTER_HEALTH);
+      
+      setMonsterHealth(newHealth); 
+      localStorage.setItem(MONSTER_HEALTH_KEY, String(newHealth));
+      localStorage.setItem(MONSTER_LAST_RECOVERY_DATE_KEY, todayDateStr);
+      
+      toast({
+        title: "Monster Recovery!",
+        description: `${storedName} recovered ${recoveryAmount} health overnight! Current health: ${newHealth.toFixed(1)}%.`,
+        variant: "default",
+        duration: 7000,
+      });
     }
+  }, [toast]);
+
+  useEffect(() => {
+    const storedMonsterImage = localStorage.getItem(MONSTER_IMAGE_KEY);
+    const storedMonsterName = localStorage.getItem(MONSTER_NAME_KEY);
+    const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
+
+    if (monsterGenerated === 'true' && storedMonsterImage && storedMonsterName) {
+      setMonsterImageUrl(storedMonsterImage);
+      setMonsterName(storedMonsterName);
+      const storedHealth = localStorage.getItem(MONSTER_HEALTH_KEY);
+      if (storedHealth) {
+        setMonsterHealth(parseFloat(storedHealth));
+      } else {
+        const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
+        setMonsterHealth(initialHealth);
+        localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
+      }
+       performNightlyRecovery();
+    }
+
+    const savedWorkingProducts = localStorage.getItem(WORKING_PRODUCTS_KEY);
+    if (savedWorkingProducts) setWorkingProducts(JSON.parse(savedWorkingProducts));
+    
+    const savedNotWorkingProducts = localStorage.getItem(NOT_WORKING_PRODUCTS_KEY);
+    if (savedNotWorkingProducts) setNotWorkingProducts(JSON.parse(savedNotWorkingProducts));
+    
+    const savedUserPoints = localStorage.getItem(USER_POINTS_KEY);
+    if (savedUserPoints) setUserPoints(parseInt(savedUserPoints, 10));
+
+  }, [performNightlyRecovery]);
+
+  useEffect(() => {
+    if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true') {
+      localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
+    }
+  }, [monsterHealth]);
+
+  useEffect(() => {
+    if (userPoints >= TIERS.GOLD.points) setCurrentTier(TIERS.GOLD);
+    else if (userPoints >= TIERS.SILVER.points) setCurrentTier(TIERS.SILVER);
+    else if (userPoints >= TIERS.BRONZE.points) setCurrentTier(TIERS.BRONZE);
+    else setCurrentTier(TIERS.NONE);
   }, [userPoints]);
 
-  // Save data to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('workingProducts', JSON.stringify(workingProducts));
-  }, [workingProducts]);
+  useEffect(() => { localStorage.setItem(WORKING_PRODUCTS_KEY, JSON.stringify(workingProducts)); }, [workingProducts]);
+  useEffect(() => { localStorage.setItem(NOT_WORKING_PRODUCTS_KEY, JSON.stringify(notWorkingProducts)); }, [notWorkingProducts]);
+  useEffect(() => { localStorage.setItem(USER_POINTS_KEY, String(userPoints)); }, [userPoints]);
 
-  useEffect(() => {
-    localStorage.setItem('notWorkingProducts', JSON.stringify(notWorkingProducts));
-  }, [notWorkingProducts]);
-
-  useEffect(() => {
-    localStorage.setItem('userPoints', String(userPoints));
-  }, [userPoints]);
-
-  const addPoints = () => {
-    // Allow points accumulation even if Gold tier is reached, for future potential tiers/leaderboards
-    setUserPoints(prevPoints => prevPoints + POINTS_PER_PRODUCT);
-  };
+  const addPoints = () => setUserPoints(prevPoints => prevPoints + POINTS_PER_PRODUCT);
 
   const handleAddWorkingProduct = () => {
     if (!currentProductName.trim()) return;
-    const newProduct: ProductEntry = {
-      id: Date.now().toString(),
-      name: currentProductName.trim(),
-      notes: currentProductNotes.trim(),
+    const tempId = Date.now().toString();
+    const newProductPending: ProductEntryClient = {
+      id: tempId,
+      productName: currentProductName.trim(),
+      clientNotes: currentProductNotes.trim(),
+      loggedAt: new Date().toISOString(),
+      benefitScore: 0, // Placeholder
+      reasoning: "Grading...",
+      isGraded: false,
     };
-    setWorkingProducts(prev => [newProduct, ...prev]);
-    addPoints();
+    setWorkingProducts(prev => [newProductPending, ...prev]);
+    
+    startGradingProductTransition(async () => {
+      try {
+        const aiResult = await gradeProductEffectAction({ 
+          productName: newProductPending.productName, 
+          notes: newProductPending.clientNotes 
+        });
+        setWorkingProducts(prev => prev.map(p => p.id === tempId ? {
+          ...p,
+          benefitScore: aiResult.benefitScore,
+          reasoning: aiResult.reasoning,
+          productName: aiResult.productName, // AI might refine the name
+          isGraded: true,
+        } : p));
+        addPoints();
+        toast({
+          title: "Product Graded",
+          description: `${aiResult.productName} has a benefit score of ${aiResult.benefitScore}/5. You can now 'Use' it.`,
+          duration: 7000
+        });
+      } catch (e) {
+        const errorMsg = e instanceof Error ? e.message : "AI grading failed.";
+        setWorkingProducts(prev => prev.filter(p => p.id !== tempId)); // Remove if grading fails
+        toast({ title: "Grading Error", description: errorMsg, variant: "destructive", duration: 7000 });
+      }
+    });
     setCurrentProductName('');
     setCurrentProductNotes('');
   };
@@ -107,10 +211,14 @@ export default function ProductTrackerPage() {
 
   const handleAddNotWorkingProduct = () => {
     if (!pastProductName.trim()) return;
-    const newProduct: ProductEntry = {
+    const newProduct: ProductEntryClient = {
       id: Date.now().toString(),
-      name: pastProductName.trim(),
-      notes: pastProductNotes.trim(),
+      productName: pastProductName.trim(),
+      clientNotes: pastProductNotes.trim(),
+      loggedAt: new Date().toISOString(),
+      benefitScore: 0, // N/A for not working
+      reasoning: 'Did not work or had adverse effects.', // Default reasoning
+      isGraded: true, // Considered "graded" as it's user-assessed
     };
     setNotWorkingProducts(prev => [newProduct, ...prev]);
     addPoints();
@@ -122,15 +230,59 @@ export default function ProductTrackerPage() {
     setNotWorkingProducts(prev => prev.filter(p => p.id !== id));
   };
 
+  const checkMonsterDeath = (currentHealth: number, cause: string) => {
+    if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterName && monsterImageUrl) {
+       const tomb: TombEntry[] = JSON.parse(localStorage.getItem(MONSTER_TOMB_KEY) || '[]');
+       tomb.unshift({ name: monsterName, imageUrl: monsterImageUrl, diedAt: new Date().toISOString() });
+       localStorage.setItem(MONSTER_TOMB_KEY, JSON.stringify(tomb.slice(0, 50)));
+       localStorage.removeItem(MONSTER_IMAGE_KEY);
+       localStorage.removeItem(MONSTER_NAME_KEY);
+       localStorage.removeItem(MONSTER_HEALTH_KEY);
+       localStorage.removeItem(MONSTER_GENERATED_KEY);
+       setMonsterImageUrl(null); setMonsterName(null); setMonsterHealth(null);
+       toast({
+         title: "Your Monster Has Perished!",
+         description: `${monsterName} has fallen due to ${cause}, with ${currentHealth.toFixed(1)}% health. Visit the Tomb.`,
+         variant: "destructive", duration: Number.MAX_SAFE_INTEGER
+       });
+       router.push('/create-monster');
+       return true;
+     }
+     return false;
+   };
+
+  const handleUseProduct = (product: ProductEntryClient) => {
+    if (!monsterGenerated || monsterHealth === null || !product.isGraded) return;
+    
+    const healthBefore = monsterHealth;
+    let newHealth = healthBefore - product.benefitScore; // Higher benefit score = more health reduction
+    newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth);
+
+    setMonsterHealth(newHealth);
+    setShowDamageEffect(true);
+    setTimeout(() => setShowDamageEffect(false), 700);
+
+    if (!checkMonsterDeath(newHealth, product.productName)) {
+      toast({
+        title: `Used ${product.productName}!`,
+        description: `Monster health reduced by ${product.benefitScore.toFixed(1)}%. Current: ${newHealth.toFixed(1)}%.`,
+        variant: "default",
+        duration: Number.MAX_SAFE_INTEGER,
+      });
+    }
+  };
+  
+  const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+
   const nextTierPoints = () => {
     if (currentTier.points < TIERS.BRONZE.points) return TIERS.BRONZE.points;
     if (currentTier.points < TIERS.SILVER.points) return TIERS.SILVER.points;
     if (currentTier.points < TIERS.GOLD.points) return TIERS.GOLD.points;
-    return TIERS.GOLD.points; // Max tier for now
+    return TIERS.GOLD.points; 
   };
   
   const progressToNextTier = () => {
-    if (currentTier === TIERS.GOLD) return 100; // Already at max tier
+    if (currentTier === TIERS.GOLD) return 100;
     const pointsForNext = nextTierPoints();
     const pointsForCurrent = currentTier.points;
     const neededForNext = pointsForNext - pointsForCurrent;
@@ -138,8 +290,8 @@ export default function ProductTrackerPage() {
     return Math.max(0, Math.min((earnedTowardsNext / neededForNext) * 100, 100));
   };
 
-
   return (
+    <TooltipProvider>
     <div className="space-y-8">
       <Card className="border-primary/50 shadow-lg">
         <CardHeader>
@@ -178,15 +330,44 @@ export default function ProductTrackerPage() {
                 : <p className="text-xs text-green-500">You've reached the highest tier! Congratulations!</p>
             }
           </div>
-          <p className="text-xs text-muted-foreground pt-2">Each product logged (working or not) earns {POINTS_PER_PRODUCT} points. Other contributions (forum posts, journal entries) also count towards your score when logged here.</p>
+          <p className="text-xs text-muted-foreground pt-2">Each product logged (working or not) earns {POINTS_PER_PRODUCT} points.</p>
         </CardContent>
       </Card>
+
+      {monsterGenerated && monsterName && monsterImageUrl && monsterHealth !== null && (
+        <Card className={cn("lg:col-span-1", showDamageEffect && 'animate-damage-flash')}>
+          <CardHeader className="items-center text-center">
+            <Link href="/my-profile">
+                <Image src={monsterImageUrl} alt={monsterName} width={100} height={100} className="rounded-full border-2 border-primary shadow-md mx-auto cursor-pointer hover:opacity-80 transition-opacity" data-ai-hint="generated monster"/>
+            </Link>
+            <CardTitle className="font-headline text-xl pt-2">{monsterName}</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center">
+            <Label htmlFor="monster-health-progress" className="text-sm font-medium block mb-1">
+              Monster Health: {monsterHealth.toFixed(1)}%
+            </Label>
+            <Progress id="monster-health-progress" value={Math.max(0, Math.min((monsterHealth - MONSTER_DEATH_THRESHOLD) / (MAX_MONSTER_HEALTH - MONSTER_DEATH_THRESHOLD) * 100, 100))} className="w-full h-2.5" />
+            <p className="text-xs text-muted-foreground mt-1">Dies at {MONSTER_DEATH_THRESHOLD}%, Max: {MAX_MONSTER_HEALTH}%</p>
+          </CardContent>
+        </Card>
+      )}
+      {!monsterGenerated && (
+         <Card className="p-4 bg-muted/50 text-center">
+            <Info className="mx-auto h-8 w-8 text-primary mb-2" />
+            <CardTitle className="text-md mb-1">No Active Monster</CardTitle>
+            <p className="text-sm text-muted-foreground mb-3">Create a monster to use products and see their health impact.</p>
+            <Button asChild size="sm">
+                <Link href="/create-monster"><Sparkles className="mr-2 h-4 w-4"/>Create Monster</Link>
+            </Button>
+        </Card>
+      )}
+
 
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="font-headline">Currently Using & Working</CardTitle>
-            <CardDescription>List products that are currently helping you.</CardDescription>
+            <CardDescription>List products that help. AI will grade their benefit (1-5 score). Using a product reduces monster health by its score.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -197,6 +378,7 @@ export default function ProductTrackerPage() {
                   value={currentProductName} 
                   onChange={(e) => setCurrentProductName(e.target.value)} 
                   placeholder="e.g., Specific Vitamin C Serum" 
+                  disabled={isGradingProduct}
                 />
               </div>
               <div>
@@ -207,24 +389,51 @@ export default function ProductTrackerPage() {
                   onChange={(e) => setCurrentProductNotes(e.target.value)} 
                   placeholder="e.g., Brand X, 500mg daily" 
                   className="min-h-[60px]"
+                  disabled={isGradingProduct}
                 />
               </div>
             </div>
-            <Button onClick={handleAddWorkingProduct} className="w-full sm:w-auto">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Working Product
+            <Button onClick={handleAddWorkingProduct} className="w-full sm:w-auto" disabled={isGradingProduct || !currentProductName.trim()}>
+              {isGradingProduct ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+              {isGradingProduct ? 'Grading Product...' : 'Add & Grade Working Product'}
             </Button>
             <div className="space-y-3 pt-4 max-h-96 overflow-y-auto">
               {workingProducts.length === 0 && <p className="text-sm text-muted-foreground">No working products logged yet.</p>}
               {workingProducts.map(product => (
                 <Card key={product.id} className="p-3 bg-card/60">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-semibold text-foreground">{product.name}</h4>
-                      {product.notes && <p className="text-xs text-muted-foreground mt-1">{product.notes}</p>}
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="flex-grow">
+                      <h4 className="font-semibold text-foreground">{product.productName}</h4>
+                      {product.clientNotes && <p className="text-xs text-muted-foreground mt-0.5">{product.clientNotes}</p>}
+                       <div className="text-xs mt-1">
+                        {product.isGraded ? (
+                            <div className="flex items-center gap-1">
+                                <Badge variant="default">Benefit: {product.benefitScore}/5</Badge>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-5 w-5"><HelpCircle className="h-3.5 w-3.5 text-muted-foreground"/></Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="max-w-xs">
+                                        <p className="text-xs font-medium">AI Reasoning:</p>
+                                        <p className="text-xs">{product.reasoning}</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
+                        ) : (
+                            <Badge variant="outline" className="animate-pulse">Grading by AI...</Badge>
+                        )}
+                      </div>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => handleRemoveWorkingProduct(product.id)} aria-label="Remove product">
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                        <Button variant="ghost" size="icon" onClick={() => handleRemoveWorkingProduct(product.id)} aria-label="Remove product" className="h-7 w-7">
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                        {monsterGenerated && product.isGraded && (
+                            <Button size="sm" variant="outline" onClick={() => handleUseProduct(product)} className="text-xs h-7 px-2" disabled={monsterHealth === null || monsterHealth <= MONSTER_DEATH_THRESHOLD}>
+                                <HeartPulse className="mr-1 h-3 w-3"/> Use
+                            </Button>
+                        )}
+                    </div>
                   </div>
                 </Card>
               ))}
@@ -235,7 +444,7 @@ export default function ProductTrackerPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline">Tried & Did Not Work</CardTitle>
-            <CardDescription>List products that didn't provide the desired results for you.</CardDescription>
+            <CardDescription>List products that didn't help or had adverse effects.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -259,7 +468,7 @@ export default function ProductTrackerPage() {
                 />
               </div>
             </div>
-            <Button onClick={handleAddNotWorkingProduct} className="w-full sm:w-auto">
+            <Button onClick={handleAddNotWorkingProduct} className="w-full sm:w-auto" disabled={!pastProductName.trim()}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add Past Product
             </Button>
             <div className="space-y-3 pt-4 max-h-96 overflow-y-auto">
@@ -268,10 +477,10 @@ export default function ProductTrackerPage() {
                 <Card key={product.id} className="p-3 bg-card/60">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h4 className="font-semibold text-foreground">{product.name}</h4>
-                      {product.notes && <p className="text-xs text-muted-foreground mt-1">{product.notes}</p>}
+                      <h4 className="font-semibold text-foreground">{product.productName}</h4>
+                      {product.clientNotes && <p className="text-xs text-muted-foreground mt-1">{product.clientNotes}</p>}
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => handleRemoveNotWorkingProduct(product.id)} aria-label="Remove product">
+                    <Button variant="ghost" size="icon" onClick={() => handleRemoveNotWorkingProduct(product.id)} aria-label="Remove product" className="h-7 w-7">
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
@@ -282,7 +491,6 @@ export default function ProductTrackerPage() {
         </Card>
       </div>
     </div>
+    </TooltipProvider>
   );
 }
-
-    
