@@ -20,7 +20,7 @@ const MonsterBanterInputSchema = z.object({
   previousBanter: z.array(z.object({
     speakerMonsterName: z.string().optional().describe("The monster previously featured or 'speaking' in the banter."), // Making this optional as AI might describe a general scene
     banterText: z.string().describe("The previous line of monster banter.")
-  })).optional().max(3).describe("The last few lines of monster banter, if any, for context."),
+  })).max(3).optional().describe("The last few lines of monster banter, if any, for context. Maximum of 3 entries."),
 });
 export type MonsterBanterInput = z.infer<typeof MonsterBanterInputSchema>;
 
@@ -81,3 +81,4 @@ const monsterBanterFlow = ai.defineFlow(
     return output;
   }
 );
+
