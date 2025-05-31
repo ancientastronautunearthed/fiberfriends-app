@@ -61,6 +61,11 @@
     --border: 240 6% 18%;         /* Darker border for dark theme */
     --input: 240 7% 16%;          /* Darker input for dark theme */
     --ring: 275 80% 60%;           /* Primary color for rings */
+    --chart-1: 12 76% 61%; /* Keeping chart colors consistent for now */
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
 
     --sidebar-background: 240 10% 7%;
     --sidebar-foreground: 220 15% 80%;
