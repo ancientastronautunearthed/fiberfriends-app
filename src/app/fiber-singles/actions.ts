@@ -16,6 +16,12 @@ import {
   MessageQualityInput,
   MessageQualityOutput,
 } from '@/ai/flows/message-quality-flow';
+import {
+  generateMonsterBanter,
+  MonsterBanterInput,
+  MonsterBanterOutput,
+} from '@/ai/flows/monster-banter-flow';
+
 
 export async function expandRomanticMonsterPromptAction(
   input: RomanticMonsterWordsInput
@@ -59,5 +65,20 @@ export async function analyzeMessageQualityAction(
       throw new Error(`Failed to analyze message quality: ${error.message}`);
     }
     throw new Error("An unexpected error occurred during message quality analysis.");
+  }
+}
+
+export async function generateMonsterBanterAction(
+  input: MonsterBanterInput
+): Promise<MonsterBanterOutput> {
+  try {
+    const result = await generateMonsterBanter(input);
+    return result;
+  } catch (error) {
+    console.error("Error in generateMonsterBanterAction:", error);
+    if (error instanceof Error) {
+      throw new Error(`Failed to generate monster banter: ${error.message}`);
+    }
+    throw new Error("An unexpected error occurred during monster banter generation.");
   }
 }
