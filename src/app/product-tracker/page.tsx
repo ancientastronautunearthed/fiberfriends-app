@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Trash2, Target, Award, ListChecks, ShieldCheck, Gem, Star, Info, Sparkles, Skull, HeartPulse, HelpCircle } from "lucide-react";
+import { PlusCircle, Trash2, Target, Award, ListChecks, ShieldCheck, Gem, Star, Info, Sparkles, Skull, HeartPulse, HelpCircle, Loader2 } from "lucide-react";
 import { Label } from '@/components/ui/label';
 import { gradeProductEffectAction } from './actions';
 import type { ProductEffectGradingOutput } from '@/ai/flows/product-effect-grading-flow';
@@ -17,11 +17,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import Image from "next/image";
 
 
 interface ProductEntryClient extends ProductEffectGradingOutput {
   id: string;
-  clientNotes?: string; // Notes entered by user on client, not sent to AI
+  clientNotes?: string; 
   loggedAt: string;
   isGraded: boolean;
 }
@@ -105,8 +106,8 @@ export default function ProductTrackerPage() {
       localStorage.setItem(MONSTER_LAST_RECOVERY_DATE_KEY, todayDateStr);
       
       toast({
-        title: "Monster Recovery!",
-        description: `${storedName} recovered ${recoveryAmount} health overnight! Current health: ${newHealth.toFixed(1)}%.`,
+        title: `${storedName} Stirs...`,
+        description: `Heh. While you slept, I regained ${recoveryAmount} health. I'm now at ${newHealth.toFixed(1)}%.`,
         variant: "default",
         duration: 7000,
       });
@@ -144,10 +145,15 @@ export default function ProductTrackerPage() {
   }, [performNightlyRecovery]);
 
   useEffect(() => {
-    if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true') {
+    if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true' && monsterName) {
       localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
+      checkMonsterDeath(monsterHealth, "its own frail constitution"); // Default cause
     }
-  }, [monsterHealth]);
+  }, [monsterHealth, monsterName]);
+
+  useEffect(() => { localStorage.setItem(WORKING_PRODUCTS_KEY, JSON.stringify(workingProducts)); }, [workingProducts]);
+  useEffect(() => { localStorage.setItem(NOT_WORKING_PRODUCTS_KEY, JSON.stringify(notWorkingProducts)); }, [notWorkingProducts]);
+  useEffect(() => { localStorage.setItem(USER_POINTS_KEY, String(userPoints)); }, [userPoints]);
 
   useEffect(() => {
     if (userPoints >= TIERS.GOLD.points) setCurrentTier(TIERS.GOLD);
@@ -156,22 +162,19 @@ export default function ProductTrackerPage() {
     else setCurrentTier(TIERS.NONE);
   }, [userPoints]);
 
-  useEffect(() => { localStorage.setItem(WORKING_PRODUCTS_KEY, JSON.stringify(workingProducts)); }, [workingProducts]);
-  useEffect(() => { localStorage.setItem(NOT_WORKING_PRODUCTS_KEY, JSON.stringify(notWorkingProducts)); }, [notWorkingProducts]);
-  useEffect(() => { localStorage.setItem(USER_POINTS_KEY, String(userPoints)); }, [userPoints]);
 
   const addPoints = () => setUserPoints(prevPoints => prevPoints + POINTS_PER_PRODUCT);
 
   const handleAddWorkingProduct = () => {
-    if (!currentProductName.trim()) return;
+    if (!currentProductName.trim() || !monsterName) return;
     const tempId = Date.now().toString();
     const newProductPending: ProductEntryClient = {
       id: tempId,
       productName: currentProductName.trim(),
       clientNotes: currentProductNotes.trim(),
       loggedAt: new Date().toISOString(),
-      benefitScore: 0, // Placeholder
-      reasoning: "Grading...",
+      benefitScore: 0, 
+      reasoning: "Awaiting assessment...",
       isGraded: false,
     };
     setWorkingProducts(prev => [newProductPending, ...prev]);
@@ -186,19 +189,24 @@ export default function ProductTrackerPage() {
           ...p,
           benefitScore: aiResult.benefitScore,
           reasoning: aiResult.reasoning,
-          productName: aiResult.productName, // AI might refine the name
+          productName: aiResult.productName, 
           isGraded: true,
         } : p));
         addPoints();
         toast({
-          title: "Product Graded",
-          description: `${aiResult.productName} has a benefit score of ${aiResult.benefitScore}/5. You can now 'Use' it.`,
-          duration: 7000
+          title: `AI Analysis: ${aiResult.productName}`,
+          description: `It has a ${aiResult.benefitScore}/5 benefit. ${monsterName} scoffs: 'As if I'd let that weaken me! ${aiResult.reasoning.substring(0,70)}...'`,
+          duration: Number.MAX_SAFE_INTEGER
         });
       } catch (e) {
         const errorMsg = e instanceof Error ? e.message : "AI grading failed.";
-        setWorkingProducts(prev => prev.filter(p => p.id !== tempId)); // Remove if grading fails
-        toast({ title: "Grading Error", description: errorMsg, variant: "destructive", duration: 7000 });
+        setWorkingProducts(prev => prev.filter(p => p.id !== tempId)); 
+        toast({ 
+            title: "Grading Error", 
+            description: `${monsterName} cackles: 'The AI couldn't handle assessing ${newProductPending.productName}! Pathetic! Error: ${errorMsg}'`, 
+            variant: "destructive", 
+            duration: Number.MAX_SAFE_INTEGER 
+        });
       }
     });
     setCurrentProductName('');
@@ -216,9 +224,9 @@ export default function ProductTrackerPage() {
       productName: pastProductName.trim(),
       clientNotes: pastProductNotes.trim(),
       loggedAt: new Date().toISOString(),
-      benefitScore: 0, // N/A for not working
-      reasoning: 'Did not work or had adverse effects.', // Default reasoning
-      isGraded: true, // Considered "graded" as it's user-assessed
+      benefitScore: 0, 
+      reasoning: 'User marked as "Did not work or had adverse effects".', 
+      isGraded: true, 
     };
     setNotWorkingProducts(prev => [newProduct, ...prev]);
     addPoints();
@@ -241,8 +249,8 @@ export default function ProductTrackerPage() {
        localStorage.removeItem(MONSTER_GENERATED_KEY);
        setMonsterImageUrl(null); setMonsterName(null); setMonsterHealth(null);
        toast({
-         title: "Your Monster Has Perished!",
-         description: `${monsterName} has fallen due to ${cause}, with ${currentHealth.toFixed(1)}% health. Visit the Tomb.`,
+         title: `${monsterName} Has Perished!`,
+         description: `Its reign of internal terror ends, falling to ${currentHealth.toFixed(1)}% health due to ${cause}. A new shadow will soon take its place... Create it now!`,
          variant: "destructive", duration: Number.MAX_SAFE_INTEGER
        });
        router.push('/create-monster');
@@ -252,10 +260,10 @@ export default function ProductTrackerPage() {
    };
 
   const handleUseProduct = (product: ProductEntryClient) => {
-    if (!monsterGenerated || monsterHealth === null || !product.isGraded) return;
+    if (!monsterGenerated || monsterHealth === null || !product.isGraded || !monsterName) return;
     
     const healthBefore = monsterHealth;
-    let newHealth = healthBefore - product.benefitScore; // Higher benefit score = more health reduction
+    let newHealth = healthBefore - product.benefitScore; 
     newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth);
 
     setMonsterHealth(newHealth);
@@ -264,9 +272,9 @@ export default function ProductTrackerPage() {
 
     if (!checkMonsterDeath(newHealth, product.productName)) {
       toast({
-        title: `Used ${product.productName}!`,
-        description: `Monster health reduced by ${product.benefitScore.toFixed(1)}%. Current: ${newHealth.toFixed(1)}%.`,
-        variant: "default",
+        title: `${monsterName} screeches!`,
+        description: `That wretched ${product.productName}! My health plummets to ${newHealth.toFixed(1)}% (-${product.benefitScore.toFixed(1)}%)! Its supposed benefit is just a curse.`,
+        variant: "default", // Or warning
         duration: Number.MAX_SAFE_INTEGER,
       });
     }
@@ -289,6 +297,13 @@ export default function ProductTrackerPage() {
     const earnedTowardsNext = userPoints - pointsForCurrent;
     return Math.max(0, Math.min((earnedTowardsNext / neededForNext) * 100, 100));
   };
+  
+  const getHealthBarValue = () => {
+      if (monsterHealth === null) return 0;
+      const range = MAX_MONSTER_HEALTH - MONSTER_DEATH_THRESHOLD;
+      const currentValInRange = monsterHealth - MONSTER_DEATH_THRESHOLD;
+      return Math.max(0, Math.min((currentValInRange / range) * 100, 100));
+  }
 
   return (
     <TooltipProvider>
@@ -346,7 +361,7 @@ export default function ProductTrackerPage() {
             <Label htmlFor="monster-health-progress" className="text-sm font-medium block mb-1">
               Monster Health: {monsterHealth.toFixed(1)}%
             </Label>
-            <Progress id="monster-health-progress" value={Math.max(0, Math.min((monsterHealth - MONSTER_DEATH_THRESHOLD) / (MAX_MONSTER_HEALTH - MONSTER_DEATH_THRESHOLD) * 100, 100))} className="w-full h-2.5" />
+            <Progress id="monster-health-progress" value={getHealthBarValue()} className="w-full h-2.5" />
             <p className="text-xs text-muted-foreground mt-1">Dies at {MONSTER_DEATH_THRESHOLD}%, Max: {MAX_MONSTER_HEALTH}%</p>
           </CardContent>
         </Card>
@@ -395,7 +410,7 @@ export default function ProductTrackerPage() {
             </div>
             <Button onClick={handleAddWorkingProduct} className="w-full sm:w-auto" disabled={isGradingProduct || !currentProductName.trim()}>
               {isGradingProduct ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-              {isGradingProduct ? 'Grading Product...' : 'Add & Grade Working Product'}
+              {isGradingProduct ? `Asking ${monsterName || 'the AI'} about ${currentProductName}...` : 'Add & Grade Working Product'}
             </Button>
             <div className="space-y-3 pt-4 max-h-96 overflow-y-auto">
               {workingProducts.length === 0 && <p className="text-sm text-muted-foreground">No working products logged yet.</p>}
@@ -414,7 +429,7 @@ export default function ProductTrackerPage() {
                                         <Button variant="ghost" size="icon" className="h-5 w-5"><HelpCircle className="h-3.5 w-3.5 text-muted-foreground"/></Button>
                                     </TooltipTrigger>
                                     <TooltipContent side="top" className="max-w-xs">
-                                        <p className="text-xs font-medium">AI Reasoning:</p>
+                                        <p className="text-xs font-medium">{monsterName || 'AI'} Reasoning:</p>
                                         <p className="text-xs">{product.reasoning}</p>
                                     </TooltipContent>
                                 </Tooltip>
@@ -494,3 +509,4 @@ export default function ProductTrackerPage() {
     </TooltipProvider>
   );
 }
+

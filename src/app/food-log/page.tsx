@@ -91,8 +91,8 @@ export default function FoodLogPage() {
       localStorage.setItem(MONSTER_LAST_RECOVERY_DATE_KEY, todayDateStr);
       
       toast({
-        title: "Monster Recovery!",
-        description: `${storedName} recovered ${recoveryAmount} health overnight! Current health: ${newHealth.toFixed(1)}%.`,
+        title: `${storedName} Stirs...`,
+        description: `Heh. While you slept, I regained ${recoveryAmount} health. I'm now at ${newHealth.toFixed(1)}%.`,
         variant: "default",
         duration: 7000,
       });
@@ -130,11 +130,11 @@ export default function FoodLogPage() {
   }, [performNightlyRecovery]);
 
   useEffect(() => {
-    if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true') {
+    if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true' && monsterName) {
       localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
-      checkMonsterDeath(monsterHealth, "Initial health check");
+      checkMonsterDeath(monsterHealth, "its own wretched existence"); // Default cause if checked here
     }
-  }, [monsterHealth]);
+  }, [monsterHealth, monsterName]);
 
   useEffect(() => {
     if (foodLogEntries.length > 0 || localStorage.getItem(FOOD_LOG_KEY)) {
@@ -142,7 +142,7 @@ export default function FoodLogPage() {
     }
   }, [foodLogEntries]);
 
-  const checkMonsterDeath = (currentHealth: number, foodNameForToast: string) => {
+  const checkMonsterDeath = (currentHealth: number, cause: string) => {
      if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterName && monsterImageUrl) {
         const tomb: TombEntry[] = JSON.parse(localStorage.getItem(MONSTER_TOMB_KEY) || '[]');
         tomb.unshift({ name: monsterName, imageUrl: monsterImageUrl, diedAt: new Date().toISOString() });
@@ -158,8 +158,8 @@ export default function FoodLogPage() {
         setMonsterHealth(null); 
 
         toast({
-          title: "Your Monster Has Perished!",
-          description: `${foodNameForToast} contributed to its demise. ${monsterName} has fallen with ${currentHealth.toFixed(1)}% health. Visit the Tomb of Monsters. You can now create a new monster.`,
+          title: `${monsterName} Has Perished!`,
+          description: `Its reign of internal terror ends, falling to ${currentHealth.toFixed(1)}% health due to ${cause}. A new shadow will soon take its place... Create it now!`,
           variant: "destructive",
           duration: Number.MAX_SAFE_INTEGER,
         });
@@ -207,11 +207,29 @@ export default function FoodLogPage() {
         };
         setFoodLogEntries(prev => [newLogEntry, ...prev].slice(0, 20)); 
 
+        let toastTitle = "";
+        let toastDescription = "";
+        let toastVariant: "default" | "destructive" = "default";
+
+        if (result.grade === "good") {
+          toastTitle = `${monsterName} wails!`;
+          toastDescription = `Ugh, ${result.foodName}! That cursed stuff drops my health to ${newHealth.toFixed(1)}% (-${Math.abs(result.healthImpactPercentage).toFixed(1)}%). The AI mumbled something about '${result.reasoning.substring(0, 70)}...' Bah!`;
+          toastVariant = "default"; // Or perhaps a "warning" if you add one
+        } else if (result.grade === "bad") {
+          toastTitle = `${monsterName} rejoices!`;
+          toastDescription = `Yes! ${result.foodName}! My power surges to ${newHealth.toFixed(1)}% (+${result.healthImpactPercentage.toFixed(1)}%)! The AI mentioned '${result.reasoning.substring(0,70)}...' as if I care!`;
+          toastVariant = "destructive";
+        } else { // Neutral
+          toastTitle = `${monsterName} is indifferent.`;
+          toastDescription = `${result.foodName}? Means nothing to me. Health remains ${newHealth.toFixed(1)}%. AI note: ${result.reasoning.substring(0,70)}...`;
+          toastVariant = "default";
+        }
+
         if (!checkMonsterDeath(newHealth, result.foodName)) {
           toast({
-            title: `${result.foodName} Logged!`,
-            description: `Monster health changed by ${result.healthImpactPercentage.toFixed(1)}%. Current: ${newHealth.toFixed(1)}%. Reason: ${result.reasoning}`,
-            variant: result.grade === "good" ? "default" : result.grade === "bad" ? "destructive" : "default",
+            title: toastTitle,
+            description: toastDescription,
+            variant: toastVariant,
             duration: Number.MAX_SAFE_INTEGER, 
           });
         }
@@ -221,7 +239,7 @@ export default function FoodLogPage() {
         setError(errorMessage);
         toast({
           title: "Error Grading Food",
-          description: errorMessage,
+          description: `${monsterName} snarls: 'Your food request confused the AI! Or maybe it was just incompetence.' Details: ${errorMessage}`,
           variant: "destructive",
           duration: Number.MAX_SAFE_INTEGER,
         });
@@ -230,19 +248,22 @@ export default function FoodLogPage() {
   };
 
   const handleRiddleChallengeComplete = (wasCorrect: boolean) => {
-    if (monsterHealth === null) return;
+    if (monsterHealth === null || !monsterName) return;
 
     let healthChangeDescription = "";
     let newHealth = monsterHealth;
+    let toastTitle = "";
 
     if (wasCorrect) {
       newHealth -= RIDDLE_HEALTH_IMPACT;
-      healthChangeDescription = `Correct! Monster health decreased by ${RIDDLE_HEALTH_IMPACT}%.`;
-      toast({ title: "Riddle Solved!", description: healthChangeDescription, variant: "default", duration: 5000});
+      toastTitle = `${monsterName} is furious!`;
+      healthChangeDescription = `You solved it, meddler! My health drops by ${RIDDLE_HEALTH_IMPACT}%. I'll get you next time!`;
+      toast({ title: toastTitle, description: healthChangeDescription, variant: "default", duration: 7000});
     } else {
       newHealth += RIDDLE_HEALTH_IMPACT;
-      healthChangeDescription = `Incorrect! Monster health increased by ${RIDDLE_HEALTH_IMPACT}%.`;
-      toast({ title: "Riddle Failed!", description: healthChangeDescription, variant: "destructive", duration: 5000});
+      toastTitle = `${monsterName} exults!`;
+      healthChangeDescription = `FOOL! My health surges by ${RIDDLE_HEALTH_IMPACT}%! Your ignorance empowers me!`;
+      toast({ title: toastTitle, description: healthChangeDescription, variant: "destructive", duration: 7000});
     }
     newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth);
     setMonsterHealth(newHealth);
@@ -253,8 +274,8 @@ export default function FoodLogPage() {
       localStorage.setItem(USER_POINTS_KEY, String(currentPoints + FIRST_SPEAK_BONUS_POINTS));
       localStorage.setItem(MONSTER_HAS_SPOKEN_KEY, 'true');
       toast({
-        title: "Bonus Points!",
-        description: `Your monster spoke for the first time! You earned ${FIRST_SPEAK_BONUS_POINTS} contribution points.`,
+        title: `${monsterName} grumbles: 'Bonus Points?'`,
+        description: `Hmph. So my first words earned you ${FIRST_SPEAK_BONUS_POINTS} points. Don't get used to it.`,
         variant: "default",
         duration: 7000,
       });
@@ -264,15 +285,15 @@ export default function FoodLogPage() {
 
 
   const getMonsterStatusMessage = () => {
-    if (monsterHealth === null) return "";
-    if (monsterHealth <= MONSTER_DEATH_THRESHOLD) return "Your monster has perished!";
-    if (monsterHealth < 0) return `Your monster is critically weak at ${monsterHealth.toFixed(1)}%!`;
-    if (monsterHealth < 20) return "Your monster is very weak!";
-    if (monsterHealth < INITIAL_HEALTH_MIN) return "Your monster is feeling weak!";
-    if (monsterHealth > (MAX_MONSTER_HEALTH - (MAX_MONSTER_HEALTH - INITIAL_HEALTH_MAX)/2) ) return "Your monster is overwhelmingly powerful!";
-    if (monsterHealth > INITIAL_HEALTH_MAX + 20) return "Your monster is significantly strengthened!";
-    if (monsterHealth > INITIAL_HEALTH_MAX) return "Your monster is gaining strength.";
-    return "Your monster's health is stable.";
+    if (monsterHealth === null || !monsterName) return "Awaiting its creation...";
+    if (monsterHealth <= MONSTER_DEATH_THRESHOLD) return `${monsterName} has perished! Its reign is over.`;
+    if (monsterHealth < 0) return `${monsterName} is critically weak at ${monsterHealth.toFixed(1)}%! It's on the verge of oblivion!`;
+    if (monsterHealth < 20) return `${monsterName} is very weak! It can barely sustain its shadowy form.`;
+    if (monsterHealth < INITIAL_HEALTH_MIN) return `${monsterName} is feeling weak! Your efforts are noticeable.`;
+    if (monsterHealth > (MAX_MONSTER_HEALTH - (MAX_MONSTER_HEALTH - INITIAL_HEALTH_MAX)/2) ) return `${monsterName} is overwhelmingly powerful! Its presence is suffocating.`;
+    if (monsterHealth > INITIAL_HEALTH_MAX + 20) return `${monsterName} is significantly strengthened! It crackles with dark energy.`;
+    if (monsterHealth > INITIAL_HEALTH_MAX) return `${monsterName} is gaining strength. It seems pleased.`;
+    return `${monsterName}'s health is stable... for now.`;
   };
   
   const getHealthBarValue = () => {
@@ -334,7 +355,7 @@ export default function FoodLogPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline flex items-center gap-2"><Apple className="h-6 w-6 text-primary"/>Log Food Item</CardTitle>
-            <CardDescription>Enter a food item to see how it affects your monster's health. The AI will grade it.</CardDescription>
+            <CardDescription>Enter a food item to see how it affects {monsterName}. The AI will grade it, and {monsterName} will react!</CardDescription>
           </CardHeader>
           <form onSubmit={handleFoodSubmit}>
             <CardContent className="space-y-4">
@@ -358,7 +379,7 @@ export default function FoodLogPage() {
             <CardFooter>
               <Button type="submit" disabled={isGrading || !foodInput.trim()} className="w-full sm:w-auto">
                 {isGrading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Apple className="mr-2 h-4 w-4" />}
-                {isGrading ? 'Analyzing Food...' : 'Log Food & See Impact'}
+                {isGrading ? `Asking ${monsterName} about ${foodInput}...` : `Log Food & See ${monsterName}'s Reaction`}
               </Button>
             </CardFooter>
           </form>
@@ -367,7 +388,7 @@ export default function FoodLogPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline">Recent Food Log</CardTitle>
-            <CardDescription>Your last 20 food entries and their impact.</CardDescription>
+            <CardDescription>Your last 20 food entries and their impact on {monsterName}.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 max-h-96 overflow-y-auto">
             {foodLogEntries.length === 0 && <p className="text-sm text-muted-foreground">No food items logged yet.</p>}
@@ -382,12 +403,12 @@ export default function FoodLogPage() {
                       {entry.foodName}
                     </h4>
                     <p className="text-xs text-muted-foreground">
-                      Logged: {new Date(entry.loggedAt).toLocaleTimeString()} - Health Impact: <span className={entry.healthImpactPercentage > 0 ? "text-red-500" : entry.healthImpactPercentage < 0 ? "text-green-500" : ""}>{entry.healthImpactPercentage.toFixed(1)}%</span>
+                      Logged: {new Date(entry.loggedAt).toLocaleTimeString()} - Impact: <span className={entry.healthImpactPercentage > 0 ? "text-red-500" : entry.healthImpactPercentage < 0 ? "text-green-500" : ""}>{entry.healthImpactPercentage > 0 ? '+':''}{entry.healthImpactPercentage.toFixed(1)}%</span>
                     </p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 text-right flex-shrink-0">Now: {entry.healthAfter.toFixed(1)}%</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 text-right flex-shrink-0">Health after: {entry.healthAfter.toFixed(1)}%</p>
                 </div>
-                <p className="text-sm text-foreground/80 mt-1 pl-1 border-l-2 border-accent/50 ml-1.5 "> <span className="italic text-muted-foreground">AI says:</span> {entry.reasoning}</p>
+                <p className="text-sm text-foreground/80 mt-1 pl-1 border-l-2 border-accent/50 ml-1.5 "> <span className="italic text-muted-foreground">{monsterName} said:</span> "{entry.reasoning}"</p>
               </Card>
             ))}
           </CardContent>
@@ -402,3 +423,4 @@ export default function FoodLogPage() {
     </>
   );
 }
+

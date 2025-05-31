@@ -81,13 +81,13 @@ export default function ExerciseLogPage() {
       const recoveryAmount = Math.floor(Math.random() * (MAX_RECOVERY - MIN_RECOVERY + 1)) + MIN_RECOVERY;
       const newHealth = Math.min(currentHealth + recoveryAmount, MAX_MONSTER_HEALTH);
       
-      setMonsterHealth(newHealth); // Update state
+      setMonsterHealth(newHealth); 
       localStorage.setItem(MONSTER_HEALTH_KEY, String(newHealth));
       localStorage.setItem(MONSTER_LAST_RECOVERY_DATE_KEY, todayDateStr);
       
       toast({
-        title: "Monster Recovery!",
-        description: `${storedName} recovered ${recoveryAmount} health overnight! Current health: ${newHealth.toFixed(1)}%.`,
+        title: `${storedName} Stirs...`,
+        description: `Heh. While you slept, I regained ${recoveryAmount} health. I'm now at ${newHealth.toFixed(1)}%.`,
         variant: "default",
         duration: 7000,
       });
@@ -125,11 +125,11 @@ export default function ExerciseLogPage() {
   }, [performNightlyRecovery]);
 
   useEffect(() => {
-    if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true') {
+    if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true' && monsterName) {
       localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
-      checkMonsterDeath(monsterHealth, "Recent activity");
+      checkMonsterDeath(monsterHealth, "the strain of existence"); // Default cause
     }
-  }, [monsterHealth]);
+  }, [monsterHealth, monsterName]);
 
   useEffect(() => {
     if (exerciseLogEntries.length > 0 || localStorage.getItem(EXERCISE_LOG_KEY)) {
@@ -153,8 +153,8 @@ export default function ExerciseLogPage() {
         setMonsterHealth(null);
 
         toast({
-          title: "Your Monster Has Perished!",
-          description: `${monsterName} has fallen due to ${cause}, with ${currentHealth.toFixed(1)}% health. Visit the Tomb of Monsters. You can now create a new monster.`,
+          title: `${monsterName} Has Perished!`,
+          description: `Its reign of internal terror ends, falling to ${currentHealth.toFixed(1)}% health due to ${cause}. A new shadow will soon take its place... Create it now!`,
           variant: "destructive",
           duration: Number.MAX_SAFE_INTEGER,
         });
@@ -187,8 +187,8 @@ export default function ExerciseLogPage() {
         const result = await gradeExerciseAction({ exerciseDescription: exerciseInput, durationMinutes: duration });
         
         const healthBefore = monsterHealth;
-        let newHealth = healthBefore - result.benefitScore; // Benefit score reduces health
-        newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth); // Cannot exceed max health even if it was negative
+        let newHealth = healthBefore - result.benefitScore; 
+        newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth); 
         
         setMonsterHealth(newHealth);
         setExerciseInput('');
@@ -207,10 +207,10 @@ export default function ExerciseLogPage() {
         };
         setExerciseLogEntries(prev => [newLogEntry, ...prev].slice(0, 20)); 
 
-        if (!checkMonsterDeath(newHealth, result.exerciseName)) {
+        if (!checkMonsterDeath(newHealth, `the exertion of ${result.exerciseName}`)) {
           toast({
-            title: `${result.exerciseName} Logged!`,
-            description: `Monster health reduced by ${result.benefitScore.toFixed(1)}%. Current: ${newHealth.toFixed(1)}%. AI says: ${result.reasoning}`,
+            title: `${monsterName} Groans!`,
+            description: `Exercising with ${result.exerciseName} for ${duration} minutes? My health is now ${newHealth.toFixed(1)}% (-${result.benefitScore.toFixed(1)}%). ${monsterName} says: '${result.reasoning.substring(0,70)}...' Must you?`,
             variant: "default", 
             duration: Number.MAX_SAFE_INTEGER, 
           });
@@ -221,7 +221,7 @@ export default function ExerciseLogPage() {
         setError(errorMessage);
         toast({
           title: "Error Grading Exercise",
-          description: errorMessage,
+          description: `${monsterName} scoffs: 'Your attempt to log exercise was pathetic and failed. Error: ${errorMessage}'`,
           variant: "destructive",
           duration: Number.MAX_SAFE_INTEGER,
         });
@@ -230,20 +230,19 @@ export default function ExerciseLogPage() {
   };
   
   const getMonsterStatusMessage = () => {
-    if (monsterHealth === null) return "";
-    if (monsterHealth <= MONSTER_DEATH_THRESHOLD) return "Your monster has perished!";
-    if (monsterHealth < 0) return `Your monster is critically weak at ${monsterHealth.toFixed(1)}%!`;
-    if (monsterHealth < 20) return "Your monster is very weak!";
-    if (monsterHealth < INITIAL_HEALTH_MIN) return "Your monster is feeling weak!";
-    if (monsterHealth > (MAX_MONSTER_HEALTH - (MAX_MONSTER_HEALTH - INITIAL_HEALTH_MAX)/2) ) return "Your monster is overwhelmingly powerful!";
-    if (monsterHealth > INITIAL_HEALTH_MAX + 20) return "Your monster is significantly strengthened!";
-    if (monsterHealth > INITIAL_HEALTH_MAX) return "Your monster is gaining strength.";
-    return "Your monster's health is stable.";
+    if (monsterHealth === null || !monsterName) return "Awaiting its creation...";
+    if (monsterHealth <= MONSTER_DEATH_THRESHOLD) return `${monsterName} has perished! Its reign is over.`;
+    if (monsterHealth < 0) return `${monsterName} is critically weak at ${monsterHealth.toFixed(1)}%! It's on the verge of oblivion!`;
+    if (monsterHealth < 20) return `${monsterName} is very weak! It can barely sustain its shadowy form.`;
+    if (monsterHealth < INITIAL_HEALTH_MIN) return `${monsterName} is feeling weak! Your efforts are noticeable.`;
+    if (monsterHealth > (MAX_MONSTER_HEALTH - (MAX_MONSTER_HEALTH - INITIAL_HEALTH_MAX)/2) ) return `${monsterName} is overwhelmingly powerful! Its presence is suffocating.`;
+    if (monsterHealth > INITIAL_HEALTH_MAX + 20) return `${monsterName} is significantly strengthened! It crackles with dark energy.`;
+    if (monsterHealth > INITIAL_HEALTH_MAX) return `${monsterName} is gaining strength. It seems pleased.`;
+    return `${monsterName}'s health is stable... for now.`;
   };
   
   const getHealthBarValue = () => {
       if (monsterHealth === null) return 0;
-      // Scale for display: 0% on bar is MONSTER_DEATH_THRESHOLD, 100% on bar is MAX_MONSTER_HEALTH
       const range = MAX_MONSTER_HEALTH - MONSTER_DEATH_THRESHOLD;
       const currentValInRange = monsterHealth - MONSTER_DEATH_THRESHOLD;
       return Math.max(0, Math.min((currentValInRange / range) * 100, 100));
@@ -294,7 +293,7 @@ export default function ExerciseLogPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline flex items-center gap-2"><Dumbbell className="h-6 w-6 text-primary"/>Log Exercise</CardTitle>
-            <CardDescription>Enter your exercise. The AI will gauge its impact on your monster's health.</CardDescription>
+            <CardDescription>Enter your exercise. The AI will gauge its impact on {monsterName}'s health, and {monsterName} will react!</CardDescription>
           </CardHeader>
           <form onSubmit={handleExerciseSubmit}>
             <CardContent className="space-y-4">
@@ -330,7 +329,7 @@ export default function ExerciseLogPage() {
             <CardFooter>
               <Button type="submit" disabled={isGrading || !exerciseInput.trim() || !durationInput.trim()} className="w-full sm:w-auto">
                 {isGrading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Activity className="mr-2 h-4 w-4" />}
-                {isGrading ? 'Analyzing Exercise...' : 'Log Exercise & See Impact'}
+                {isGrading ? `Analyzing with ${monsterName}'s disdain...` : `Log Exercise & See ${monsterName}'s Reaction`}
               </Button>
             </CardFooter>
           </form>
@@ -339,7 +338,7 @@ export default function ExerciseLogPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline">Recent Exercise Log</CardTitle>
-            <CardDescription>Your last 20 exercise entries and their impact.</CardDescription>
+            <CardDescription>Your last 20 exercise entries and their impact on {monsterName}.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 max-h-96 overflow-y-auto">
             {exerciseLogEntries.length === 0 && <p className="text-sm text-muted-foreground">No exercises logged yet.</p>}
@@ -352,12 +351,12 @@ export default function ExerciseLogPage() {
                       {entry.exerciseName} ({entry.durationMinutes} min)
                     </h4>
                     <p className="text-xs text-muted-foreground">
-                      Logged: {new Date(entry.loggedAt).toLocaleTimeString()} - Health Impact: <span className="text-green-500">-{entry.benefitScore.toFixed(1)}%</span>
+                      Logged: {new Date(entry.loggedAt).toLocaleTimeString()} - Impact: <span className="text-green-500">-{entry.benefitScore.toFixed(1)}%</span>
                     </p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 text-right flex-shrink-0">Now: {entry.healthAfter.toFixed(1)}%</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 text-right flex-shrink-0">Health After: {entry.healthAfter.toFixed(1)}%</p>
                 </div>
-                <p className="text-sm text-foreground/80 mt-1 pl-1 border-l-2 border-accent/50 ml-1.5 "> <span className="italic text-muted-foreground">AI says:</span> {entry.reasoning}</p>
+                <p className="text-sm text-foreground/80 mt-1 pl-1 border-l-2 border-accent/50 ml-1.5 "> <span className="italic text-muted-foreground">{monsterName} said:</span> "{entry.reasoning}"</p>
               </Card>
             ))}
           </CardContent>
@@ -366,3 +365,4 @@ export default function ExerciseLogPage() {
     </div>
   );
 }
+
