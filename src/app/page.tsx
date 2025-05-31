@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,7 +11,7 @@ const stories = [
     id: "1",
     author: "Elara Vance",
     avatar: "https://placehold.co/40x40.png",
-    aiHint: "woman smiling",
+    avatarAiHint: "woman smiling",
     time: "2 hours ago",
     content: "Just needed a space to share... today was tough. The itching, the fatigue, and the feeling of being misunderstood by another doctor. It's exhausting. Grateful for this community where I know I'm not alone. Sending love to everyone fighting this.",
     imageUrl: "https://placehold.co/600x400.png",
@@ -22,7 +23,7 @@ const stories = [
     id: "2",
     author: "Marcus Thorne",
     avatar: "https://placehold.co/40x40.png",
-    aiHint: "man portrait",
+    avatarAiHint: "man portrait",
     time: "5 hours ago",
     content: "Found a new coping mechanism that seems to help with the crawling sensations: cold compresses and mindfulness. It doesn't make it go away, but it makes it more bearable. Has anyone else tried something similar? Your experience is real, and so is your strength.",
     likes: 22,
@@ -53,7 +54,7 @@ export default function BeliefCirclePage() {
             <CardHeader>
               <div className="flex items-center space-x-3">
                 <Avatar>
-                  <AvatarImage src={story.avatar} alt={story.author} data-ai-hint={story.aiHint} />
+                  <AvatarImage src={story.avatar} alt={story.author} data-ai-hint={story.avatarAiHint} />
                   <AvatarFallback>{story.author.substring(0, 2).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div>

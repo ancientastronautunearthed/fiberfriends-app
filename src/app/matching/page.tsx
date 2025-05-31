@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,7 +12,7 @@ const mockUsers = [
     id: "1",
     name: "Alex Rivera",
     avatarUrl: "https://placehold.co/60x60.png",
-    aiHint: "person nature",
+    avatarAiHint: "person nature",
     sharedSymptoms: ["Skin lesions", "Fatigue", "Brain fog"],
     copingStrategies: ["Mindfulness", "Topical creams"],
     lastActive: "Online",
@@ -20,7 +21,7 @@ const mockUsers = [
     id: "2",
     name: "Jamie Lee",
     avatarUrl: "https://placehold.co/60x60.png",
-    aiHint: "artist studio",
+    avatarAiHint: "artist studio",
     sharedSymptoms: ["Crawling sensations", "Joint pain"],
     copingStrategies: ["Herbal supplements", "Light exercise"],
     lastActive: "Active 2 hours ago",
@@ -29,7 +30,7 @@ const mockUsers = [
     id: "3",
     name: "Sam K.",
     avatarUrl: "https://placehold.co/60x60.png",
-    aiHint: "student library",
+    avatarAiHint: "student library",
     sharedSymptoms: ["Itching", "Sleep disturbances"],
     copingStrategies: ["Antihistamines", "Meditation"],
     lastActive: "Online",
@@ -51,7 +52,7 @@ export default function MatchingPage() {
               {mockUsers.map(user => (
                 <Card key={user.id} className="flex flex-col sm:flex-row items-start sm:items-center p-4 gap-4 hover:shadow-md transition-shadow">
                   <Avatar className="h-16 w-16">
-                    <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint={user.aiHint} />
+                    <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint={user.avatarAiHint} />
                     <AvatarFallback>{user.name.substring(0,2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div className="flex-grow">

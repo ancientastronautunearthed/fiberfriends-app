@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,7 +12,7 @@ const forumPosts = [
     id: "1",
     author: "Patient Advocate",
     avatar: "https://placehold.co/40x40.png",
-    aiHint: "person microphone",
+    avatarAiHint: "person microphone",
     time: "1 day ago",
     title: "My doc said it was just 'lint from my clothes'...",
     content: "After months of suffering, showing clear photos of fibers, the dermatologist literally shrugged and said, 'Looks like lint.' I was speechless. How do you even respond to that level of dismissal?",
@@ -23,7 +24,7 @@ const forumPosts = [
     id: "2",
     author: "Fiber Fighter",
     avatar: "https://placehold.co/40x40.png",
-    aiHint: "activist rally",
+    avatarAiHint: "activist rally",
     time: "3 days ago",
     title: "Prescribed anti-depressants for skin lesions!",
     content: "Went in for painful skin lesions and crawling sensations. Came out with a prescription for an SSRI and a referral to a psychiatrist. Apparently, it's all in my head. The usual story, right?",
@@ -66,7 +67,7 @@ export default function DoctorForumPage() {
               <CardHeader>
                 <div className="flex items-center space-x-3 mb-2">
                   <Avatar>
-                    <AvatarImage src={post.avatar} alt={post.author} data-ai-hint={post.aiHint} />
+                    <AvatarImage src={post.avatar} alt={post.author} data-ai-hint={post.avatarAiHint} />
                     <AvatarFallback>{post.author.substring(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div>

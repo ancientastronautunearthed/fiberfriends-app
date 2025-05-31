@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,7 @@ const mockProviders = [
     philosophy: "Holistic approach, patient-centered care.",
     morgellonsExperience: "Positive, understanding",
     imageUrl: "https://placehold.co/80x80.png",
-    aiHint: "doctor portrait",
+    imageAiHint: "doctor portrait",
   },
   {
     id: "2",
@@ -29,7 +30,7 @@ const mockProviders = [
     philosophy: "Focus on root cause, natural therapies.",
     morgellonsExperience: "Knowledgeable, validating",
     imageUrl: "https://placehold.co/80x80.png",
-    aiHint: "physician office",
+    imageAiHint: "physician office",
   },
   {
     id: "3",
@@ -41,7 +42,7 @@ const mockProviders = [
     philosophy: "Comprehensive testing and lifestyle changes.",
     morgellonsExperience: "Supportive, willing to learn",
     imageUrl: "https://placehold.co/80x80.png",
-    aiHint: "clinic building",
+    imageAiHint: "clinic building",
   },
 ];
 
@@ -90,7 +91,7 @@ export default function ProviderDirectoryPage() {
         {mockProviders.map(provider => (
           <Card key={provider.id} className="hover:shadow-lg transition-shadow">
             <CardHeader className="flex flex-row items-start gap-4">
-              <Image src={provider.imageUrl} alt={provider.name} width={80} height={80} className="rounded-lg border object-cover" data-ai-hint={provider.aiHint} />
+              <Image src={provider.imageUrl} alt={provider.name} width={80} height={80} className="rounded-lg border object-cover" data-ai-hint={provider.imageAiHint} />
               <div>
                 <CardTitle className="text-lg">{provider.name}</CardTitle>
                 <CardDescription className="text-xs">{provider.specialty}</CardDescription>

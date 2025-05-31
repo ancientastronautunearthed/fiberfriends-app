@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, UserSearch, ShieldQuestion, Heart, Wand2, Sparkles, Loader2 as IconLoader } from "lucide-react"; // Renamed Loader2 to avoid conflict
+import { MessageSquare, UserSearch, ShieldQuestion, Heart, Wand2, Sparkles, Loader2 as IconLoader } from "lucide-react"; 
 import Image from "next/image";
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -22,7 +22,7 @@ interface MockSingle {
   romanticMonsterImageUrl: string; 
   romanticMonsterAiHint: string;
   avatarUrl: string; 
-  aiHint: string;
+  avatarAiHint: string;
   bio: string;
   interests: string[];
   onlineStatus: string;
@@ -36,7 +36,7 @@ const mockSingles: MockSingle[] = [
     romanticMonsterImageUrl: "https://placehold.co/100x100.png", 
     romanticMonsterAiHint: "fantasy creature gentle",
     avatarUrl: "https://placehold.co/100x100.png", 
-    aiHint: "person smiling",
+    avatarAiHint: "person smiling",
     bio: "Loves hiking, reading, and quiet evenings. My monster, Velvet Whisperwind, seeks a kind soul.",
     interests: ["Nature", "Books", "Mindfulness", "Art"],
     onlineStatus: "Online",
@@ -48,7 +48,7 @@ const mockSingles: MockSingle[] = [
     romanticMonsterImageUrl: "https://placehold.co/100x100.png",
     romanticMonsterAiHint: "ethereal being dreamlike",
     avatarUrl: "https://placehold.co/100x100.png",
-    aiHint: "artist painting",
+    avatarAiHint: "artist painting",
     bio: "Creative soul, passionate about music. Starlight Dreamer and I value deep conversations.",
     interests: ["Music", "Sustainability", "Cooking", "Yoga"],
     onlineStatus: "Active 3 hours ago",
@@ -56,9 +56,9 @@ const mockSingles: MockSingle[] = [
 ];
 
 const chatFlairExamples = [
-    { name: "Sparkle Heart", imageUrl: "https://placehold.co/50x50.png", aiHint: "glitter heart", cost: 10 },
-    { name: "Witty Remark Bubble", imageUrl: "https://placehold.co/50x50.png", aiHint: "comic bubble", cost: 15 },
-    { name: "Mystic Flower", imageUrl: "https://placehold.co/50x50.png", aiHint: "glowing flower", cost: 20 },
+    { name: "Sparkle Heart", imageUrl: "https://placehold.co/50x50.png", imageAiHint: "glitter heart", cost: 10 },
+    { name: "Witty Remark Bubble", imageUrl: "https://placehold.co/50x50.png", imageAiHint: "comic bubble", cost: 15 },
+    { name: "Mystic Flower", imageUrl: "https://placehold.co/50x50.png", imageAiHint: "glowing flower", cost: 20 },
 ];
 
 interface ShowcasedSyncedPair {
@@ -87,7 +87,6 @@ export default function FiberSinglesPage() {
       setUserRomanticMonsterName(name);
       setUserRomanticMonsterImageUrl(imageUrl);
 
-      // Check for synced pairs
       const newSyncedPairs: ShowcasedSyncedPair[] = [];
       mockSingles.forEach(opponent => {
         const syncedKey = `monstersSynced_${opponent.id}`;
@@ -247,7 +246,7 @@ export default function FiberSinglesPage() {
                 <div className="flex justify-center gap-4 flex-wrap">
                     {chatFlairExamples.map(flair => (
                         <div key={flair.name} className="text-center p-2 border rounded-md bg-card/50 w-32">
-                            <Image src={flair.imageUrl} alt={flair.name} width={40} height={40} className="mx-auto rounded" data-ai-hint={flair.aiHint}/>
+                            <Image src={flair.imageUrl} alt={flair.name} width={40} height={40} className="mx-auto rounded" data-ai-hint={flair.imageAiHint}/>
                             <p className="text-xs mt-1">{flair.name}</p>
                             <Badge variant="outline" className="text-xxs mt-0.5">{flair.cost} pts</Badge>
                         </div>
@@ -261,7 +260,7 @@ export default function FiberSinglesPage() {
               <Card key={user.id} className="flex flex-col transition-all hover:shadow-xl hover:scale-[1.02]">
                 <CardHeader className="items-center text-center p-4">
                   <Avatar className="w-20 h-20 mb-2 border-2 border-muted-foreground shadow-md">
-                    <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint={user.aiHint}/>
+                    <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint={user.avatarAiHint}/>
                     <AvatarFallback>{user.name.substring(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <CardTitle className="text-lg">{user.name}</CardTitle>

@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Share2, Copy } from "lucide-react";
@@ -5,9 +6,9 @@ import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 
 const beliefBadges = [
-  { id: "1", title: "Yes, I've Tried Changing My Detergent", imageUrl: "https://placehold.co/200x200.png", aiHint: "badge award", description: "For when you've heard it a million times." },
-  { id: "2", title: "Expert in Rare Symptoms", imageUrl: "https://placehold.co/200x200.png", aiHint: "medal honor", description: "Because you know more than most doctors." },
-  { id: "3", title: "Survived Another 'It's Just Stress'", imageUrl: "https://placehold.co/200x200.png", aiHint: "trophy success", description: "A badge of honor for your resilience." },
+  { id: "1", title: "Yes, I've Tried Changing My Detergent", imageUrl: "https://placehold.co/200x200.png", imageAiHint: "badge award", description: "For when you've heard it a million times." },
+  { id: "2", title: "Expert in Rare Symptoms", imageUrl: "https://placehold.co/200x200.png", imageAiHint: "medal honor", description: "Because you know more than most doctors." },
+  { id: "3", title: "Survived Another 'It's Just Stress'", imageUrl: "https://placehold.co/200x200.png", imageAiHint: "trophy success", description: "A badge of honor for your resilience." },
 ];
 
 const translationGuide = [
@@ -40,7 +41,7 @@ export default function HumorHubPage() {
                 <CardTitle className="text-md">{badge.title}</CardTitle>
               </CardHeader>
               <CardContent>
-                <Image src={badge.imageUrl} alt={badge.title} width={150} height={150} className="mx-auto rounded-lg border object-cover" data-ai-hint={badge.aiHint}/>
+                <Image src={badge.imageUrl} alt={badge.title} width={150} height={150} className="mx-auto rounded-lg border object-cover" data-ai-hint={badge.imageAiHint}/>
                 <p className="text-xs text-muted-foreground mt-2">{badge.description}</p>
               </CardContent>
               <CardFooter className="flex justify-center gap-2">

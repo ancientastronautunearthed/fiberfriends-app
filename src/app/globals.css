@@ -12,13 +12,13 @@
     --card-foreground: 240 10% 15%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 15%;
-    --primary: 259 90% 75%;     /* Soft Lavender (#D0B8FF -> HSL(259,100%,88%)), adjusted for button contrast */
+    --primary: 259 90% 75%;     /* Soft Lavender */
     --primary-foreground: 259 80% 20%; /* Dark Purple for text on primary */
     --secondary: 240 8% 90%;     /* Lighter cool gray */
     --secondary-foreground: 240 5% 30%;
     --muted: 240 8% 93%;         /* Slightly darker than background for muted elements */
     --muted-foreground: 240 5% 45%;
-    --accent: 203 75% 78%;      /* Pale Blue (#A0D2EB -> HSL(203,68%,84%)), adjusted for button contrast */
+    --accent: 203 75% 78%;      /* Pale Blue */
     --accent-foreground: 203 80% 20%;  /* Dark Blue for text on Accent */
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
@@ -44,18 +44,18 @@
   }
 
   .dark {
-    /* Dark Theme - Cool, Modern, Techy (Logo Inspired) */
+    /* Dark Theme - Cool, Modern, Techy (Logo Inspired & Refined) */
     --background: 222 47% 11%;      /* Very Dark Cool Blue/Indigo */
     --foreground: 210 40% 98%;      /* Almost White, slight cool tint */
-    --card: 222 47% 14%;            /* Slightly lighter dark blue */
+    --card: 222 47% 14%;            /* Slightly lighter dark blue for cards */
     --card-foreground: 210 40% 98%;
     --popover: 222 47% 10%;         /* Even darker for popovers */
     --popover-foreground: 210 40% 98%;
     --primary: 198 93% 60%;       /* Vibrant Cyan/Electric Blue */
-    --primary-foreground: 200 100% 10%; /* Very Dark Blue for contrast */
+    --primary-foreground: 200 100% 10%; /* Very Dark Blue for contrast on primary */
     --secondary: 217 33% 25%;     /* Muted darker blue */
     --secondary-foreground: 210 40% 90%;
-    --muted: 217 33% 17%;         /* Darker muted blue */
+    --muted: 217 33% 17%;         /* Darker muted blue for less emphasis */
     --muted-foreground: 215 20% 65%;
     --accent: 260 100% 75%;        /* Vibrant contrasting Purple/Magenta */
     --accent-foreground: 260 100% 15%;   /* Dark for text on accent */
@@ -63,7 +63,7 @@
     --destructive-foreground: 0 0% 98%;
     --border: 217 33% 22%;        /* Subtle dark border */
     --input: 217 33% 19%;         /* Dark input background */
-    --ring: 198 93% 60%;          /* Primary color for rings */
+    --ring: 198 93% 60%;          /* Primary color for rings/focus */
 
     --chart-1: 198 93% 60%; /* Cyan */
     --chart-2: 260 100% 75%; /* Magenta */
@@ -71,14 +71,15 @@
     --chart-4: 180 70% 55%; /* Teal */
     --chart-5: 210 50% 75%; /* Lighter Cool Blue */
     
-    --sidebar-background: 222 47% 9%; 
+    --sidebar-background: 222 47% 9%; /* Darker sidebar background */
     --sidebar-foreground: 210 40% 95%;
-    --sidebar-primary: 198 93% 60%;
+    --sidebar-primary: 198 93% 60%; /* Sidebar primary matches main primary */
     --sidebar-primary-foreground: 200 100% 10%;
-    --sidebar-accent: 260 100% 75%;
+    --sidebar-accent: 260 100% 75%; /* Sidebar accent matches main accent */
     --sidebar-accent-foreground: 260 100% 15%;
     --sidebar-border: 217 33% 18%;
     --sidebar-ring: 198 93% 60%;
+    --radius: 0.5rem;
   }
 }
 
@@ -104,8 +105,7 @@
     border-color: hsl(var(--border));
   }
   50% {
-    /* Ensure flash uses destructive colors from the current theme */
     background-color: hsl(var(--destructive)); 
-    border-color: hsl(var(--destructive)); /* Flash border with destructive color too */
+    border-color: hsl(var(--destructive));
   }
 }

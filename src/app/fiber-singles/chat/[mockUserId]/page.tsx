@@ -201,9 +201,6 @@ export default function SimulatedChatPage() {
           });
         }
         
-        // Removed the toast for immediate message quality feedback
-        // It's now logged in messageQualityLog state
-
       } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "Failed to process message.";
         setError(errorMessage);
@@ -389,6 +386,3 @@ export default function SimulatedChatPage() {
     </div>
   );
 }
-    
-
-    

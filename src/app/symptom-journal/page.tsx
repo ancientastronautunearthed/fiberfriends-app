@@ -20,7 +20,7 @@ import { Badge } from '@/components/ui/badge';
 interface SymptomEntry {
   id: string;
   date: Date;
-  symptoms: string[]; // Changed from string to string[]
+  symptoms: string[]; 
   notes: string;
   photoDataUri?: string;
   photoAiHint?: string;
@@ -64,7 +64,6 @@ export default function SymptomJournalPage() {
 
   useEffect(() => {
     const symptomCounts: { [key: string]: number } = entries.reduce((acc, entry) => {
-      // entry.symptoms is now an array of strings
       entry.symptoms.forEach(symptom => {
         const s = symptom.trim().toLowerCase();
         if (s) { 
@@ -139,7 +138,6 @@ export default function SymptomJournalPage() {
     };
     setEntries(prevEntries => [newEntry, ...prevEntries].sort((a,b) => b.date.getTime() - a.date.getTime()));
     
-    // Reset form
     setDate(new Date());
     setCurrentSymptoms([]);
     setCustomSymptom('');
@@ -274,8 +272,8 @@ export default function SymptomJournalPage() {
                     tickMargin={5}
                     axisLine={false}
                     className="text-xs"
-                    width={100} // Increased width for longer symptom names
-                    interval={0} // Show all ticks
+                    width={100} 
+                    interval={0} 
                   />
                   <XAxis dataKey="count" type="number" hide />
                   <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" nameKey="name" />} />
@@ -300,7 +298,7 @@ export default function SymptomJournalPage() {
         </CardHeader>
         <CardContent className="space-y-4 flex-grow overflow-y-auto">
           {entries.length === 0 && <p className="text-muted-foreground">No entries yet. Add your first one!</p>}
-          {entries.sort((a,b) => b.date.getTime() - a.date.getTime()).map(entry => ( // Sort entries by date descending
+          {entries.sort((a,b) => b.date.getTime() - a.date.getTime()).map(entry => ( 
             <Card key={entry.id} className="bg-card/50">
               <CardHeader className="pb-2 pt-4">
                 <CardTitle className="text-md">{format(entry.date, "PPP")}</CardTitle>
@@ -315,7 +313,7 @@ export default function SymptomJournalPage() {
                 {entry.notes && <p className="mt-1"><strong>Notes:</strong> {entry.notes}</p>}
                 {entry.photoDataUri && (
                   <div className="mt-2">
-                     <Image src={entry.photoDataUri} alt="Symptom" width={100} height={100} className="rounded-md border object-cover" data-ai-hint={entry.photoAiHint || "medical condition"} />
+                     <Image src={entry.photoDataUri} alt="Symptom" width={100} height={100} className="rounded-md border object-cover" data-ai-hint={entry.photoDataUri.startsWith('https://placehold.co/') ? entry.photoAiHint : 'medical condition'} />
                   </div>
                 )}
               </CardContent>
@@ -326,6 +324,3 @@ export default function SymptomJournalPage() {
     </div>
   );
 }
-
-
-    
