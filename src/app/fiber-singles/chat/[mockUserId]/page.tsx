@@ -9,12 +9,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Send, Sparkles, Heart, MessageCircle, ArrowLeft, VenetianMask } from "lucide-react";
+import { Loader2, Send, Sparkles, Heart, MessageCircle, ArrowLeft, VenetianMask, ClipboardList } from "lucide-react";
 import Image from "next/image";
 import { useToast } from '@/hooks/use-toast';
 import { analyzeMessageQualityAction, generateMonsterBanterAction } from '../../actions';
 import Link from 'next/link';
-import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const ROMANTIC_MONSTER_IMAGE_KEY = 'romanticMonsterImageUrl';
 const ROMANTIC_MONSTER_NAME_KEY = 'romanticMonsterName';
@@ -45,6 +46,14 @@ interface MonsterBanterMessage {
     timestamp: Date;
 }
 
+interface MessageQualityLogEntry {
+    id: string;
+    messageText: string;
+    score: number;
+    reasoning?: string;
+    timestamp: Date;
+}
+
 type ConversationTone = "positive" | "neutral" | "negative" | "flirty" | "awkward";
 
 export default function SimulatedChatPage() {
@@ -57,13 +66,14 @@ export default function SimulatedChatPage() {
   const [userRomanticMonsterImageUrl, setUserRomanticMonsterImageUrl] = useState<string | null>(null);
   const [mockOpponent, setMockOpponent] = useState<MockOpponent | null>(null);
   
-  const [userDesire, setUserDesire] = useState(0); // User's monster's desire for opponent
-  const [opponentDesire, setOpponentDesire] = useState(0); // Opponent's monster's desire for user
+  const [userDesire, setUserDesire] = useState(0);
+  const [opponentDesire, setOpponentDesire] = useState(0);
   const [monstersSynced, setMonstersSynced] = useState(false);
   
   const [message, setMessage] = useState('');
   const [chatLog, setChatLog] = useState<ChatMessage[]>([]);
   const [monsterChatLog, setMonsterChatLog] = useState<MonsterBanterMessage[]>([]);
+  const [messageQualityLog, setMessageQualityLog] = useState<MessageQualityLogEntry[]>([]);
   
   const [isProcessing, startProcessingTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -81,10 +91,16 @@ export default function SimulatedChatPage() {
       const userDesireKey = `desire_userFor_${mockUserId}`;
       const opponentDesireKey = `desire_${mockUserId}_forUser`;
       const syncedKey = `monstersSynced_${mockUserId}`;
+      const qualityLogKey = `messageQualityLog_${mockUserId}`;
 
-      setUserDesire(parseInt(localStorage.getItem(userDesireKey) || '50', 10)); // Start at 50 for demo
-      setOpponentDesire(parseInt(localStorage.getItem(opponentDesireKey) || '50', 10)); // Start at 50 for demo
+      setUserDesire(parseInt(localStorage.getItem(userDesireKey) || '50', 10));
+      setOpponentDesire(parseInt(localStorage.getItem(opponentDesireKey) || '50', 10));
       setMonstersSynced(localStorage.getItem(syncedKey) === 'true');
+      const storedQualityLog = localStorage.getItem(qualityLogKey);
+      if (storedQualityLog) {
+        setMessageQualityLog(JSON.parse(storedQualityLog));
+      }
+
     } else {
       router.push('/fiber-singles');
     }
@@ -102,6 +118,12 @@ export default function SimulatedChatPage() {
     }
   }, [monsterChatLog]);
 
+  useEffect(() => {
+    if (mockUserId && messageQualityLog.length > 0) {
+        localStorage.setItem(`messageQualityLog_${mockUserId}`, JSON.stringify(messageQualityLog));
+    }
+  }, [messageQualityLog, mockUserId]);
+
 
   const handleSendMessage = async () => {
     if (!message.trim() || !mockUserId || !mockOpponent || !userRomanticMonsterName) return;
@@ -118,16 +140,19 @@ export default function SimulatedChatPage() {
         const qualityResult = await analyzeMessageQualityAction({ messageText: userMessageText });
         const score = qualityResult.score;
 
-        // User's message quality primarily affects the opponent's desire for the user.
-        // User's own desire would be affected by opponent's messages (which are canned here).
-        let newOpponentDesire = Math.min(100, Math.max(0, opponentDesire + score)); 
-        // For this prototype, userDesire is not directly changed by their own outgoing message's score.
-        // It would change based on incoming messages. We'll keep it static from this specific action.
-        // Let newUserDesire = userDesire; // Stays the same for now based on user's own message.
+        // Log message quality
+        const newQualityLogEntry: MessageQualityLogEntry = {
+            id: Date.now().toString(),
+            messageText: userMessageText,
+            score: score,
+            reasoning: qualityResult.reasoning,
+            timestamp: new Date(),
+        };
+        setMessageQualityLog(prev => [newQualityLogEntry, ...prev].slice(0, 50)); // Keep last 50 quality logs
 
+        let newOpponentDesire = Math.min(100, Math.max(0, opponentDesire + score)); 
         setOpponentDesire(newOpponentDesire);
-        // localStorage.setItem(`desire_userFor_${mockUserId}`, String(newUserDesire)); // User's desire for opponent
-        localStorage.setItem(`desire_${mockUserId}_forUser`, String(newOpponentDesire)); // Opponent's desire for user
+        localStorage.setItem(`desire_${mockUserId}_forUser`, String(newOpponentDesire));
 
         // 2. Generate canned opponent reply
         const cannedReplies = [
@@ -139,11 +164,9 @@ export default function SimulatedChatPage() {
         const opponentMessageText = cannedReplies[Math.floor(Math.random() * cannedReplies.length)];
         const opponentMessage: ChatMessage = {id: (Date.now() + 1).toString(), sender: 'opponent', text: opponentMessageText, timestamp: new Date()};
         
-        // Simulate a delay for opponent's reply to feel more natural
         setTimeout(() => {
             setChatLog(prev => [...prev, opponentMessage]);
         }, 1000 + Math.random() * 1000);
-
 
         // 3. Determine conversation tone based on score
         let currentTone: ConversationTone = "neutral";
@@ -151,7 +174,6 @@ export default function SimulatedChatPage() {
         else if (score > 3) currentTone = "positive";
         else if (score <= 0) currentTone = "awkward";
         else if (score < -2) currentTone = "negative";
-
 
         // 4. Generate monster banter
         const banterInput = {
@@ -164,11 +186,9 @@ export default function SimulatedChatPage() {
         const banterResult = await generateMonsterBanterAction(banterInput);
         const newMonsterBanter: MonsterBanterMessage = { id: (Date.now() + 2).toString(), text: banterResult.banter, timestamp: new Date()};
         
-        // Simulate a slight delay for monster banter too
         setTimeout(() => {
              setMonsterChatLog(prev => [...prev, newMonsterBanter]);
         }, 500 + Math.random() * 500);
-
 
         if (userDesire >= 100 && newOpponentDesire >= 100 && !monstersSynced) {
           setMonstersSynced(true);
@@ -181,12 +201,8 @@ export default function SimulatedChatPage() {
           });
         }
         
-        toast({
-          title: "Message Quality Score",
-          description: `Your message received a score of ${score}. ${qualityResult.reasoning || ''} (Opponent's desire for you is now ${newOpponentDesire}%)`,
-          variant: score > 0 ? "default" : "destructive",
-          duration: 6000,
-        });
+        // Removed the toast for immediate message quality feedback
+        // It's now logged in messageQualityLog state
 
       } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "Failed to process message.";
@@ -223,6 +239,39 @@ export default function SimulatedChatPage() {
                 <CardDescription>As your romantic monster: <span className="font-semibold text-pink-600 dark:text-pink-400">{userRomanticMonsterName}</span></CardDescription>
             </div>
           </div>
+           <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <ClipboardList className="mr-2 h-4 w-4" /> View Message Quality Log
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Message Quality Log</DialogTitle>
+                <DialogDescription>
+                  Review of AI feedback on your sent messages.
+                </DialogDescription>
+              </DialogHeader>
+              <ScrollArea className="h-96">
+                {messageQualityLog.length === 0 ? (
+                  <p className="text-muted-foreground text-sm text-center py-10">No messages sent yet or log is empty.</p>
+                ) : (
+                  <div className="space-y-3 p-1">
+                    {messageQualityLog.map(entry => (
+                      <Card key={entry.id} className="p-3">
+                        <p className="text-xs text-muted-foreground">{new Date(entry.timestamp).toLocaleString()}</p>
+                        <p className="text-sm font-medium mt-1">Your message: <span className="italic">"{entry.messageText}"</span></p>
+                        <p className={`text-sm mt-1 ${entry.score > 0 ? 'text-green-600' : entry.score < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                          AI Score: {entry.score}
+                        </p>
+                        {entry.reasoning && <p className="text-xs text-muted-foreground mt-0.5">Reasoning: {entry.reasoning}</p>}
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </DialogContent>
+          </Dialog>
         </CardHeader>
       </Card>
 
@@ -340,5 +389,6 @@ export default function SimulatedChatPage() {
     </div>
   );
 }
+    
 
     
