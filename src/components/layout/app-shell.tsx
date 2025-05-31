@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -17,9 +16,10 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Atom, LogOut, ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart, Dumbbell, Trophy } from 'lucide-react';
+import { HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Atom, LogOut, ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart, Dumbbell, Trophy, LayoutDashboard } from 'lucide-react';
 
 const navItems = [
+  { href: '/landing', label: 'About Fiber Friends', icon: LayoutDashboard, pageTitle: 'Welcome to Fiber Friends' },
   { href: '/', label: 'Belief Circle', icon: HeartHandshake, pageTitle: 'Belief Circle' },
   { href: '/symptom-journal', label: 'Symptom Journal', icon: BookText, pageTitle: 'Symptom Journal' },
   { href: '/pattern-recognition', label: 'Pattern Recognition', icon: BrainCircuit, pageTitle: 'Pattern Recognition' },
@@ -81,6 +81,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const currentPage = navItems.find(item => {
     if (item.href === '/') return pathname === '/';
     // Ensure deeper paths still match their parent nav item for title
+    // Special handling for landing page to not conflict with root if it becomes root.
+    if (item.href === '/landing') return pathname === '/landing';
     return pathname.startsWith(item.href) && (pathname.length === item.href.length || pathname[item.href.length] === '/');
   });
 
@@ -90,7 +92,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen bg-background">
         <Sidebar collapsible="icon" variant="sidebar" side="left" className="border-r bg-sidebar text-sidebar-foreground">
           <SidebarHeader className="p-4 flex items-center justify-between border-b border-sidebar-border">
-            <Link href="/" className="flex items-center gap-2 group">
+            <Link href="/landing" className="flex items-center gap-2 group">
               <Atom className="h-8 w-8 text-sidebar-primary transition-transform group-hover:scale-110" />
               <h1 className="text-xl font-headline font-semibold text-sidebar-foreground group-data-[collapsible=icon]:hidden">Fiber Friends</h1>
             </Link>
@@ -101,7 +103,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <SidebarMenuItem key={item.href}>
                   <Link href={item.href} legacyBehavior passHref>
                     <SidebarMenuButton
-                      isActive={pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))}
+                      isActive={pathname === item.href || (item.href !== '/' && item.href !== '/landing' && pathname.startsWith(item.href))}
                       tooltip={{ children: item.label, side: 'right' }}
                       className="w-full justify-start text-sm"
                     >
