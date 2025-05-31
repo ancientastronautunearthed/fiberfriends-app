@@ -17,7 +17,7 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Smile, Zap, LogOut, ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart, Dumbbell } from 'lucide-react';
+import { HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Smile, Atom, LogOut, ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart, Dumbbell } from 'lucide-react';
 
 const navItems = [
   { href: '/', label: 'Belief Circle', icon: HeartHandshake, pageTitle: 'Belief Circle' },
@@ -91,7 +91,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Sidebar collapsible="icon" variant="sidebar" side="left" className="border-r bg-sidebar text-sidebar-foreground">
           <SidebarHeader className="p-4 flex items-center justify-between border-b border-sidebar-border">
             <Link href="/" className="flex items-center gap-2 group">
-              <Zap className="h-8 w-8 text-sidebar-primary transition-transform group-hover:scale-110" />
+              <Atom className="h-8 w-8 text-sidebar-primary transition-transform group-hover:scale-110" />
               <h1 className="text-xl font-headline font-semibold text-sidebar-foreground group-data-[collapsible=icon]:hidden">Fiber Friends</h1>
             </Link>
           </SidebarHeader>
@@ -136,3 +136,4 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+
