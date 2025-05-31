@@ -11,3 +11,6 @@ import '@/ai/flows/product-effect-grading-flow.ts';
 import '@/ai/flows/exercise-grading-flow.ts';
 import '@/ai/flows/meal-suggestion-flow.ts';
 import '@/ai/flows/recipe-generation-flow.ts';
+import '@/ai/flows/romantic-monster-prompt-expansion-flow.ts';
+import '@/ai/flows/romantic-monster-image-generation-flow.ts';
+import '@/ai/flows/message-quality-flow.ts';
