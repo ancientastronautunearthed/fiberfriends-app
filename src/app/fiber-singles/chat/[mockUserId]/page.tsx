@@ -57,8 +57,8 @@ export default function SimulatedChatPage() {
   const [userRomanticMonsterImageUrl, setUserRomanticMonsterImageUrl] = useState<string | null>(null);
   const [mockOpponent, setMockOpponent] = useState<MockOpponent | null>(null);
   
-  const [userDesire, setUserDesire] = useState(0);
-  const [opponentDesire, setOpponentDesire] = useState(0);
+  const [userDesire, setUserDesire] = useState(0); // User's monster's desire for opponent
+  const [opponentDesire, setOpponentDesire] = useState(0); // Opponent's monster's desire for user
   const [monstersSynced, setMonstersSynced] = useState(false);
   
   const [message, setMessage] = useState('');
@@ -75,13 +75,15 @@ export default function SimulatedChatPage() {
     setUserRomanticMonsterImageUrl(localStorage.getItem(ROMANTIC_MONSTER_IMAGE_KEY));
 
     if (mockUserId && mockOpponentsDatabase[mockUserId]) {
-      setMockOpponent(mockOpponentsDatabase[mockUserId]);
+      const currentOpponent = mockOpponentsDatabase[mockUserId];
+      setMockOpponent(currentOpponent);
+      
       const userDesireKey = `desire_userFor_${mockUserId}`;
       const opponentDesireKey = `desire_${mockUserId}_forUser`;
       const syncedKey = `monstersSynced_${mockUserId}`;
 
-      setUserDesire(parseInt(localStorage.getItem(userDesireKey) || '0', 10));
-      setOpponentDesire(parseInt(localStorage.getItem(opponentDesireKey) || '0', 10));
+      setUserDesire(parseInt(localStorage.getItem(userDesireKey) || '50', 10)); // Start at 50 for demo
+      setOpponentDesire(parseInt(localStorage.getItem(opponentDesireKey) || '50', 10)); // Start at 50 for demo
       setMonstersSynced(localStorage.getItem(syncedKey) === 'true');
     } else {
       router.push('/fiber-singles');
@@ -116,13 +118,16 @@ export default function SimulatedChatPage() {
         const qualityResult = await analyzeMessageQualityAction({ messageText: userMessageText });
         const score = qualityResult.score;
 
-        let newUserDesire = Math.min(100, Math.max(0, userDesire + score));
+        // User's message quality primarily affects the opponent's desire for the user.
+        // User's own desire would be affected by opponent's messages (which are canned here).
         let newOpponentDesire = Math.min(100, Math.max(0, opponentDesire + score)); 
+        // For this prototype, userDesire is not directly changed by their own outgoing message's score.
+        // It would change based on incoming messages. We'll keep it static from this specific action.
+        // Let newUserDesire = userDesire; // Stays the same for now based on user's own message.
 
-        setUserDesire(newUserDesire);
         setOpponentDesire(newOpponentDesire);
-        localStorage.setItem(`desire_userFor_${mockUserId}`, String(newUserDesire));
-        localStorage.setItem(`desire_${mockUserId}_forUser`, String(newOpponentDesire));
+        // localStorage.setItem(`desire_userFor_${mockUserId}`, String(newUserDesire)); // User's desire for opponent
+        localStorage.setItem(`desire_${mockUserId}_forUser`, String(newOpponentDesire)); // Opponent's desire for user
 
         // 2. Generate canned opponent reply
         const cannedReplies = [
@@ -133,7 +138,12 @@ export default function SimulatedChatPage() {
         ];
         const opponentMessageText = cannedReplies[Math.floor(Math.random() * cannedReplies.length)];
         const opponentMessage: ChatMessage = {id: (Date.now() + 1).toString(), sender: 'opponent', text: opponentMessageText, timestamp: new Date()};
-        setChatLog(prev => [...prev, opponentMessage]);
+        
+        // Simulate a delay for opponent's reply to feel more natural
+        setTimeout(() => {
+            setChatLog(prev => [...prev, opponentMessage]);
+        }, 1000 + Math.random() * 1000);
+
 
         // 3. Determine conversation tone based on score
         let currentTone: ConversationTone = "neutral";
@@ -149,14 +159,18 @@ export default function SimulatedChatPage() {
           userMonsterName: userRomanticMonsterName,
           opponentMonsterName: mockOpponent.romanticMonsterName,
           currentConversationTone: currentTone,
-          previousBanter: monsterChatLog.slice(-2).map(b => ({ banterText: b.text })), // Simplified context
+          previousBanter: monsterChatLog.slice(-2).map(b => ({ banterText: b.text })), 
         };
         const banterResult = await generateMonsterBanterAction(banterInput);
         const newMonsterBanter: MonsterBanterMessage = { id: (Date.now() + 2).toString(), text: banterResult.banter, timestamp: new Date()};
-        setMonsterChatLog(prev => [...prev, newMonsterBanter]);
+        
+        // Simulate a slight delay for monster banter too
+        setTimeout(() => {
+             setMonsterChatLog(prev => [...prev, newMonsterBanter]);
+        }, 500 + Math.random() * 500);
 
 
-        if (newUserDesire >= 100 && newOpponentDesire >= 100 && !monstersSynced) {
+        if (userDesire >= 100 && newOpponentDesire >= 100 && !monstersSynced) {
           setMonstersSynced(true);
           localStorage.setItem(`monstersSynced_${mockUserId}`, 'true');
           toast({
@@ -169,7 +183,7 @@ export default function SimulatedChatPage() {
         
         toast({
           title: "Message Quality Score",
-          description: `Your message received a score of ${score}. ${qualityResult.reasoning || ''} (Desire levels updated!)`,
+          description: `Your message received a score of ${score}. ${qualityResult.reasoning || ''} (Opponent's desire for you is now ${newOpponentDesire}%)`,
           variant: score > 0 ? "default" : "destructive",
           duration: 6000,
         });
@@ -203,7 +217,7 @@ export default function SimulatedChatPage() {
             <Button variant="ghost" size="icon" onClick={() => router.push('/fiber-singles')} className="mr-2">
                 <ArrowLeft />
             </Button>
-            <Image src={mockOpponent.romanticMonsterImageUrl} alt={mockOpponent.romanticMonsterName} width={40} height={40} className="rounded-full border-2 border-pink-400 object-cover" data-ai-hint={mockOpponent.romanticMonsterAiHint}/>
+            <Image src={mockOpponent.romanticMonsterImageUrl} alt={mockOpponent.romanticMonsterName} width={40} height={40} className="rounded-lg border-2 border-pink-400 object-cover" data-ai-hint={mockOpponent.romanticMonsterAiHint}/>
             <div>
                 <CardTitle className="font-headline text-xl">Chatting with {mockOpponent.name}</CardTitle>
                 <CardDescription>As your romantic monster: <span className="font-semibold text-pink-600 dark:text-pink-400">{userRomanticMonsterName}</span></CardDescription>
@@ -220,7 +234,7 @@ export default function SimulatedChatPage() {
             <CardDescription>Your Persona</CardDescription>
           </CardHeader>
           <CardContent className="text-sm">
-            <Label htmlFor="user-desire">Desire for {mockOpponent.romanticMonsterName}: {userDesire}%</Label>
+            <Label htmlFor="user-desire">{userRomanticMonsterName}'s Desire for {mockOpponent.romanticMonsterName}: {userDesire}%</Label>
             <Progress id="user-desire" value={userDesire} className="h-3 bg-pink-200 [&>div]:bg-pink-500" />
           </CardContent>
         </Card>
@@ -232,7 +246,7 @@ export default function SimulatedChatPage() {
             <CardDescription>{mockOpponent.name}'s Persona</CardDescription>
           </CardHeader>
           <CardContent className="text-sm">
-            <Label htmlFor="opponent-desire">Desire for {userRomanticMonsterName}: {opponentDesire}%</Label>
+            <Label htmlFor="opponent-desire">{mockOpponent.romanticMonsterName}'s Desire for {userRomanticMonsterName}: {opponentDesire}%</Label>
             <Progress id="opponent-desire" value={opponentDesire} className="h-3 bg-purple-200 [&>div]:bg-purple-500" />
           </CardContent>
         </Card>
@@ -326,3 +340,5 @@ export default function SimulatedChatPage() {
     </div>
   );
 }
+
+    
