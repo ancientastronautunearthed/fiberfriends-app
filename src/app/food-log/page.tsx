@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Apple, ThumbsUp, ThumbsDown, MinusCircle, Info, Sparkles } from "lucide-react";
+import { Loader2, Apple, ThumbsUp, ThumbsDown, MinusCircle, Info, Sparkles, Skull } from "lucide-react";
 import Image from "next/image";
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { gradeFoodItemAction } from './actions';
 import type { FoodGradingOutput } from '@/ai/flows/food-grading-flow';
 import { useToast } from '@/hooks/use-toast';
@@ -19,9 +20,11 @@ import { cn } from '@/lib/utils';
 const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
 const MONSTER_NAME_KEY = 'morgellonMonsterName';
 const MONSTER_HEALTH_KEY = 'morgellonMonsterHealth';
+const MONSTER_GENERATED_KEY = 'morgellonMonsterGenerated';
 const FOOD_LOG_KEY = 'morgellonFoodLogEntries';
+const MONSTER_TOMB_KEY = 'morgellonMonsterTomb';
 
-const MIN_MONSTER_HEALTH = 20;
+const MONSTER_DEATH_THRESHOLD = -50;
 const MAX_MONSTER_HEALTH = 200;
 const INITIAL_HEALTH_MIN = 80;
 const INITIAL_HEALTH_MAX = 100;
@@ -31,6 +34,12 @@ interface FoodLogEntry extends FoodGradingOutput {
   loggedAt: string;
   healthBefore: number;
   healthAfter: number;
+}
+
+interface TombEntry {
+  name: string;
+  imageUrl: string;
+  diedAt: string;
 }
 
 export default function FoodLogPage() {
@@ -44,22 +53,30 @@ export default function FoodLogPage() {
   const [isGrading, startGradingTransition] = useTransition();
   const { toast } = useToast();
   const [showDamageEffect, setShowDamageEffect] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const storedImage = localStorage.getItem(MONSTER_IMAGE_KEY);
     const storedName = localStorage.getItem(MONSTER_NAME_KEY);
-    setMonsterImageUrl(storedImage);
-    setMonsterName(storedName);
+    const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
 
-    if (storedName && storedImage) { 
+    if (monsterGenerated === 'true' && storedImage && storedName) {
+      setMonsterImageUrl(storedImage);
+      setMonsterName(storedName);
       const storedHealth = localStorage.getItem(MONSTER_HEALTH_KEY);
       if (storedHealth) {
         setMonsterHealth(parseFloat(storedHealth));
       } else {
+        // This case should ideally be handled at monster creation
         const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
         setMonsterHealth(initialHealth);
         localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
       }
+    } else {
+      // No monster exists or hasn't been fully set up
+      setMonsterImageUrl(null);
+      setMonsterName(null);
+      setMonsterHealth(null);
     }
 
     const storedFoodLog = localStorage.getItem(FOOD_LOG_KEY);
@@ -69,13 +86,15 @@ export default function FoodLogPage() {
   }, []);
 
   useEffect(() => {
-    if (monsterHealth !== null) {
+    if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true') {
       localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
     }
   }, [monsterHealth]);
 
   useEffect(() => {
-    localStorage.setItem(FOOD_LOG_KEY, JSON.stringify(foodLogEntries));
+    if (foodLogEntries.length > 0 || localStorage.getItem(FOOD_LOG_KEY)) {
+      localStorage.setItem(FOOD_LOG_KEY, JSON.stringify(foodLogEntries));
+    }
   }, [foodLogEntries]);
 
   const handleFoodSubmit = async (event: React.FormEvent) => {
@@ -84,8 +103,8 @@ export default function FoodLogPage() {
       setError("Please enter a food item.");
       return;
     }
-    if (monsterHealth === null) {
-        setError("Monster health not initialized. This shouldn't happen if a monster exists.");
+    if (monsterHealth === null || !monsterName || !monsterImageUrl) {
+        setError("Monster not found or health not initialized. Please create a monster first.");
         return;
     }
     setError(null);
@@ -96,13 +115,14 @@ export default function FoodLogPage() {
         
         const healthBefore = monsterHealth;
         let newHealth = healthBefore + result.healthImpactPercentage;
-        newHealth = Math.max(MIN_MONSTER_HEALTH, Math.min(MAX_MONSTER_HEALTH, newHealth));
+        newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth); // Cap at max health, min is handled by death threshold
         
         setMonsterHealth(newHealth);
+        setFoodInput('');
 
         if (result.grade === 'bad') {
           setShowDamageEffect(true);
-          setTimeout(() => setShowDamageEffect(false), 700); // Animation duration
+          setTimeout(() => setShowDamageEffect(false), 700);
         }
 
         const newLogEntry: FoodLogEntry = {
@@ -113,13 +133,38 @@ export default function FoodLogPage() {
           healthAfter: newHealth,
         };
         setFoodLogEntries(prev => [newLogEntry, ...prev].slice(0, 20)); 
-        setFoodInput('');
-        toast({
-          title: `${result.foodName} Logged!`,
-          description: `Monster health changed by ${result.healthImpactPercentage.toFixed(1)}%. Current: ${newHealth.toFixed(1)}%. Reason: ${result.reasoning}`,
-          variant: result.grade === "good" ? "default" : result.grade === "bad" ? "destructive" : "default",
-          duration: Number.MAX_SAFE_INTEGER, // Make toast persistent until manually closed
-        });
+
+        if (newHealth <= MONSTER_DEATH_THRESHOLD) {
+          // Monster dies
+          const tomb: TombEntry[] = JSON.parse(localStorage.getItem(MONSTER_TOMB_KEY) || '[]');
+          tomb.unshift({ name: monsterName, imageUrl: monsterImageUrl, diedAt: new Date().toISOString() });
+          localStorage.setItem(MONSTER_TOMB_KEY, JSON.stringify(tomb.slice(0, 50))); // Keep last 50 dead monsters
+
+          localStorage.removeItem(MONSTER_IMAGE_KEY);
+          localStorage.removeItem(MONSTER_NAME_KEY);
+          localStorage.removeItem(MONSTER_HEALTH_KEY);
+          localStorage.removeItem(MONSTER_GENERATED_KEY);
+          
+          setMonsterImageUrl(null);
+          setMonsterName(null);
+          setMonsterHealth(null);
+
+          toast({
+            title: "Your Monster Has Perished!",
+            description: `${result.foodName} was the final blow. ${monsterName} has fallen with ${newHealth.toFixed(1)}% health. Visit the Tomb of Monsters. You can now create a new monster.`,
+            variant: "destructive",
+            duration: Number.MAX_SAFE_INTEGER,
+          });
+          router.push('/create-monster');
+
+        } else {
+          toast({
+            title: `${result.foodName} Logged!`,
+            description: `Monster health changed by ${result.healthImpactPercentage.toFixed(1)}%. Current: ${newHealth.toFixed(1)}%. Reason: ${result.reasoning}`,
+            variant: result.grade === "good" ? "default" : result.grade === "bad" ? "destructive" : "default",
+            duration: Number.MAX_SAFE_INTEGER, 
+          });
+        }
 
       } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "Failed to grade food item.";
@@ -136,7 +181,9 @@ export default function FoodLogPage() {
 
   const getMonsterStatusMessage = () => {
     if (monsterHealth === null) return "";
-    if (monsterHealth < (MIN_MONSTER_HEALTH + (INITIAL_HEALTH_MIN - MIN_MONSTER_HEALTH) / 2) ) return "Your monster is critically weak!";
+    if (monsterHealth <= MONSTER_DEATH_THRESHOLD) return "Your monster has perished!";
+    if (monsterHealth < 0) return `Your monster is critically weak at ${monsterHealth.toFixed(1)}%!`;
+    if (monsterHealth < 20) return "Your monster is very weak!";
     if (monsterHealth < INITIAL_HEALTH_MIN) return "Your monster is feeling weak!";
     if (monsterHealth > (MAX_MONSTER_HEALTH - (MAX_MONSTER_HEALTH - INITIAL_HEALTH_MAX)/2) ) return "Your monster is overwhelmingly powerful!";
     if (monsterHealth > INITIAL_HEALTH_MAX + 20) return "Your monster is significantly strengthened!";
@@ -146,21 +193,26 @@ export default function FoodLogPage() {
   
   const getHealthBarValue = () => {
       if (monsterHealth === null) return 0;
-      return (monsterHealth / MAX_MONSTER_HEALTH) * 100;
+      // Progress bar visually shows 0 if health is negative or 0.
+      // It scales from 0 to MAX_MONSTER_HEALTH for positive values.
+      return Math.max(0, monsterHealth) / MAX_MONSTER_HEALTH * 100;
   }
 
-  if (!monsterName || !monsterImageUrl) {
+  if (!monsterName || !monsterImageUrl || monsterHealth === null) {
     return (
       <Card className="max-w-lg mx-auto">
         <CardHeader>
-          <CardTitle className="font-headline flex items-center gap-2"><Info className="h-6 w-6 text-primary"/>Monster Not Found</CardTitle>
+          <CardTitle className="font-headline flex items-center gap-2"><Info className="h-6 w-6 text-primary"/>Monster Not Found or Perished</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-center text-muted-foreground mb-4">
-            You need to create your Morgellon Monster before you can log food and track its health.
+            You need to create your Morgellon Monster, or your previous one has fallen.
           </p>
-          <Button asChild className="w-full">
-            <Link href="/create-monster"><Sparkles className="mr-2 h-4 w-4"/>Create Your Monster</Link>
+          <Button asChild className="w-full mb-2">
+            <Link href="/create-monster"><Sparkles className="mr-2 h-4 w-4"/>Create a New Monster</Link>
+          </Button>
+          <Button asChild variant="outline" className="w-full">
+            <Link href="/monster-tomb"><Skull className="mr-2 h-4 w-4"/>View Tomb of Monsters</Link>
           </Button>
         </CardContent>
       </Card>
@@ -172,27 +224,17 @@ export default function FoodLogPage() {
       <div className="lg:col-span-1 space-y-6">
         <Card className={cn(showDamageEffect && 'animate-damage-flash')}>
           <CardHeader className="items-center text-center">
-            {monsterImageUrl && monsterName && (
-              <Image src={monsterImageUrl} alt={monsterName} width={128} height={128} className="rounded-full border-2 border-primary shadow-md mx-auto" data-ai-hint="generated monster" />
-            )}
+            <Image src={monsterImageUrl} alt={monsterName} width={128} height={128} className="rounded-full border-2 border-primary shadow-md mx-auto" data-ai-hint="generated monster" />
             <CardTitle className="font-headline text-2xl pt-2">{monsterName}</CardTitle>
-            {monsterHealth !== null && (
-                <CardDescription>{getMonsterStatusMessage()}</CardDescription>
-            )}
+            <CardDescription>{getMonsterStatusMessage()}</CardDescription>
           </CardHeader>
           <CardContent>
-            {monsterHealth !== null ? (
-              <>
-                <Label htmlFor="monster-health-progress" className="text-sm font-medium text-center block mb-1">
-                  Monster Health: {monsterHealth.toFixed(1)}% / {MAX_MONSTER_HEALTH}%
-                </Label>
-                <Progress id="monster-health-progress" value={getHealthBarValue()} className="w-full h-3" 
-                    aria-label={`Monster health: ${monsterHealth.toFixed(1)}%`} />
-                 <p className="text-xs text-muted-foreground text-center mt-1">Min: {MIN_MONSTER_HEALTH}%, Max: {MAX_MONSTER_HEALTH}%</p>
-              </>
-            ) : (
-              <p className="text-center text-muted-foreground">Loading monster health...</p>
-            )}
+            <Label htmlFor="monster-health-progress" className="text-sm font-medium text-center block mb-1">
+              Monster Health: {monsterHealth.toFixed(1)}% (Max: {MAX_MONSTER_HEALTH}%)
+            </Label>
+            <Progress id="monster-health-progress" value={getHealthBarValue()} className="w-full h-3" 
+                aria-label={`Monster health: ${monsterHealth.toFixed(1)}%`} />
+             <p className="text-xs text-muted-foreground text-center mt-1">Dies at: {MONSTER_DEATH_THRESHOLD}%</p>
           </CardContent>
         </Card>
       </div>

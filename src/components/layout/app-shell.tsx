@@ -18,7 +18,7 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Smile, HeartPulse, LogOut, ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple } from 'lucide-react';
+import { HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Smile, HeartPulse, LogOut, ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull } from 'lucide-react';
 
 const navItems = [
   { href: '/', label: 'Belief Circle', icon: HeartHandshake, pageTitle: 'Belief Circle' },
@@ -31,6 +31,7 @@ const navItems = [
   { href: '/doctor-forum', label: 'Doctor Forum', icon: MessageSquareQuote, pageTitle: 'Doctor Forum' },
   { href: '/humor-hub', label: 'Humor Hub', icon: Smile, pageTitle: 'Humor Hub' },
   { href: '/create-monster', label: 'Create Monster', icon: Wand2, pageTitle: 'Create Your Monster' },
+  { href: '/monster-tomb', label: 'Monster Tomb', icon: Skull, pageTitle: 'Tomb of Monsters' },
   { href: '/my-profile', label: 'My Profile', icon: UserCircle, pageTitle: 'My Profile' },
   { href: '/support-us', label: 'Support Us', icon: PiggyBank, pageTitle: 'Support Us' },
 ];
