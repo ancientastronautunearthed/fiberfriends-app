@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, UserSearch, ShieldQuestion, Heart, Wand2, Sparkles } from "lucide-react";
+import { MessageSquare, UserSearch, ShieldQuestion, Heart, Wand2, Sparkles, Loader2 as IconLoader } from "lucide-react"; // Renamed Loader2 to avoid conflict
 import Image from "next/image";
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -15,14 +15,27 @@ const ROMANTIC_MONSTER_IMAGE_KEY = 'romanticMonsterImageUrl';
 const ROMANTIC_MONSTER_NAME_KEY = 'romanticMonsterName';
 const ROMANTIC_MONSTER_GENERATED_KEY = 'romanticMonsterGenerated';
 
-const mockSingles = [
+interface MockSingle {
+  id: string;
+  name: string;
+  romanticMonsterName: string;
+  romanticMonsterImageUrl: string; 
+  romanticMonsterAiHint: string;
+  avatarUrl: string; 
+  aiHint: string;
+  bio: string;
+  interests: string[];
+  onlineStatus: string;
+}
+
+const mockSingles: MockSingle[] = [
   {
     id: "s1",
     name: "Casey L.",
     romanticMonsterName: "Velvet Whisperwind",
-    romanticMonsterImageUrl: "https://placehold.co/100x100.png", // Placeholder for mock user's romantic monster
+    romanticMonsterImageUrl: "https://placehold.co/100x100.png", 
     romanticMonsterAiHint: "fantasy creature gentle",
-    avatarUrl: "https://placehold.co/100x100.png", // Placeholder for user's actual avatar
+    avatarUrl: "https://placehold.co/100x100.png", 
     aiHint: "person smiling",
     bio: "Loves hiking, reading, and quiet evenings. My monster, Velvet Whisperwind, seeks a kind soul.",
     interests: ["Nature", "Books", "Mindfulness", "Art"],
@@ -48,18 +61,48 @@ const chatFlairExamples = [
     { name: "Mystic Flower", imageUrl: "https://placehold.co/50x50.png", aiHint: "glowing flower", cost: 20 },
 ];
 
+interface ShowcasedSyncedPair {
+  userMonsterName: string;
+  userMonsterImageUrl: string;
+  opponentMonsterName: string;
+  opponentMonsterImageUrl: string;
+  opponentMonsterAiHint: string;
+  opponentName: string;
+}
+
 
 export default function FiberSinglesPage() {
   const { toast } = useToast();
   const [userRomanticMonsterName, setUserRomanticMonsterName] = useState<string | null>(null);
   const [userRomanticMonsterImageUrl, setUserRomanticMonsterImageUrl] = useState<string | null>(null);
   const [isLoadingPersona, setIsLoadingPersona] = useState(true);
+  const [showcasedSyncedPairs, setShowcasedSyncedPairs] = useState<ShowcasedSyncedPair[]>([]);
 
   useEffect(() => {
     const generated = localStorage.getItem(ROMANTIC_MONSTER_GENERATED_KEY);
-    if (generated === 'true') {
-      setUserRomanticMonsterName(localStorage.getItem(ROMANTIC_MONSTER_NAME_KEY));
-      setUserRomanticMonsterImageUrl(localStorage.getItem(ROMANTIC_MONSTER_IMAGE_KEY));
+    const name = localStorage.getItem(ROMANTIC_MONSTER_NAME_KEY);
+    const imageUrl = localStorage.getItem(ROMANTIC_MONSTER_IMAGE_KEY);
+
+    if (generated === 'true' && name && imageUrl) {
+      setUserRomanticMonsterName(name);
+      setUserRomanticMonsterImageUrl(imageUrl);
+
+      // Check for synced pairs
+      const newSyncedPairs: ShowcasedSyncedPair[] = [];
+      mockSingles.forEach(opponent => {
+        const syncedKey = `monstersSynced_${opponent.id}`;
+        if (localStorage.getItem(syncedKey) === 'true') {
+          newSyncedPairs.push({
+            userMonsterName: name,
+            userMonsterImageUrl: imageUrl,
+            opponentMonsterName: opponent.romanticMonsterName,
+            opponentMonsterImageUrl: opponent.romanticMonsterImageUrl,
+            opponentMonsterAiHint: opponent.romanticMonsterAiHint,
+            opponentName: opponent.name,
+          });
+        }
+      });
+      setShowcasedSyncedPairs(newSyncedPairs);
     }
     setIsLoadingPersona(false);
   }, []);
@@ -76,7 +119,7 @@ export default function FiberSinglesPage() {
   if (isLoadingPersona) {
     return (
         <div className="flex justify-center items-center h-64">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <IconLoader className="h-12 w-12 animate-spin text-primary" />
             <p className="ml-4 text-muted-foreground">Loading Fiber Singles...</p>
         </div>
     );
@@ -107,6 +150,54 @@ export default function FiberSinglesPage() {
 
   return (
     <div className="space-y-8">
+      {showcasedSyncedPairs.length > 0 && (
+        <Card className="shadow-xl bg-gradient-to-br from-pink-400 via-purple-400 to-indigo-400 text-white">
+          <CardHeader className="text-center">
+            <Heart className="h-12 w-12 mx-auto text-white animate-pulse mb-2" />
+            <CardTitle className="font-headline text-3xl">Soul Connected Pairs</CardTitle>
+            <CardDescription className="text-pink-100">
+              These monsters have achieved perfect harmony, their essences intertwined!
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-6">
+            {showcasedSyncedPairs.map((pair, index) => (
+              <div key={index} className="p-4 bg-white/20 rounded-lg shadow-lg text-center">
+                <div className="flex flex-col sm:flex-row items-center justify-around gap-2 mb-2">
+                  <div className="flex flex-col items-center">
+                    <Image 
+                        src={pair.userMonsterImageUrl} 
+                        alt={pair.userMonsterName} 
+                        width={80} 
+                        height={80} 
+                        className="rounded-lg border-2 border-pink-300 object-cover shadow-md"
+                        data-ai-hint="user romantic monster"
+                    />
+                    <p className="mt-1 text-xs font-semibold">{pair.userMonsterName}</p>
+                    <p className="text-xxs text-pink-200">(Your Persona)</p>
+                  </div>
+                  <Heart className="h-6 w-6 text-pink-200 my-2 sm:my-0" />
+                  <div className="flex flex-col items-center">
+                    <Image 
+                        src={pair.opponentMonsterImageUrl} 
+                        alt={pair.opponentMonsterName} 
+                        width={80} 
+                        height={80} 
+                        className="rounded-lg border-2 border-purple-300 object-cover shadow-md"
+                        data-ai-hint={pair.opponentMonsterAiHint}
+                    />
+                    <p className="mt-1 text-xs font-semibold">{pair.opponentMonsterName}</p>
+                    <p className="text-xxs text-purple-200">(with {pair.opponentName})</p>
+                  </div>
+                </div>
+                <p className="text-sm italic mt-2 text-pink-50">
+                  "{pair.userMonsterName} & {pair.opponentMonsterName} - A bond forged in fibers!"
+                </p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="shadow-lg">
         <CardHeader className="text-center pb-4">
           <UserSearch className="h-10 w-10 mx-auto text-primary mb-1" />
@@ -119,8 +210,8 @@ export default function FiberSinglesPage() {
         <CardContent>
             <Card className="mb-6 p-4 bg-gradient-to-r from-pink-100 via-purple-100 to-indigo-100 dark:from-pink-900/30 dark:via-purple-900/30 dark:to-indigo-900/30 border-pink-300 dark:border-pink-700">
                 <CardHeader className="p-0 pb-2 flex flex-row items-center gap-3">
-                     {userRomanticMonsterImageUrl && (
-                        <Image src={userRomanticMonsterImageUrl} alt={userRomanticMonsterName || "Your Romantic Monster"} width={128} height={128} className="rounded-lg border-2 border-pink-400 shadow-md object-cover" data-ai-hint="romantic monster user"/>
+                     {userRomanticMonsterImageUrl && userRomanticMonsterName && (
+                        <Image src={userRomanticMonsterImageUrl} alt={userRomanticMonsterName} width={128} height={128} className="rounded-lg border-2 border-pink-400 shadow-md object-cover" data-ai-hint="romantic monster user"/>
                      )}
                     <div>
                         <CardTitle className="text-xl text-pink-700 dark:text-pink-300">{userRomanticMonsterName}</CardTitle>
@@ -135,7 +226,6 @@ export default function FiberSinglesPage() {
                     </Button>
                 </CardContent>
             </Card>
-
 
             <div className="p-4 bg-accent/20 border border-accent rounded-md text-accent-foreground mb-6">
               <div className="flex items-start gap-3">
@@ -165,7 +255,6 @@ export default function FiberSinglesPage() {
                 </div>
                 <p className="text-xs text-muted-foreground text-center mt-2">(Imagine sending these fun icons in chat! Feature simulated.)</p>
             </div>
-
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {mockSingles.map(user => (
@@ -225,9 +314,3 @@ export default function FiberSinglesPage() {
     </div>
   );
 }
-
-// Helper component to avoid hydration errors with localStorage
-const Loader2 = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-);
-
