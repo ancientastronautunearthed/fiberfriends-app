@@ -18,6 +18,7 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Image from "next/image";
+import { showSocialProofToast } from '@/lib/social-proof-toast';
 
 
 interface ProductEntryClient extends ProductEffectGradingOutput {
@@ -45,6 +46,8 @@ const WORKING_PRODUCTS_KEY = 'workingProducts';
 const NOT_WORKING_PRODUCTS_KEY = 'notWorkingProducts';
 const USER_POINTS_KEY = 'userPoints';
 const MONSTER_LAST_RECOVERY_DATE_KEY = 'monsterLastRecoveryDate';
+const POSITIVE_PRODUCT_USAGE_STREAK_KEY = 'positiveProductUsageStreak';
+const PRODUCT_LOG_MILESTONE_INTERVAL = 5; // Show social proof every 5 products logged
 
 
 const MONSTER_DEATH_THRESHOLD = -50;
@@ -58,6 +61,11 @@ interface TombEntry {
   name: string;
   imageUrl: string;
   diedAt: string;
+}
+
+interface StreakData {
+  date: string; // YYYY-MM-DD
+  count: number;
 }
 
 
@@ -82,6 +90,40 @@ export default function ProductTrackerPage() {
   const [monsterName, setMonsterName] = useState<string | null>(null);
   const [monsterHealth, setMonsterHealth] = useState<number | null>(null);
   const [showDamageEffect, setShowDamageEffect] = useState(false);
+  const [positiveProductUsageStreak, setPositiveProductUsageStreak] = useState<StreakData>({ date: '', count: 0});
+
+
+  const updateStreak = (streakKey: string, setStreakState: React.Dispatch<React.SetStateAction<StreakData>>): number => {
+    const today = new Date().toISOString().split('T')[0];
+    const storedStreak = localStorage.getItem(streakKey);
+    let currentStreak: StreakData = { date: today, count: 0 };
+
+    if (storedStreak) {
+      currentStreak = JSON.parse(storedStreak);
+      const lastDate = new Date(currentStreak.date);
+      const currentDate = new Date(today);
+      
+      const diffTime = Math.abs(currentDate.getTime() - lastDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (today === currentStreak.date) {
+        // Same day, streak continues (count already reflects this day if it's not the first action of the day)
+        // If it's the first action *of this type* for the day, it might need specific handling
+        // For now, let's assume it's a continuation or the first log of the day for this streak.
+      } else if (diffDays === 1) {
+        currentStreak.count += 1; // Consecutive day
+      } else {
+        currentStreak.count = 1; // Streak broken, reset
+      }
+    } else {
+      currentStreak.count = 1; // First time logging this type of action
+    }
+    currentStreak.date = today;
+    localStorage.setItem(streakKey, JSON.stringify(currentStreak));
+    setStreakState(currentStreak);
+    return currentStreak.count;
+  };
+
 
   const performNightlyRecovery = useCallback(() => {
     const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
@@ -142,18 +184,24 @@ export default function ProductTrackerPage() {
     const savedUserPoints = localStorage.getItem(USER_POINTS_KEY);
     if (savedUserPoints) setUserPoints(parseInt(savedUserPoints, 10));
 
+    const savedProductUsageStreak = localStorage.getItem(POSITIVE_PRODUCT_USAGE_STREAK_KEY);
+    if (savedProductUsageStreak) setPositiveProductUsageStreak(JSON.parse(savedProductUsageStreak));
+
+
   }, [performNightlyRecovery]);
 
   useEffect(() => {
     if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true' && monsterName) {
       localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
-      checkMonsterDeath(monsterHealth, "its own frail constitution"); // Default cause
+      checkMonsterDeath(monsterHealth, "its own frail constitution"); 
     }
   }, [monsterHealth, monsterName]);
 
   useEffect(() => { localStorage.setItem(WORKING_PRODUCTS_KEY, JSON.stringify(workingProducts)); }, [workingProducts]);
   useEffect(() => { localStorage.setItem(NOT_WORKING_PRODUCTS_KEY, JSON.stringify(notWorkingProducts)); }, [notWorkingProducts]);
   useEffect(() => { localStorage.setItem(USER_POINTS_KEY, String(userPoints)); }, [userPoints]);
+  useEffect(() => { localStorage.setItem(POSITIVE_PRODUCT_USAGE_STREAK_KEY, JSON.stringify(positiveProductUsageStreak)); }, [positiveProductUsageStreak]);
+
 
   useEffect(() => {
     if (userPoints >= TIERS.GOLD.points) setCurrentTier(TIERS.GOLD);
@@ -198,6 +246,13 @@ export default function ProductTrackerPage() {
           description: `It has a ${aiResult.benefitScore}/5 benefit. ${monsterName} scoffs: 'As if I'd let that weaken me! ${aiResult.reasoning.substring(0,70)}...'`,
           duration: Number.MAX_SAFE_INTEGER
         });
+
+        const totalProductsLogged = workingProducts.length + notWorkingProducts.length; 
+        if (totalProductsLogged > 0 && totalProductsLogged % PRODUCT_LOG_MILESTONE_INTERVAL === 0) {
+            showSocialProofToast(`${totalProductsLogged} product insights shared`, POINTS_PER_PRODUCT, true);
+        }
+
+
       } catch (e) {
         const errorMsg = e instanceof Error ? e.message : "AI grading failed.";
         setWorkingProducts(prev => prev.filter(p => p.id !== tempId)); 
@@ -230,6 +285,12 @@ export default function ProductTrackerPage() {
     };
     setNotWorkingProducts(prev => [newProduct, ...prev]);
     addPoints();
+
+    const totalProductsLogged = workingProducts.length + notWorkingProducts.length + 1; 
+    if (totalProductsLogged > 0 && totalProductsLogged % PRODUCT_LOG_MILESTONE_INTERVAL === 0) {
+        showSocialProofToast(`${totalProductsLogged} product insights shared`, POINTS_PER_PRODUCT, true);
+    }
+
     setPastProductName('');
     setPastProductNotes('');
   };
@@ -262,21 +323,40 @@ export default function ProductTrackerPage() {
   const handleUseProduct = (product: ProductEntryClient) => {
     if (!monsterGenerated || monsterHealth === null || !product.isGraded || !monsterName) return;
     
+    const STREAK_BONUS_PER_DAY = 0.02;
+    const MAX_STREAK_MODIFIER = 0.50;
+
+    const currentStreakCount = updateStreak(POSITIVE_PRODUCT_USAGE_STREAK_KEY, setPositiveProductUsageStreak);
+    const streakModifier = Math.min(currentStreakCount * STREAK_BONUS_PER_DAY, MAX_STREAK_MODIFIER);
+    const finalBenefitScore = product.benefitScore * (1 + streakModifier);
+    
     const healthBefore = monsterHealth;
-    let newHealth = healthBefore - product.benefitScore; 
+    let newHealth = healthBefore - finalBenefitScore; 
     newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth);
 
     setMonsterHealth(newHealth);
     setShowDamageEffect(true);
     setTimeout(() => setShowDamageEffect(false), 700);
 
+    let monsterReact = `${monsterName} screeches! That wretched ${product.productName}! My health plummets to ${newHealth.toFixed(1)}% (-${finalBenefitScore.toFixed(1)}%).`;
+    if (streakModifier > 0) {
+        monsterReact += ` Your ${currentStreakCount}-day consistency (+${(streakModifier * 100).toFixed(0)}% effect) makes it even WORSE!`;
+    }
+    
+    if (newHealth <= 0 && newHealth > MONSTER_DEATH_THRESHOLD) monsterReact += " I'm... fading...";
+    else if (newHealth <= MONSTER_DEATH_THRESHOLD / 2 && newHealth > MONSTER_DEATH_THRESHOLD) monsterReact += " Please... stop...";
+
+
     if (!checkMonsterDeath(newHealth, product.productName)) {
       toast({
-        title: `${monsterName} screeches!`,
-        description: `That wretched ${product.productName}! My health plummets to ${newHealth.toFixed(1)}% (-${product.benefitScore.toFixed(1)}%)! Its supposed benefit is just a curse.`,
-        variant: "default", // Or warning
+        title: `${monsterName} Reacts to ${product.productName}`,
+        description: monsterReact,
+        variant: "default",
         duration: Number.MAX_SAFE_INTEGER,
       });
+      if (currentStreakCount >= 5 && currentStreakCount % 5 === 0) { // Social proof for usage streak
+          showSocialProofToast(`${currentStreakCount}-day streak using helpful products like ${product.productName}`, undefined, true);
+      }
     }
   };
   
@@ -345,7 +425,7 @@ export default function ProductTrackerPage() {
                 : <p className="text-xs text-green-500">You've reached the highest tier! Congratulations!</p>
             }
           </div>
-          <p className="text-xs text-muted-foreground pt-2">Each product logged (working or not) earns {POINTS_PER_PRODUCT} points.</p>
+          <p className="text-xs text-muted-foreground pt-2">Each product logged (working or not) earns {POINTS_PER_PRODUCT} points. Using helpful products consistently also has benefits!</p>
         </CardContent>
       </Card>
 
@@ -356,6 +436,11 @@ export default function ProductTrackerPage() {
                 <Image src={monsterImageUrl} alt={monsterName} width={100} height={100} className="rounded-full border-2 border-primary shadow-md mx-auto cursor-pointer hover:opacity-80 transition-opacity" data-ai-hint="generated monster"/>
             </Link>
             <CardTitle className="font-headline text-xl pt-2">{monsterName}</CardTitle>
+             {positiveProductUsageStreak.count > 0 && (
+                <Badge variant="secondary" className="mt-1">
+                    Product Use Streak: {positiveProductUsageStreak.count} day{positiveProductUsageStreak.count > 1 ? 's' : ''}
+                </Badge>
+            )}
           </CardHeader>
           <CardContent className="text-center">
             <Label htmlFor="monster-health-progress" className="text-sm font-medium block mb-1">
@@ -382,7 +467,7 @@ export default function ProductTrackerPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline">Currently Using & Working</CardTitle>
-            <CardDescription>List products that help. AI will grade their benefit (1-5 score). Using a product reduces monster health by its score.</CardDescription>
+            <CardDescription>List products that help. AI will grade their benefit (1-5 score). Using a product reduces monster health by its score, amplified by consistency streaks.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -408,7 +493,7 @@ export default function ProductTrackerPage() {
                 />
               </div>
             </div>
-            <Button onClick={handleAddWorkingProduct} className="w-full sm:w-auto" disabled={isGradingProduct || !currentProductName.trim()}>
+            <Button onClick={handleAddWorkingProduct} className="w-full sm:w-auto" disabled={isGradingProduct || !currentProductName.trim() || !monsterGenerated}>
               {isGradingProduct ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
               {isGradingProduct ? `Asking ${monsterName || 'the AI'} about ${currentProductName}...` : 'Add & Grade Working Product'}
             </Button>
