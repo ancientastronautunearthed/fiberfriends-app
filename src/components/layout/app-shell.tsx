@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -18,7 +17,7 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Smile, HeartPulse, LogOut, ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull } from 'lucide-react';
+import { HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Smile, HeartPulse, LogOut, ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart } from 'lucide-react';
 
 const navItems = [
   { href: '/', label: 'Belief Circle', icon: HeartHandshake, pageTitle: 'Belief Circle' },
@@ -26,7 +25,8 @@ const navItems = [
   { href: '/pattern-recognition', label: 'Pattern Recognition', icon: BrainCircuit, pageTitle: 'Pattern Recognition' },
   { href: '/product-tracker', label: 'Product Tracker', icon: ListChecks, pageTitle: 'Product Tracker' },
   { href: '/food-log', label: 'Food Log', icon: Apple, pageTitle: 'Daily Food Log' },
-  { href: '/matching', label: 'Find Friends', icon: Users, pageTitle: 'Find Friends' },
+  { href: '/matching', label: 'Find Friends', icon: Users, pageTitle: 'Find Friends (Community)' },
+  { href: '/fiber-singles', label: 'Fiber Singles', icon: Heart, pageTitle: 'Fiber Singles Connect' },
   { href: '/provider-directory', label: 'Provider Directory', icon: Stethoscope, pageTitle: 'Provider Directory' },
   { href: '/doctor-forum', label: 'Doctor Forum', icon: MessageSquareQuote, pageTitle: 'Doctor Forum' },
   { href: '/humor-hub', label: 'Humor Hub', icon: Smile, pageTitle: 'Humor Hub' },
@@ -46,6 +46,8 @@ const infoTips = [
   "Coolness: Even in darkness, there's a unique light. Find yours.",
   "Food Tip: Whole, unprocessed foods are generally a good foundation for health.",
   "Monster Wisdom: Understanding your inner monster can be a source of power.",
+  "Connection Tip: Reaching out can make a big difference. Consider messaging someone today.",
+  "Self-care: Remember to prioritize your well-being, both physically and mentally.",
 ];
 
 function InfoBar() {
