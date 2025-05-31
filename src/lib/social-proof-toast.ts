@@ -2,7 +2,8 @@
 "use client";
 
 import { toast } from '@/hooks/use-toast';
-import { Award, Zap, TrendingUp } from 'lucide-react';
+import { Award, Zap, TrendingUp, type LucideIcon } from 'lucide-react';
+import React from 'react'; // Ensure React is imported
 
 const mockUsernames = [
   "StarlightSeeker",
@@ -39,8 +40,8 @@ export function showSocialProofToast(
 
   const randomUsername = mockUsernames[Math.floor(Math.random() * mockUsernames.length)];
   let message: string;
-  let toastTitle = "Community Achievement!";
-  let IconComponent: React.ElementType = Award; // Explicitly type IconComponent
+  let toastTitleText = "Community Achievement!"; // Using a different variable name for clarity
+  let IconComponent: LucideIcon = Award;
 
   if (pointsAwarded) {
     message = `${randomUsername} +${pointsAwarded} points! For ${achievementDescription}.`;
@@ -51,11 +52,11 @@ export function showSocialProofToast(
   }
 
   toast({
-    title: (
-      <div className="flex items-center gap-2">
-        <IconComponent className="h-5 w-5 text-primary" />
-        <span>{toastTitle}</span>
-      </div>
+    title: React.createElement(
+      "div",
+      { className: "flex items-center gap-2" },
+      React.createElement(IconComponent, { className: "h-5 w-5 text-primary" }),
+      React.createElement("span", null, toastTitleText)
     ),
     description: message,
     duration: 6000,
