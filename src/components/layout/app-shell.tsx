@@ -17,7 +17,7 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Atom, LogOut, ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart, Dumbbell, Trophy, LayoutDashboard, Pill } from 'lucide-react';
+import { HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Atom, LogOut, ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart, Dumbbell, Trophy, LayoutDashboard, Pill, Wind } from 'lucide-react';
 
 const navItems = [
   { href: '/landing', label: 'About Fiber Friends', icon: LayoutDashboard, pageTitle: 'Welcome to Fiber Friends' },
@@ -28,6 +28,7 @@ const navItems = [
   { href: '/prescription-tracker', label: 'Prescription Tracker', icon: Pill, pageTitle: 'Prescription Tracker' },
   { href: '/food-log', label: 'Food Log', icon: Apple, pageTitle: 'Daily Food Log' },
   { href: '/exercise-log', label: 'Exercise Log', icon: Dumbbell, pageTitle: 'Exercise Log Tracker' },
+  { href: '/mindful-moment', label: 'Mindful Moment', icon: Wind, pageTitle: 'Mindful Moment' },
   { href: '/matching', label: 'Find Friends', icon: Users, pageTitle: 'Find Friends (Community)' },
   { href: '/fiber-singles', label: 'Fiber Singles', icon: Heart, pageTitle: 'Fiber Singles Connect' },
   { href: '/leaderboard', label: 'Leaderboard', icon: Trophy, pageTitle: 'Community Champions' },
@@ -140,3 +141,4 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+
