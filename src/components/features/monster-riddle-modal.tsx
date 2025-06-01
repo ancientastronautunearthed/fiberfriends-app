@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Lightbulb, CheckCircle, XCircle, Volume2, Eraser, MessageSquareQuestion, VenetianMask } from 'lucide-react';
+import { Loader2, Lightbulb, CheckCircle, XCircle, Volume2, Eraser, MessageSquareQuote, VenetianMask } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { generateMonsterRiddleAction } from '@/app/riddle-challenge/actions';
 import type { MonsterRiddleOutput } from '@/ai/flows/monster-riddle-flow';
@@ -340,7 +340,7 @@ export default function MonsterRiddleModal({ isOpen, onClose, onChallengeComplet
                   disabled={phoneFriendUsed || userPoints < PHONE_FRIEND_COST}
                   className="flex-1"
                 >
-                  <MessageSquareQuestion className="mr-2 h-4 w-4"/> Ask Friend ({PHONE_FRIEND_COST} pts)
+                  <MessageSquareQuote className="mr-2 h-4 w-4"/> Ask Friend ({PHONE_FRIEND_COST} pts)
                   {!phoneFriendUsed && userPoints < PHONE_FRIEND_COST && <span className="text-xs ml-1 text-destructive/80">(Need {PHONE_FRIEND_COST})</span>}
                 </Button>
               </div>
