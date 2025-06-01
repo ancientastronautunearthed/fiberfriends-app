@@ -89,18 +89,19 @@ const navItemsConfig: NavItem[] = [
     ]
   },
   {
-    label: 'Curated Wellness Aids', // New Top-Level Parent
+    label: 'Curated Wellness Aids', 
     icon: ShoppingCart,
     pageTitle: 'Curated Wellness Aids',
     isParent: true,
     authRequired: false,
     children: [
-      { href: '/curated-wellness-aids#supplements', label: 'Supplements', icon: Package, pageTitle: 'Curated Wellness Aids' },
-      { href: '/curated-wellness-aids#food-items', label: 'Food Items', icon: Apple, pageTitle: 'Curated Wellness Aids' },
-      { href: '/curated-wellness-aids#beverages', label: 'Beverages', icon: GlassWater, pageTitle: 'Curated Wellness Aids' },
-      { href: '/curated-wellness-aids#topicals', label: 'Topicals', icon: Droplets, pageTitle: 'Curated Wellness Aids' },
-      { href: '/curated-wellness-aids#wellness-tools', label: 'Wellness Tools', icon: ToyBrick, pageTitle: 'Curated Wellness Aids' },
-      { href: '/curated-wellness-aids#books', label: 'Books', icon: BookOpen, pageTitle: 'Curated Wellness Aids' },
+      { href: '/curated-wellness-aids#ai-product-suggester', label: 'AI Product Suggester', icon: BrainCircuit, pageTitle: 'AI Product Suggester' },
+      { href: '/curated-wellness-aids#supplements', label: 'Supplements', icon: Package, pageTitle: 'Supplements Category' },
+      { href: '/curated-wellness-aids#food-items', label: 'Food Items', icon: Apple, pageTitle: 'Food Items Category' },
+      { href: '/curated-wellness-aids#beverages', label: 'Beverages', icon: GlassWater, pageTitle: 'Beverages Category' },
+      { href: '/curated-wellness-aids#topicals', label: 'Topicals', icon: Droplets, pageTitle: 'Topicals Category' },
+      { href: '/curated-wellness-aids#wellness-tools', label: 'Wellness Tools', icon: ToyBrick, pageTitle: 'Wellness Tools Category' },
+      { href: '/curated-wellness-aids#books', label: 'Books', icon: BookOpen, pageTitle: 'Books Category' },
     ]
   },
   {
@@ -191,9 +192,17 @@ const findCurrentPage = (items: NavItem[], currentPath: string): NavItem | undef
       const baseItemPath = item.href.split('#')[0];
       if (baseItemPath === '/' && currentPath === '/') return item;
       if (baseItemPath === '/landing' && currentPath === '/landing') return item;
+      // For other paths, check if the current path starts with the baseItemPath.
+      // This handles sub-routes like /fiber-singles/chat/[id] matching /fiber-singles.
+      // And it also handles hash links matching the base path.
       if (baseItemPath !== '/' && baseItemPath !== '/landing' && currentPath.startsWith(baseItemPath)) {
-        if (currentPath.length === baseItemPath.length || currentPath[baseItemPath.length] === '/') {
-          return item;
+        // Ensure it's a full match or a sub-route, not just a partial prefix.
+        // e.g. /foo should match /foo and /foo/bar, but not /foobar
+        // Also consider if item.href itself contains a hash, the title should still come from the base.
+        if (currentPath.length === baseItemPath.length || currentPath[baseItemPath.length] === '/' || currentPath[baseItemPath.length] === '#') {
+          // If item.href has a hash, use the main item's pageTitle.
+          const mainNavItem = navItemsConfig.flatMap(nav => nav.children || [nav]).find(nav => nav.href && nav.href.split('#')[0] === baseItemPath);
+          return mainNavItem || item;
         }
       }
     }
@@ -203,13 +212,29 @@ const findCurrentPage = (items: NavItem[], currentPath: string): NavItem | undef
       if (childPage) return childPage;
     }
   }
-  // Fallback for parent if only hash differs
+  // Fallback for parent if only hash differs or if direct children define page titles differently
   for (const item of items) {
-      if (item.isParent && item.children && item.children.some(c => currentPath.startsWith(c.href?.split('#')[0] || ''))) {
-          // A child's base path matches, so return parent's page title.
-          // We need to find the *actual* parent item in the original config that contains these children.
-          const parentCandidate = navItemsConfig.find(parent => parent.label === item.label && parent.isParent);
-          if (parentCandidate) return parentCandidate;
+      if (item.isParent && item.children) {
+          for (const child of item.children) {
+            if (child.href) {
+                const childBase = child.href.split('#')[0];
+                if (currentPath.startsWith(childBase)) {
+                    // If the child's href contains a hash, it's an anchor link.
+                    // The page title should come from the parent menu item or the specific child if it's meant to be a distinct page.
+                    // In this case, the parent 'Curated Wellness Aids' itself is a page.
+                    if (child.href.includes('#')) {
+                        // If we are on /curated-wellness-aids#something, the title is "Curated Wellness Aids"
+                        if (currentPath.startsWith('/curated-wellness-aids')) {
+                            return navItemsConfig.find(nav => nav.label === 'Curated Wellness Aids' && nav.isParent);
+                        }
+                    }
+                    // If child.href is a base path, and it *is* the parent's main page, return parent.
+                    if (childBase === item.href?.split('#')[0]) return item; // Or child if child defines its own page title.
+                    // If child has its own distinct pageTitle for a base path
+                    if (currentPath.startsWith(childBase) && child.pageTitle !== item.pageTitle) return child;
+                }
+            }
+          }
       }
   }
   return undefined;
@@ -348,7 +373,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             <SidebarMenuItem key={child.href} className="p-0">
                               <Link href={child.href} legacyBehavior passHref>
                                 <SidebarMenuButton
-                                  isActive={(pathname === child.href.split('#')[0] || (child.href !== '/' && child.href !== '/landing' && pathname.startsWith(child.href.split('#')[0])))}
+                                  isActive={(pathname === child.href || (child.href !== '/' && child.href !== '/landing' && pathname.startsWith(child.href)))}
                                   tooltip={{ children: child.label, side: 'right' }}
                                   className="w-full justify-start text-xs h-[1.875rem] pl-1.5 py-1" 
                                   variant="ghost"
@@ -408,3 +433,4 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </>
   );
 }
+

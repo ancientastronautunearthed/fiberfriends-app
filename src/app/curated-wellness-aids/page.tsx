@@ -196,7 +196,7 @@ export default function CuratedWellnessAidsPage() {
 
   return (
     <div className="space-y-8">
-      <Card className="shadow-lg">
+      <Card id="ai-product-suggester" className="shadow-lg scroll-mt-20">
         <CardHeader>
           <CardTitle className="font-headline flex items-center gap-2">
             <BrainCircuit className="h-7 w-7 text-primary" />
@@ -366,3 +366,4 @@ export default function CuratedWellnessAidsPage() {
     </div>
   );
 }
+
