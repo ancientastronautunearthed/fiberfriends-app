@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Sparkles, Skull, HeartPulse, ShieldCheck, VenetianMask, Speaker } from "lucide-react";
+import { Loader2, Sparkles, Skull, HeartPulse, ShieldCheck, VenetianMask, Speaker, HelpCircle, Info } from "lucide-react"; // Added HelpCircle, Info
 import Image from "next/image";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -24,6 +24,7 @@ const MONSTER_TOMB_KEY = 'morgellonMonsterTomb';
 const USER_POINTS_KEY = 'userPoints';
 const MONSTER_LAST_RECOVERY_DATE_KEY = 'monsterLastRecoveryDate';
 const MONSTER_VOICE_CONFIG_KEY = 'monsterVoiceConfig';
+const AFFIRMATION_AMPLIFIER_LAST_COMPLETED_DATE_KEY = 'affirmationAmplifierLastCompletedDate';
 
 
 const MONSTER_DEATH_THRESHOLD = -50;
@@ -34,7 +35,7 @@ const MIN_RECOVERY = 10;
 const MAX_RECOVERY = 20;
 const POINTS_FOR_AFFIRMATION = 10;
 const MONSTER_HP_REDUCTION_FOR_AFFIRMATION = 4;
-const AMPLIFY_DURATION_MS = 1500; // Duration for the "amplifying" animation
+const AMPLIFY_DURATION_MS = 1500; 
 
 interface TombEntry {
   name: string;
@@ -59,6 +60,7 @@ export default function AffirmationAmplifierPage() {
   const [affirmationData, setAffirmationData] = useState<AffirmationOutput | null>(null);
   const [isAmplifying, setIsAmplifying] = useState(false);
   const [amplificationProgress, setAmplificationProgress] = useState(0);
+  const [hasAmplifiedToday, setHasAmplifiedToday] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [isLoadingAffirmation, startLoadingAffirmationTransition] = useTransition();
@@ -70,18 +72,25 @@ export default function AffirmationAmplifierPage() {
   const [userMonsterVoiceConfig, setUserMonsterVoiceConfig] = useState<MonsterVoiceConfig | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
+  const getCurrentDateString = () => new Date().toISOString().split('T')[0];
 
   useEffect(() => {
     const storedConfig = localStorage.getItem(MONSTER_VOICE_CONFIG_KEY);
     if (storedConfig) {
       try {
         setUserMonsterVoiceConfig(JSON.parse(storedConfig));
-      } catch (e) { /* Use default if parse error */ 
+      } catch (e) { 
         setUserMonsterVoiceConfig({ voiceURI: null, pitch: defaultDemonicPitch(), rate: defaultDemonicRate() });
       }
     } else {
        setUserMonsterVoiceConfig({ voiceURI: null, pitch: defaultDemonicPitch(), rate: defaultDemonicRate() });
     }
+
+    const lastCompletedDate = localStorage.getItem(AFFIRMATION_AMPLIFIER_LAST_COMPLETED_DATE_KEY);
+    if (lastCompletedDate === getCurrentDateString()) {
+      setHasAmplifiedToday(true);
+    }
+
   }, []);
 
 
@@ -162,7 +171,7 @@ export default function AffirmationAmplifierPage() {
   };
 
   const handleInternalizeAffirmation = () => {
-    if (isAmplifying || !affirmationData || !monsterName || monsterHealth === null) return;
+    if (isAmplifying || !affirmationData || !monsterName || monsterHealth === null || hasAmplifiedToday) return;
     
     setIsAmplifying(true);
     setAmplificationProgress(0);
@@ -190,10 +199,13 @@ export default function AffirmationAmplifierPage() {
     setShowDamageEffect(true);
     setTimeout(() => setShowDamageEffect(false), 700);
 
+    localStorage.setItem(AFFIRMATION_AMPLIFIER_LAST_COMPLETED_DATE_KEY, getCurrentDateString());
+    setHasAmplifiedToday(true);
+
     if (!checkMonsterDeath(newHealth, "an internalized affirmation")) {
       toast({ title: "Affirmation Amplified!", description: `${monsterName} recoils! Your inner strength grows. Monster Health: ${newHealth.toFixed(1)}% (-${MONSTER_HP_REDUCTION_FOR_AFFIRMATION}). You earned ${POINTS_FOR_AFFIRMATION} points!`, duration: 7000 });
     }
-    // Fetch a new affirmation after completion
+    // Fetch a new affirmation after completion, even if they can't amplify again today
     fetchAffirmation();
   };
   
@@ -256,7 +268,7 @@ export default function AffirmationAmplifierPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline flex items-center gap-2"><HeartPulse className="h-6 w-6 text-primary"/>Affirmation Amplifier</CardTitle>
-            <CardDescription>Focus on a positive affirmation to strengthen your inner resolve and weaken your monster.</CardDescription>
+            <CardDescription>Focus on a positive affirmation to strengthen your inner resolve and weaken your monster. One internalization per day.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 text-center">
             {isLoadingAffirmation && (
@@ -299,18 +311,27 @@ export default function AffirmationAmplifierPage() {
                     <p className="text-sm text-primary animate-pulse mt-1">Amplifying affirmation...</p>
                   </div>
                 )}
+                {hasAmplifiedToday && !isAmplifying && (
+                    <Alert variant="default" className="bg-accent/20 border-accent text-accent-foreground">
+                        <Info className="h-4 w-4"/>
+                        <AlertTitle>Daily Limit Reached</AlertTitle>
+                        <AlertDescription>
+                        You've amplified your affirmation for today. Come back tomorrow for another boost!
+                        </AlertDescription>
+                    </Alert>
+                )}
               </div>
             )}
           </CardContent>
           <CardFooter className="flex flex-col gap-3">
             <Button 
               onClick={handleInternalizeAffirmation} 
-              disabled={isLoadingAffirmation || isAmplifying || !affirmationData} 
+              disabled={isLoadingAffirmation || isAmplifying || !affirmationData || hasAmplifiedToday} 
               className="w-full sm:w-auto text-base py-3 px-6"
               size="lg"
             >
               {isAmplifying ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <ShieldCheck className="mr-2 h-5 w-5"/>}
-              {isAmplifying ? "Amplifying..." : "Internalize Affirmation"}
+              {isAmplifying ? "Amplifying..." : hasAmplifiedToday ? "Amplified Today" : "Internalize Affirmation"}
             </Button>
             <Button onClick={fetchAffirmation} variant="outline" disabled={isLoadingAffirmation || isAmplifying} className="w-full sm:w-auto">
               <Sparkles className="mr-2 h-4 w-4"/> Get New Affirmation
@@ -321,3 +342,4 @@ export default function AffirmationAmplifierPage() {
     </div>
   );
 }
+
