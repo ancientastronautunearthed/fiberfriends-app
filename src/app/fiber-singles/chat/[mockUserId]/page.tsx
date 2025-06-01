@@ -9,13 +9,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Send, Sparkles, Heart, MessageCircle, ArrowLeft, VenetianMask, ClipboardList } from "lucide-react";
+import { Loader2, Send, Sparkles, Heart, MessageCircle, ArrowLeft, VenetianMask, ClipboardList, Puzzle } from "lucide-react";
 import Image from "next/image";
 import { useToast } from '@/hooks/use-toast';
 import { analyzeMessageQualityAction, generateMonsterBanterAction } from '../../actions';
 import Link from 'next/link';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 const ROMANTIC_MONSTER_IMAGE_KEY = 'romanticMonsterImageUrl';
 const ROMANTIC_MONSTER_NAME_KEY = 'romanticMonsterName';
@@ -35,7 +36,7 @@ const mockOpponentsDatabase: Record<string, MockOpponent> = {
 
 interface ChatMessage {
     id: string;
-    sender: 'user' | 'opponent';
+    sender: 'user' | 'opponent' | 'system'; // Added 'system'
     text: string;
     timestamp: Date;
 }
@@ -92,14 +93,23 @@ export default function SimulatedChatPage() {
       const opponentDesireKey = `desire_${mockUserId}_forUser`;
       const syncedKey = `monstersSynced_${mockUserId}`;
       const qualityLogKey = `messageQualityLog_${mockUserId}`;
+      const existingChatLogKey = `chatLog_${mockUserId}`;
+      const existingMonsterChatLogKey = `monsterChatLog_${mockUserId}`;
+
 
       setUserDesire(parseInt(localStorage.getItem(userDesireKey) || '50', 10));
       setOpponentDesire(parseInt(localStorage.getItem(opponentDesireKey) || '50', 10));
       setMonstersSynced(localStorage.getItem(syncedKey) === 'true');
+      
       const storedQualityLog = localStorage.getItem(qualityLogKey);
-      if (storedQualityLog) {
-        setMessageQualityLog(JSON.parse(storedQualityLog));
-      }
+      if (storedQualityLog) setMessageQualityLog(JSON.parse(storedQualityLog).map((l: MessageQualityLogEntry) => ({...l, timestamp: new Date(l.timestamp)})));
+      
+      const storedChatLog = localStorage.getItem(existingChatLogKey);
+      if (storedChatLog) setChatLog(JSON.parse(storedChatLog).map((m: ChatMessage) => ({...m, timestamp: new Date(m.timestamp)})));
+
+      const storedMonsterLog = localStorage.getItem(existingMonsterChatLogKey);
+      if (storedMonsterLog) setMonsterChatLog(JSON.parse(storedMonsterLog).map((m: MonsterBanterMessage) => ({...m, timestamp: new Date(m.timestamp)})));
+
 
     } else {
       router.push('/fiber-singles');
@@ -110,13 +120,19 @@ export default function SimulatedChatPage() {
     if (humanChatLogRef.current) {
       humanChatLogRef.current.scrollTop = humanChatLogRef.current.scrollHeight;
     }
-  }, [chatLog]);
+    if (mockUserId && chatLog.length > 0) {
+        localStorage.setItem(`chatLog_${mockUserId}`, JSON.stringify(chatLog));
+    }
+  }, [chatLog, mockUserId]);
 
   useEffect(() => {
     if (monsterChatLogRef.current) {
         monsterChatLogRef.current.scrollTop = monsterChatLogRef.current.scrollHeight;
     }
-  }, [monsterChatLog]);
+    if (mockUserId && monsterChatLog.length > 0) {
+        localStorage.setItem(`monsterChatLog_${mockUserId}`, JSON.stringify(monsterChatLog));
+    }
+  }, [monsterChatLog, mockUserId]);
 
   useEffect(() => {
     if (mockUserId && messageQualityLog.length > 0) {
@@ -148,7 +164,7 @@ export default function SimulatedChatPage() {
             reasoning: qualityResult.reasoning,
             timestamp: new Date(),
         };
-        setMessageQualityLog(prev => [newQualityLogEntry, ...prev].slice(0, 50)); // Keep last 50 quality logs
+        setMessageQualityLog(prev => [newQualityLogEntry, ...prev].slice(0, 50));
 
         let newOpponentDesire = Math.min(100, Math.max(0, opponentDesire + score)); 
         setOpponentDesire(newOpponentDesire);
@@ -207,6 +223,23 @@ export default function SimulatedChatPage() {
         toast({ title: "Processing Error", description: errorMessage, variant: "destructive" });
       }
     });
+  };
+
+  const handlePlayWhimsyGame = () => {
+    const gameRules = `🎲 Let's play 'Two Truths &amp; a Monster Whimsy'! 🎲
+One player shares:
+- Two true facts about themselves.
+- One whimsical statement about their Romantic Monster.
+The other player guesses which one is the Monster Whimsy!
+Decide who goes first. Good luck!`;
+
+    const systemMessage: ChatMessage = {
+      id: `game-${Date.now()}`,
+      sender: 'system',
+      text: gameRules,
+      timestamp: new Date(),
+    };
+    setChatLog(prev => [...prev, systemMessage]);
   };
 
   if (!userRomanticMonsterName || !userRomanticMonsterImageUrl || !mockOpponent) {
@@ -320,40 +353,52 @@ export default function SimulatedChatPage() {
             <CardContent ref={humanChatLogRef} className="h-64 overflow-y-auto border rounded-md p-3 space-y-3 bg-background">
             {chatLog.length === 0 && <p className="text-muted-foreground text-sm text-center py-10">Start the conversation!</p>}
             {chatLog.map((msg) => (
-                <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[70%] p-2 rounded-lg text-sm shadow-md ${
-                    msg.sender === 'user' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-secondary text-secondary-foreground'
-                }`}>
-                    <p>{msg.text}</p>
-                    <p className={`text-xs mt-1 ${msg.sender === 'user' ? 'text-primary-foreground/70 text-right' : 'text-secondary-foreground/70 text-left'}`}>
-                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                </div>
+                <div key={msg.id} className={cn("flex", 
+                    msg.sender === 'user' ? 'justify-end' : msg.sender === 'opponent' ? 'justify-start' : 'justify-center'
+                )}>
+                    {msg.sender === 'system' ? (
+                        <div className="my-2 p-2 text-xs text-center text-muted-foreground bg-accent/50 rounded-md shadow-sm w-full max-w-md whitespace-pre-wrap">
+                            {msg.text}
+                        </div>
+                    ) : (
+                        <div className={cn("max-w-[70%] p-2 rounded-lg text-sm shadow-md",
+                            msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'
+                        )}>
+                            <p>{msg.text}</p>
+                            <p className={cn("text-xs mt-1", 
+                                msg.sender === 'user' ? 'text-primary-foreground/70 text-right' : 'text-secondary-foreground/70 text-left'
+                            )}>
+                                {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                        </div>
+                    )}
                 </div>
             ))}
             </CardContent>
-            <CardFooter className="pt-4">
-            <div className="flex w-full gap-2">
-                <Textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Type your charming message..."
-                disabled={isProcessing || monstersSynced}
-                className="flex-grow"
-                onKeyPress={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    if (!isProcessing && !monstersSynced) handleSendMessage();
-                    }
-                }}
-                />
-                <Button onClick={handleSendMessage} disabled={isProcessing || !message.trim() || monstersSynced}>
-                {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                Send
+            <CardFooter className="pt-4 flex-col gap-2">
+                <div className="flex w-full gap-2 items-center">
+                    <Textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Type your charming message..."
+                    disabled={isProcessing || monstersSynced}
+                    className="flex-grow"
+                    rows={1}
+                    onKeyPress={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (!isProcessing && !monstersSynced) handleSendMessage();
+                        }
+                    }}
+                    />
+                    <Button onClick={handleSendMessage} disabled={isProcessing || !message.trim() || monstersSynced} className="shrink-0">
+                        {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        <span className="ml-2 hidden sm:inline">Send</span>
+                    </Button>
+                </div>
+                 <Button onClick={handlePlayWhimsyGame} variant="outline" size="sm" className="w-full mt-2" disabled={isProcessing || monstersSynced}>
+                    <Puzzle className="mr-2 h-4 w-4"/> Play 'Two Truths &amp; a Monster Whimsy'
                 </Button>
-            </div>
             </CardFooter>
             {error && (
                 <CardContent>
@@ -386,3 +431,4 @@ export default function SimulatedChatPage() {
     </div>
   );
 }
+
