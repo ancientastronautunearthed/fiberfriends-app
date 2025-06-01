@@ -24,6 +24,11 @@ const MONSTER_HAS_SPOKEN_KEY = 'monsterHasSpokenFirstTime';
 const INITIAL_HEALTH_MIN = 80;
 const INITIAL_HEALTH_MAX = 100;
 
+// Function to generate demonic pitch and rate
+const generateDemonicPitch = () => parseFloat((Math.random() * (0.5 - 0.1) + 0.1).toFixed(2)); // Deep: 0.1 to 0.5
+const generateDemonicRate = () => parseFloat((Math.random() * (0.8 - 0.5) + 0.5).toFixed(2));  // Slow: 0.5 to 0.8
+
+
 export default function CreateMonsterPage() {
   const [words, setWords] = useState('');
   const [monsterName, setMonsterName] = useState<string | null>(null);
@@ -40,41 +45,39 @@ export default function CreateMonsterPage() {
   const selectAndStoreVoice = () => {
     const voices = speechSynthesis.getVoices();
     
+    let selectedVoiceURI: string | null = null;
+    const pitch = generateDemonicPitch();
+    const rate = generateDemonicRate();
+
     if (voices.length === 0) {
-        // Fallback if no voices are loaded (e.g., browser issue or onvoiceschanged not fired yet)
         localStorage.setItem(MONSTER_VOICE_CONFIG_KEY, JSON.stringify({ 
             voiceURI: null, 
-            pitch: parseFloat((Math.random() * (0.9 - 0.6) + 0.6).toFixed(2)), // Default monster pitch
-            rate: parseFloat((Math.random() * (1.0 - 0.7) + 0.7).toFixed(2))   // Default monster rate
+            pitch: pitch, 
+            rate: rate   
         }));
         localStorage.setItem(MONSTER_HAS_SPOKEN_KEY, 'false');
         return;
     }
 
-    let selectedVoiceURI: string | null = null;
-
-    // Monster-like pitch and rate ranges
-    const minPitch = 0.5;
-    const maxPitch = 1.0; // Slightly lower than default
-    const minRate = 0.7;
-    const maxRate = 1.0; // Slightly slower than default
-
-    // Generate random pitch and rate within the defined "monster-like" ranges
-    const pitch = Math.random() * (maxPitch - minPitch) + minPitch;
-    const rate = Math.random() * (maxRate - minRate) + minRate;
 
     // Attempt to find a somewhat "monster-like" voice.
-    // This is heuristic and results vary wildly by browser/OS.
     const englishVoices = voices.filter(v => v.lang.startsWith('en-'));
+    // Prefer non-standard, male, or deeper sounding voices if possible
     const nonStandardEnglishVoices = englishVoices.filter(v => 
         !v.name.toLowerCase().includes('standard') && 
         !v.name.toLowerCase().includes('default') &&
-        !v.name.toLowerCase().includes('natural') && // Exclude "natural" often too smooth
-        !v.name.toLowerCase().includes('google us english') && // Common default
-        !v.name.toLowerCase().includes('microsoft david') && // Common defaults
-        !v.name.toLowerCase().includes('microsoft zira')
+        !v.name.toLowerCase().includes('natural') && 
+        !v.name.toLowerCase().includes('google us english') && 
+        !v.name.toLowerCase().includes('microsoft david') && 
+        !v.name.toLowerCase().includes('microsoft zira') &&
+        !v.name.toLowerCase().includes('female') && // try to avoid explicitly female voices
+        !(v as any).gender?.toLowerCase().includes('female')
     );
-    const maleEnglishVoices = englishVoices.filter(v => v.name.toLowerCase().includes('male') || (v as any).gender === 'male');
+    
+    const maleEnglishVoices = englishVoices.filter(v => 
+        v.name.toLowerCase().includes('male') || 
+        (v as any).gender?.toLowerCase().includes('male')
+    );
     
     let candidateVoices: SpeechSynthesisVoice[] = [];
 
@@ -89,16 +92,15 @@ export default function CreateMonsterPage() {
     }
 
     if (candidateVoices.length > 0) {
-        // Select a random voice from the suitable candidates
         selectedVoiceURI = candidateVoices[Math.floor(Math.random() * candidateVoices.length)].voiceURI;
     }
     
     localStorage.setItem(MONSTER_VOICE_CONFIG_KEY, JSON.stringify({ 
         voiceURI: selectedVoiceURI, 
-        pitch: parseFloat(pitch.toFixed(2)), 
-        rate: parseFloat(rate.toFixed(2)) 
+        pitch: pitch, 
+        rate: rate 
     }));
-    localStorage.setItem(MONSTER_HAS_SPOKEN_KEY, 'false'); // Reset flag for new monster
+    localStorage.setItem(MONSTER_HAS_SPOKEN_KEY, 'false');
   };
 
 
@@ -141,28 +143,28 @@ export default function CreateMonsterPage() {
             localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
             
             if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                // Ensure voices are loaded before selecting
                 if (speechSynthesis.getVoices().length === 0) {
                     speechSynthesis.onvoiceschanged = () => {
                         selectAndStoreVoice();
-                        speechSynthesis.onvoiceschanged = null; 
+                        speechSynthesis.onvoiceschanged = null; // Important to prevent multiple calls
                     };
                 } else {
                     selectAndStoreVoice();
                 }
             } else {
-                 // Fallback if speech synthesis is not supported
+                // Fallback if speech synthesis is not supported
                 localStorage.setItem(MONSTER_VOICE_CONFIG_KEY, JSON.stringify({ 
                     voiceURI: null, 
-                    pitch: 0.7, 
-                    rate: 0.8 
+                    pitch: generateDemonicPitch(), 
+                    rate: generateDemonicRate() 
                 }));
                 localStorage.setItem(MONSTER_HAS_SPOKEN_KEY, 'false');
             }
 
-
              toast({
                 title: "Monster Revealed!",
-                description: `Your unique Morgellon Monster, ${expansionResult.monsterName}, has been generated with ${initialHealth}% health. It is now your profile identity. It may even speak to you... with a unique voice!`,
+                description: `Your unique Morgellon Monster, ${expansionResult.monsterName}, has been generated with ${initialHealth}% health. It is now your profile identity. It may even speak to you... with a unique, deep voice!`,
                 variant: "default",
             });
 
@@ -194,7 +196,7 @@ export default function CreateMonsterPage() {
       <Card className="max-w-lg mx-auto">
         <CardHeader>
           <CardTitle className="font-headline flex items-center gap-2"><Sparkles className="h-6 w-6 text-primary"/>Your Morgellon Monster: {monsterName}</CardTitle>
-          <CardDescription>This is your unique, inner monster. Its name, form, and voice are now bound to your profile.</CardDescription>
+          <CardDescription>This is your unique, inner monster. Its name, form, and deep voice are now bound to your profile.</CardDescription>
         </CardHeader>
         <CardContent className="text-center">
             <Image src={imageUrl} alt={`Your Morgellon Monster: ${monsterName}`} width={512} height={512} className="rounded-lg border object-cover mx-auto shadow-lg" data-ai-hint="generated monster" />
@@ -226,7 +228,7 @@ export default function CreateMonsterPage() {
         <CardTitle className="font-headline flex items-center gap-2"><Wand2 className="h-6 w-6 text-primary"/>Create Your Morgellon Monster</CardTitle>
         <CardDescription>
           This is a special one-time ritual for our valued members.
-          Describe your inner Morgellon Monster in exactly 5 words. Our AI will then conjure its image, reveal its name, and give it a unique, randomized "monster-like" voice.
+          Describe your inner Morgellon Monster in exactly 5 words. Our AI will then conjure its image, reveal its name, and give it a unique, randomized deep and demonic voice.
           This image, name, voice, and its initial health will become your unique profile identity. Choose your words wisely.
         </CardDescription>
       </CardHeader>
@@ -249,7 +251,7 @@ export default function CreateMonsterPage() {
               <Loader2 className="h-12 w-12 animate-spin text-primary mb-3" />
               <p className="text-sm text-foreground">
                 {isExpanding && !isGenerating && "Expanding your vision, discovering its name..."}
-                {isGenerating && "The AI is conjuring your monster... and finding its unique voice..."}
+                {isGenerating && "The AI is conjuring your monster... and finding its unique, deep voice..."}
               </p>
               {detailedPrompt && !isGenerating && monsterName && (
                 <p className="text-xs text-muted-foreground mt-2 italic">Initial vision for {monsterName}: "{detailedPrompt.substring(0,100)}..."</p>
