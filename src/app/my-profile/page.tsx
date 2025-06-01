@@ -2,10 +2,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Image from "next/image";
-import { UserCircle, AlertTriangle, Award, Gem, Star, ShieldCheck } from 'lucide-react';
+import { UserCircle, AlertTriangle, Award, Gem, Star, ShieldCheck, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
@@ -21,46 +23,68 @@ const TIERS = {
 };
 
 export default function MyProfilePage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [monsterImageUrl, setMonsterImageUrl] = useState<string | null>(null);
   const [monsterName, setMonsterName] = useState<string | null>(null);
   const [userPoints, setUserPoints] = useState(0);
   const [currentTier, setCurrentTier] = useState(TIERS.NONE);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // Combined loading state
 
   useEffect(() => {
-    const storedImage = localStorage.getItem(MONSTER_IMAGE_KEY);
-    const storedName = localStorage.getItem(MONSTER_NAME_KEY);
-    const storedPoints = localStorage.getItem(USER_POINTS_KEY);
-
-    setMonsterImageUrl(storedImage);
-    setMonsterName(storedName);
-    
-    if (storedPoints) {
-      const points = parseInt(storedPoints, 10);
-      setUserPoints(points);
-      if (points >= TIERS.GOLD.points) {
-        setCurrentTier(TIERS.GOLD);
-      } else if (points >= TIERS.SILVER.points) {
-        setCurrentTier(TIERS.SILVER);
-      } else if (points >= TIERS.BRONZE.points) {
-        setCurrentTier(TIERS.BRONZE);
+    if (!authLoading) {
+      if (!user) {
+        router.push('/login'); // Redirect if not logged in
       } else {
-        setCurrentTier(TIERS.NONE);
+        // User is logged in, proceed to load profile data
+        const storedImage = localStorage.getItem(MONSTER_IMAGE_KEY);
+        const storedName = localStorage.getItem(MONSTER_NAME_KEY);
+        const storedPoints = localStorage.getItem(USER_POINTS_KEY);
+
+        setMonsterImageUrl(storedImage);
+        setMonsterName(storedName);
+        
+        if (storedPoints) {
+          const points = parseInt(storedPoints, 10);
+          setUserPoints(points);
+          if (points >= TIERS.GOLD.points) {
+            setCurrentTier(TIERS.GOLD);
+          } else if (points >= TIERS.SILVER.points) {
+            setCurrentTier(TIERS.SILVER);
+          } else if (points >= TIERS.BRONZE.points) {
+            setCurrentTier(TIERS.BRONZE);
+          } else {
+            setCurrentTier(TIERS.NONE);
+          }
+        }
+        setIsLoading(false);
       }
     }
-    setIsLoading(false);
-  }, []);
+  }, [user, authLoading, router]);
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
+  if (!user) {
+    // This should ideally not be reached if redirection works, but as a fallback:
+    return (
+        <div className="flex items-center justify-center min-h-screen">
+            <p>Redirecting to login...</p>
+        </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <Card>
         <CardHeader className="text-center">
           <div className="relative mx-auto mb-4">
-            {isLoading ? (
-              <div className="w-48 h-48 bg-muted rounded-full flex items-center justify-center animate-pulse">
-                <UserCircle className="h-24 w-24 text-muted-foreground" />
-              </div>
-            ) : monsterImageUrl ? (
+            {monsterImageUrl ? (
               <Image 
                 src={monsterImageUrl} 
                 alt={monsterName ? `My Morgellon Monster: ${monsterName}` : "My Morgellon Monster"} 
@@ -78,16 +102,15 @@ export default function MyProfilePage() {
             )}
           </div>
           <CardTitle className="font-headline text-3xl">
-            {isLoading ? "My Profile" : monsterName ? monsterName : "My Profile"}
+            {monsterName ? monsterName : "My Profile"}
           </CardTitle>
           <CardDescription>
-            {isLoading ? "Loading your identity..." : monsterName ? `Your unique, unchangeable Morgellon Monster.` : "This is your personal space within Fiber Friends."}
+            {monsterName ? `Your unique, unchangeable Morgellon Monster.` : "This is your personal space within Fiber Friends."}
+            {user && <span className="block text-xs mt-1">Email: {user.email}</span>}
           </CardDescription>
         </CardHeader>
         <CardContent className="text-center">
-          {isLoading ? (
-             <p className="text-muted-foreground">Loading your profile...</p>
-          ): monsterImageUrl ? (
+          {monsterImageUrl ? (
             <p className="text-lg text-foreground">
               {monsterName ? `Behold ${monsterName}, your chosen emblem in this community.` : "Behold your unique Morgellon Monster, your chosen emblem in this community."}
             </p>
@@ -117,24 +140,18 @@ export default function MyProfilePage() {
             </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-            {isLoading ? (
-                <p className="text-muted-foreground">Loading status...</p>
-            ) : (
-                <>
-                    <p className="text-foreground">Current Tier: <span className="font-semibold text-primary">{currentTier.name}</span></p>
-                    <p className="text-sm text-muted-foreground">{currentTier.benefits}</p>
-                    {currentTier.points >= TIERS.BRONZE.points && (
-                        <div className="flex items-center gap-1 text-green-600 dark:text-green-400 text-sm pt-1">
-                            <ShieldCheck className="h-4 w-4"/>
-                            <span>10% Site-Wide Discount Active!</span>
-                        </div>
-                    )}
-                    <p className="text-sm text-muted-foreground">Total Points: {userPoints}</p>
-                     <Button asChild variant="link" className="p-0 h-auto">
-                        <Link href="/product-tracker">View Contribution Score & Tiers</Link>
-                    </Button>
-                </>
+            <p className="text-foreground">Current Tier: <span className="font-semibold text-primary">{currentTier.name}</span></p>
+            <p className="text-sm text-muted-foreground">{currentTier.benefits}</p>
+            {currentTier.points >= TIERS.BRONZE.points && (
+                <div className="flex items-center gap-1 text-green-600 dark:text-green-400 text-sm pt-1">
+                    <ShieldCheck className="h-4 w-4"/>
+                    <span>10% Site-Wide Discount Active!</span>
+                </div>
             )}
+            <p className="text-sm text-muted-foreground">Total Points: {userPoints}</p>
+             <Button asChild variant="link" className="p-0 h-auto">
+                <Link href="/product-tracker">View Contribution Score & Tiers</Link>
+            </Button>
         </CardContent>
       </Card>
 
@@ -151,5 +168,3 @@ export default function MyProfilePage() {
     </div>
   );
 }
-
-    

@@ -3,7 +3,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { auth as firebaseAuthInstance } from '@/lib/firebase'; // Renamed to avoid conflict
+import { signOut } from 'firebase/auth';
+import { useAuth } from '@/context/auth-context';
 import {
   Sidebar,
   SidebarHeader,
@@ -23,10 +26,11 @@ import {
   ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart, Dumbbell, Trophy, 
   LayoutDashboard, Pill, Wind, Lightbulb, ShieldCheck as AffirmationIcon,
   Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown, Smile,
-  HandHeart, Bot // Ensure Bot is imported if it were to be used, but it's removed now.
+  HandHeart, LogIn as LogInIcon, UserPlus as UserPlusIcon, AlertTriangle // Added AlertTriangle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useToast } from '@/hooks/use-toast';
 
 
 interface NavItem {
@@ -36,15 +40,18 @@ interface NavItem {
   pageTitle: string;
   children?: NavItem[];
   isParent?: boolean;
+  authRequired?: boolean; 
+  noAuthOnly?: boolean; 
 }
 
-const navItems: NavItem[] = [
+const navItemsConfig: NavItem[] = [
   { href: '/landing', label: 'About Fiber Friends', icon: LayoutDashboard, pageTitle: 'Welcome to Fiber Friends' },
   {
     label: 'My Journey',
     icon: Activity,
     pageTitle: 'My Journey',
     isParent: true,
+    authRequired: true,
     children: [
       { href: '/symptom-journal', label: 'Symptom Journal', icon: BookText, pageTitle: 'Symptom Journal' },
       { href: '/pattern-recognition', label: 'Pattern Recognition', icon: BrainCircuit, pageTitle: 'Pattern Recognition' },
@@ -59,12 +66,12 @@ const navItems: NavItem[] = [
     icon: HeartPulseIcon,
     pageTitle: 'Mind & Wellness',
     isParent: true,
+    authRequired: true,
     children: [
       { href: '/knowledge-nugget-quiz', label: 'Knowledge Quiz', icon: Lightbulb, pageTitle: 'Knowledge Nugget Quiz' },
       { href: '/affirmation-amplifier', label: 'Affirmation Amplifier', icon: AffirmationIcon, pageTitle: 'Affirmation Amplifier' },
       { href: '/mindful-moment', label: 'Mindful Moment', icon: Wind, pageTitle: 'Mindful Moment' },
       { href: '/kindness-challenge', label: 'Kindness Connection', icon: HandHeart, pageTitle: 'Kindness Connection Challenge' },
-      // { href: '/ai-companion-chat', label: 'AI Companion Chat', icon: Bot, pageTitle: 'AI Companion Chat' }, // Removed
     ]
   },
   {
@@ -84,6 +91,7 @@ const navItems: NavItem[] = [
     icon: Share2,
     pageTitle: 'Connections',
     isParent: true,
+    authRequired: true,
     children: [
       { href: '/matching', label: 'Find Friends', icon: Users, pageTitle: 'Find Friends' },
       { href: '/fiber-singles', label: 'Fiber Singles', icon: Heart, pageTitle: 'Fiber Singles Connect' },
@@ -95,12 +103,15 @@ const navItems: NavItem[] = [
     icon: ShieldQuestion,
     pageTitle: 'My Monster',
     isParent: true,
+    authRequired: true,
     children: [
       { href: '/my-profile', label: 'Profile & Stats', icon: UserCircle, pageTitle: 'My Profile' },
       { href: '/create-monster', label: 'New/Re-Conjure', icon: Wand2, pageTitle: 'Create Your Monster' },
       { href: '/monster-tomb', label: 'Monster Tomb', icon: Skull, pageTitle: 'Tomb of Monsters' },
     ]
   },
+  { href: '/login', label: 'Login', icon: LogInIcon, pageTitle: 'Login', noAuthOnly: true },
+  { href: '/register', label: 'Register', icon: UserPlusIcon, pageTitle: 'Register', noAuthOnly: true },
   { href: '/support-us', label: 'Support Us', icon: PiggyBank, pageTitle: 'Support Us' },
 ];
 
@@ -121,7 +132,6 @@ const infoTips = [
   "Quiz Tip: Boost your knowledge (and weaken your monster!) with the Knowledge Nugget Quiz.",
   "Affirmation Tip: Amplify positive thoughts with the Affirmation Amplifier. It's a small act with big impact.",
   "Kindness Tip: Completing a small act of kindness in the 'Kindness Connection' can brighten your day and someone else's!",
-  // Tip for AI Companion Chat was removed.
 ];
 
 function InfoBar() {
@@ -169,14 +179,60 @@ const findCurrentPage = (items: NavItem[], currentPath: string): NavItem | undef
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const currentPage = findCurrentPage(navItems, pathname);
+  const router = useRouter();
+  const { user, loading, configError } = useAuth(); // Get configError from AuthContext
+  const { toast } = useToast();
+  
+  const currentPage = findCurrentPage(navItemsConfig, pathname);
   const { state: sidebarState, isMobile } = useSidebar(); 
-
   const [openAccordionItem, setOpenAccordionItem] = useState<string | undefined>(undefined);
+
+  const handleLogout = async () => {
+    if (!firebaseAuthInstance) {
+        toast({ title: "Logout Error", description: "Firebase not configured, cannot logout.", variant: "destructive"});
+        return;
+    }
+    try {
+      await signOut(firebaseAuthInstance);
+      toast({
+        title: 'Logged Out',
+        description: 'You have been successfully logged out.',
+      });
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout Error:', error);
+      toast({
+        title: 'Logout Failed',
+        description: 'An error occurred during logout. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  const filteredNavItems = React.useMemo(() => {
+    return navItemsConfig.filter(item => {
+      if (item.authRequired && !user) return false;
+      if (item.noAuthOnly && user) return false;
+      return true;
+    }).map(item => {
+      if (item.children) {
+        return {
+          ...item,
+          children: item.children.filter(child => {
+            if (child.authRequired && !user) return false;
+            if (child.noAuthOnly && user) return false;
+            return true;
+          })
+        };
+      }
+      return item;
+    }).filter(item => !(item.isParent && item.children && item.children.length === 0));
+  }, [user]);
+
 
   useEffect(() => {
     let activeParentLabel: string | undefined = undefined;
-    for (const item of navItems) {
+    for (const item of filteredNavItems) {
       if (item.isParent && item.children) {
         for (const child of item.children) {
           if (child.href && (pathname === child.href || (child.href !== '/' && pathname.startsWith(child.href)))) {
@@ -188,12 +244,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       if (activeParentLabel) break;
     }
     setOpenAccordionItem(activeParentLabel);
-  }, [pathname]);
+  }, [pathname, filteredNavItems]);
 
 
   return (
     <>
-      <div className="flex min-h-screen bg-background">
+      {configError && (
+        <div className="fixed top-0 left-0 right-0 bg-destructive text-destructive-foreground p-3 text-sm text-center shadow-lg z-[9999] flex items-center justify-center gap-2">
+          <AlertTriangle className="h-5 w-5 shrink-0" />
+          <span><strong>Configuration Error:</strong> {configError}</span>
+        </div>
+      )}
+      <div className={cn("flex min-h-screen bg-background", configError ? "pt-12" : "")}> {/* Adjust pt if banner shows */}
         <Sidebar collapsible="icon" variant="sidebar" side="left" className="border-r bg-sidebar text-sidebar-foreground">
           <SidebarHeader className="p-4 flex items-center justify-between border-b border-sidebar-border">
             <Link href="/landing" className="flex items-center gap-2 group">
@@ -204,8 +266,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           
           <SidebarContent className="flex-1 overflow-y-auto">
             <Accordion type="single" collapsible value={openAccordionItem} onValueChange={setOpenAccordionItem} className="w-full space-y-0.5 px-2 group-data-[collapsible=icon]:px-0">
-              {navItems.map((item) => (
-                item.isParent && item.children ? (
+              {filteredNavItems.map((item) => (
+                item.isParent && item.children && item.children.length > 0 ? (
                   <AccordionItem value={item.label} key={item.label} className="border-none group/accordion-item">
                      <SidebarMenuItem className="p-0 m-0 w-full group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
                       <Tooltip>
@@ -234,47 +296,53 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <AccordionContent className="pt-0 pb-0 pl-1 group-data-[collapsible=icon]:hidden">
                       <SidebarMenu className="py-1 space-y-0.5 border-l-2 border-sidebar-border/30 ml-[calc(0.625rem+4px)] pl-3">
                         {item.children.map((child) => (
-                          <SidebarMenuItem key={child.href || child.label} className="p-0">
-                            <Link href={child.href!} legacyBehavior passHref>
-                              <SidebarMenuButton
-                                isActive={(child.href && (pathname === child.href || (child.href !== '/' && child.href !== '/landing' && pathname.startsWith(child.href!)))) || false}
-                                tooltip={{ children: child.label, side: 'right' }}
-                                className="w-full justify-start text-xs h-[1.875rem] pl-1.5 py-1" 
-                                variant="ghost"
-                              >
-                                <child.icon className="h-3.5 w-3.5 mr-1.5 shrink-0" />
-                                <span>{child.label}</span>
-                              </SidebarMenuButton>
-                            </Link>
-                          </SidebarMenuItem>
+                          child.href && ( 
+                            <SidebarMenuItem key={child.href} className="p-0">
+                              <Link href={child.href} legacyBehavior passHref>
+                                <SidebarMenuButton
+                                  isActive={(pathname === child.href || (child.href !== '/' && child.href !== '/landing' && pathname.startsWith(child.href!)))}
+                                  tooltip={{ children: child.label, side: 'right' }}
+                                  className="w-full justify-start text-xs h-[1.875rem] pl-1.5 py-1" 
+                                  variant="ghost"
+                                >
+                                  <child.icon className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                                  <span>{child.label}</span>
+                                </SidebarMenuButton>
+                              </Link>
+                            </SidebarMenuItem>
+                          )
                         ))}
                       </SidebarMenu>
                     </AccordionContent>
                   </AccordionItem>
                 ) : (
-                  <SidebarMenuItem key={item.href || item.label} className="px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
-                    <Link href={item.href!} legacyBehavior passHref>
-                      <SidebarMenuButton
-                        isActive={pathname === item.href || (item.href !== '/' && item.href !== '/landing' && pathname.startsWith(item.href!))}
-                        tooltip={{ children: item.label, side: 'right' }}
-                        className="w-full justify-start text-sm px-2"
-                      >
-                        <item.icon className="h-5 w-5 mr-2 shrink-0" />
-                        <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                      </SidebarMenuButton>
-                    </Link>
-                  </SidebarMenuItem>
+                  item.href && ( 
+                    <SidebarMenuItem key={item.href} className="px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+                      <Link href={item.href} legacyBehavior passHref>
+                        <SidebarMenuButton
+                          isActive={pathname === item.href || (item.href !== '/' && item.href !== '/landing' && pathname.startsWith(item.href!))}
+                          tooltip={{ children: item.label, side: 'right' }}
+                          className="w-full justify-start text-sm px-2"
+                        >
+                          <item.icon className="h-5 w-5 mr-2 shrink-0" />
+                          <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                        </SidebarMenuButton>
+                      </Link>
+                    </SidebarMenuItem>
+                  )
                 )
               ))}
             </Accordion>
           </SidebarContent>
 
-          <SidebarFooter className="p-4 border-t border-sidebar-border group-data-[collapsible=icon]:p-2">
-            <Button variant="ghost" className="w-full justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
-              <LogOut className="h-5 w-5" />
-              <span className="group-data-[collapsible=icon]:hidden ml-2">Logout</span>
-            </Button>
-          </SidebarFooter>
+          { user && !configError && (
+            <SidebarFooter className="p-4 border-t border-sidebar-border group-data-[collapsible=icon]:p-2">
+              <Button onClick={handleLogout} variant="ghost" className="w-full justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+                <LogOut className="h-5 w-5" />
+                <span className="group-data-[collapsible=icon]:hidden ml-2">Logout</span>
+              </Button>
+            </SidebarFooter>
+           )}
         </Sidebar>
         <SidebarInset className="flex-1 flex flex-col">
           <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-6">
@@ -288,7 +356,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </main>
         </SidebarInset>
       </div>
-      <InfoBar />
+      {!configError && <InfoBar />} {/* Conditionally render InfoBar */}
     </>
   );
 }
