@@ -1,9 +1,10 @@
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Share2, Copy, Smile } from "lucide-react"; // Added Smile
+import { Download, Share2, Copy, Smile, Gamepad2 } from "lucide-react"; 
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 
 const beliefBadges = [
   { id: "1", title: "Yes, I've Tried Changing My Detergent", imageUrl: "https://placehold.co/200x200.png", imageAiHint: "badge award", description: "For when you've heard it a million times." },
@@ -34,9 +35,30 @@ export default function HumorHubPage() {
       <Card>
         <CardHeader>
             <CardTitle className="font-headline flex items-center gap-2"><Smile className="h-6 w-6 text-primary"/>Humor Hub</CardTitle>
-            <CardDescription>Lighten the mood with some relatable humor. Laughter can be good medicine!</CardDescription>
+            <CardDescription>Lighten the mood with some relatable humor and games. Laughter can be good medicine!</CardDescription>
         </CardHeader>
       </Card>
+
+      <section id="fiber-frenzy-game">
+        <h2 className="text-2xl font-headline font-semibold mb-4 text-foreground">Arcade Corner</h2>
+        <Card className="bg-gradient-to-br from-primary/10 via-accent/10 to-primary/20 shadow-lg border-primary/30 hover:shadow-primary/20 transition-shadow">
+          <CardHeader className="items-center text-center">
+            <Gamepad2 className="h-10 w-10 text-primary mb-2"/>
+            <CardTitle className="text-xl font-headline">Play Fiber Frenzy!</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center">
+            <Image src="https://placehold.co/300x150.png" alt="Fiber Frenzy Game Teaser" width={300} height={150} className="mx-auto rounded-md border object-cover mb-3" data-ai-hint="arcade game fun"/>
+            <p className="text-sm text-muted-foreground mb-4">
+              Take a break and zap some mischievous fibers in our fun mini-game! How high can you score?
+            </p>
+            <Button asChild>
+              <Link href="/fiber-frenzy">
+                <Zap className="mr-2 h-4 w-4"/> Play Fiber Frenzy Now
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
 
       <section id="belief-badges">
         <h2 className="text-2xl font-headline font-semibold mb-4 text-foreground">Belief Badges</h2>
@@ -96,4 +118,3 @@ export default function HumorHubPage() {
     </div>
   );
 }
-
