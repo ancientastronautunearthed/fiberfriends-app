@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { auth as firebaseAuthInstance } from '@/lib/firebase'; // Renamed to avoid conflict
 import { signOut } from 'firebase/auth';
 import { useAuth } from '@/context/auth-context';
+import Image from 'next/image'; // Added for logo
 import { 
   Sidebar,
   SidebarHeader,
@@ -22,7 +23,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { 
-  HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Atom, LogOut, 
+  HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, LogOut, 
   ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart, Dumbbell, Trophy, 
   LayoutDashboard, Pill, Wind, Lightbulb, ShieldCheck as AffirmationIcon,
   Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown, Smile,
@@ -259,7 +260,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Sidebar collapsible="icon" variant="sidebar" side="left" className="border-r bg-sidebar text-sidebar-foreground">
           <SidebarHeader className="p-4 flex items-center justify-between border-b border-sidebar-border">
             <Link href="/landing" className="flex items-center gap-2 group">
-              <Atom className="h-8 w-8 text-sidebar-primary transition-transform group-hover:scale-110" />
+              <Image
+                src="https://placehold.co/32x32.png" 
+                alt="Fiber Friends Logo"
+                width={32}
+                height={32}
+                className="transition-transform group-hover:scale-110"
+                data-ai-hint="company logo"
+              />
               <h1 className="text-xl font-headline font-semibold text-sidebar-foreground group-data-[collapsible=icon]:hidden">Fiber Friends</h1>
             </Link>
           </SidebarHeader>
