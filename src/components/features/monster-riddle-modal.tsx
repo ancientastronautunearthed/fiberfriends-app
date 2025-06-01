@@ -41,9 +41,18 @@ export default function MonsterRiddleModal({ isOpen, onClose, onChallengeComplet
   useEffect(() => {
     const storedConfig = localStorage.getItem(MONSTER_VOICE_CONFIG_KEY);
     if (storedConfig) {
-      setVoiceConfig(JSON.parse(storedConfig));
+      try {
+        const parsedConfig = JSON.parse(storedConfig);
+        if (parsedConfig && typeof parsedConfig.pitch === 'number' && typeof parsedConfig.rate === 'number') {
+          setVoiceConfig(parsedConfig);
+        } else {
+          throw new Error("Invalid voice config structure");
+        }
+      } catch (e) {
+        console.error("Failed to parse or validate monster voice config:", e);
+        setVoiceConfig({ voiceURI: null, pitch: 0.8, rate: 0.9 }); // Fallback
+      }
     } else {
-      // Default if no specific voice was saved
       setVoiceConfig({ voiceURI: null, pitch: 0.8, rate: 0.9 });
     }
   }, []);
@@ -54,7 +63,7 @@ export default function MonsterRiddleModal({ isOpen, onClose, onChallengeComplet
       fetchRiddle();
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
-      speechSynthesis.cancel(); // Stop any ongoing speech
+      speechSynthesis.cancel();
       setIsSpeaking(false);
     }
     return () => {
@@ -64,11 +73,11 @@ export default function MonsterRiddleModal({ isOpen, onClose, onChallengeComplet
   }, [isOpen]);
 
   useEffect(() => {
-    if (riddleData?.riddle && voiceConfig && isOpen) {
+    if (riddleData?.riddle && voiceConfig && isOpen && !isLoading) { // Ensure not loading
       speakRiddle(riddleData.riddle);
       startTimer();
     }
-  }, [riddleData, voiceConfig, isOpen]);
+  }, [riddleData, voiceConfig, isOpen, isLoading]);
 
   useEffect(() => {
     if (timeLeft <= 0 && riddleData && !showResult) {
@@ -78,7 +87,7 @@ export default function MonsterRiddleModal({ isOpen, onClose, onChallengeComplet
   }, [timeLeft, riddleData, showResult]);
 
   const speakRiddle = (text: string) => {
-    speechSynthesis.cancel(); // Cancel any previous speech
+    speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     
     if (voiceConfig) {
@@ -95,7 +104,10 @@ export default function MonsterRiddleModal({ isOpen, onClose, onChallengeComplet
 
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false); // Handle potential errors
+    utterance.onerror = (event) => {
+        console.error("Speech synthesis error:", event.error);
+        setIsSpeaking(false);
+    };
 
     speechSynthesis.speak(utterance);
   };
@@ -113,20 +125,29 @@ export default function MonsterRiddleModal({ isOpen, onClose, onChallengeComplet
   const fetchRiddle = async () => {
     setIsLoading(true);
     setError(null);
+    setRiddleData(null); // Clear old data
     try {
       const result = await generateMonsterRiddleAction();
       setRiddleData(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to fetch riddle.");
+      setRiddleData(null); 
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const startTimer = () => {
     if (timerRef.current) clearInterval(timerRef.current);
-    setTimeLeft(RIDDLE_TIMER_SECONDS); // Reset timer
+    setTimeLeft(RIDDLE_TIMER_SECONDS);
     timerRef.current = setInterval(() => {
-      setTimeLeft(prev => prev - 1);
+      setTimeLeft(prev => {
+          if (typeof prev === 'number' && prev > 0) {
+              return prev - 1;
+          }
+          if (timerRef.current) clearInterval(timerRef.current);
+          return 0;
+      });
     }, 1000);
   };
 
@@ -139,14 +160,14 @@ export default function MonsterRiddleModal({ isOpen, onClose, onChallengeComplet
     setTimeout(() => {
       onChallengeComplete(isCorrect);
       onClose();
-    }, 2500); // Show result for a bit before closing
+    }, 2500);
   };
   
   const handleTimeOut = () => {
-    if (!riddleData || showResult) return; // Ensure it only triggers once
-    setShowResult('incorrect'); // Timeout is treated as incorrect
+    if (!riddleData || showResult) return;
+    setShowResult('incorrect');
      setTimeout(() => {
-      onChallengeComplete(false); // False for incorrect/timeout
+      onChallengeComplete(false);
       onClose();
     }, 2500);
   }
@@ -161,7 +182,7 @@ export default function MonsterRiddleModal({ isOpen, onClose, onChallengeComplet
             <Lightbulb className="h-6 w-6 text-primary" />
             Monster's Riddle Challenge!
           </DialogTitle>
-          {riddleData && (
+          {riddleData && !isLoading && ( // only show desc if riddle loaded
             <DialogDescription>
               Your monster has a riddle for you. Answer wisely!
             </DialogDescription>
@@ -171,14 +192,14 @@ export default function MonsterRiddleModal({ isOpen, onClose, onChallengeComplet
         {isLoading && (
           <div className="flex flex-col items-center justify-center h-40">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="mt-2 text-muted-foreground">Monster is thinking...</p>
+            <p className="mt-2 text-muted-foreground">Monster is conjuring a riddle...</p>
           </div>
         )}
 
         {error && !isLoading && (
           <Alert variant="destructive">
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
+            <AlertTitle>Riddle Error</AlertTitle>
+            <AlertDescription>{error} The monster seems stumped. Try again later?</AlertDescription>
           </Alert>
         )}
 
@@ -210,6 +231,11 @@ export default function MonsterRiddleModal({ isOpen, onClose, onChallengeComplet
                   onChange={(e) => setUserAnswer(e.target.value)}
                   placeholder="Type your answer here..."
                   disabled={timeLeft <=0}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && userAnswer.trim() && timeLeft > 0) {
+                      handleSubmitAnswer();
+                    }
+                  }}
                 />
               </div>
             ) : (
@@ -228,14 +254,19 @@ export default function MonsterRiddleModal({ isOpen, onClose, onChallengeComplet
           </div>
         )}
 
-        {!showResult && riddleData && (
+        {!showResult && riddleData && !isLoading && (
           <DialogFooter>
             <Button onClick={handleSubmitAnswer} disabled={isLoading || timeLeft <= 0 || !userAnswer.trim()}>
               Submit Answer
             </Button>
           </DialogFooter>
         )}
-         {showResult && (
+         {showResult && !isLoading && (
+            <DialogFooter className="mt-4">
+                 <Button variant="outline" onClick={onClose}>Close</Button>
+            </DialogFooter>
+        )}
+         {!riddleData && !isLoading && error && ( // Show close button if error and not loading
             <DialogFooter className="mt-4">
                  <Button variant="outline" onClick={onClose}>Close</Button>
             </DialogFooter>
