@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useTransition, useCallback } from 'react';
@@ -18,6 +19,7 @@ import { analyzeThoughtAction } from './actions';
 import type { ThoughtChallengerInput, ThoughtChallengerOutput } from '@/ai/flows/thought-challenger-flow';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
@@ -37,6 +39,21 @@ const MIN_RECOVERY = 10;
 const MAX_RECOVERY = 20;
 const POINTS_PER_REFRAME = 40;
 const MONSTER_HP_REDUCTION_PER_REFRAME = 8;
+
+const commonNegativeThoughts = [
+  "This will never get better.",
+  "No one understands what I'm going through.",
+  "I'm a burden to my loved ones.",
+  "I can't enjoy life anymore because of this.",
+  "Doctors will never believe me or help me.",
+  "I'm losing my mind.",
+  "There's something fundamentally wrong with me.",
+  "I'll never feel normal again.",
+  "This pain/sensation is unbearable and will last forever.",
+  "I'm damaged/broken.",
+  "It's all my fault.",
+  "I'm alone in this struggle."
+];
 
 interface TombEntry {
   name: string;
@@ -70,6 +87,8 @@ export default function ThoughtChallengerPage() {
   const [alternativePerspective, setAlternativePerspective] = useState('');
   const [adviceToFriend, setAdviceToFriend] = useState('');
   const [balancedReframe, setBalancedReframe] = useState('');
+  const [selectedCommonThought, setSelectedCommonThought] = useState<string>('');
+
 
   const [aiAnalysisResult, setAiAnalysisResult] = useState<ThoughtChallengerOutput | null>(null);
   const [thoughtLog, setThoughtLog] = useState<ThoughtChallengerLogEntry[]>([]);
@@ -202,6 +221,7 @@ export default function ThoughtChallengerPage() {
     // Reset fields
     setDistressingThought(''); setEvidenceFor(''); setEvidenceAgainst('');
     setAlternativePerspective(''); setAdviceToFriend(''); setAiAnalysisResult(null); setBalancedReframe('');
+    setSelectedCommonThought(''); // Reset select
   };
   
   const getHealthBarValue = () => {
@@ -273,8 +293,44 @@ export default function ThoughtChallengerPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="distressing-thought">1. What's a distressing thought you're having?</Label>
-              <Textarea id="distressing-thought" value={distressingThought} onChange={(e) => setDistressingThought(e.target.value)} placeholder="e.g., This itching will never stop." className="min-h-[60px]" />
+              <Label htmlFor="common-thoughts-select">1. Select a common thought or type your own below:</Label>
+              <Select
+                value={selectedCommonThought}
+                onValueChange={(value) => {
+                  setSelectedCommonThought(value);
+                  if (value !== "other" && value !== "") {
+                    setDistressingThought(value);
+                  } else if (value === "other") {
+                     setDistressingThought(''); // Clear if "Other" is re-selected
+                  }
+                }}
+              >
+                <SelectTrigger id="common-thoughts-select" className="mt-1">
+                  <SelectValue placeholder="Choose a common thought..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {commonNegativeThoughts.map((thought, index) => (
+                    <SelectItem key={index} value={thought}>{thought}</SelectItem>
+                  ))}
+                  <SelectItem value="other">Other (type below)...</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="distressing-thought">Your Distressing Thought:</Label>
+              <Textarea 
+                id="distressing-thought" 
+                value={distressingThought} 
+                onChange={(e) => {
+                  setDistressingThought(e.target.value);
+                  // If user types, assume it's custom, deselect common thought
+                  if (selectedCommonThought !== "other" && selectedCommonThought !== "") {
+                    setSelectedCommonThought("other");
+                  }
+                }}
+                placeholder="e.g., This itching will never stop." 
+                className="min-h-[60px] mt-1" 
+              />
             </div>
             <Separator />
             <h3 className="text-md font-semibold pt-2">2. Challenge the Thought:</h3>
