@@ -2,8 +2,8 @@
 'use server';
 
 // Changed from alias to relative path
-import type { ProductSuggestionOutput, ProductSuggestionInput } from '../../../ai/flows/product-suggestion-flow';
-import { suggestProductSuggestions } from '../../../ai/flows/product-suggestion-flow';
+import type { ProductSuggestionOutput, ProductSuggestionInput, ProductForAI } from '../../ai/flows/product-suggestion-flow'; // Corrected path, importing ProductForAI directly
+import { suggestProductSuggestions } from '../../ai/flows/product-suggestion-flow'; // Corrected path
 import type { WellnessAid } from './page'; // Type definition from the page component
 
 // Interface for the data structure expected by this server action
@@ -12,35 +12,23 @@ interface SuggestProductsActionInput {
   allProducts: WellnessAid[];
 }
 
-// Interface for the product structure expected by the AI flow's ProductSchema
-// This ensures we are mapping correctly.
-interface ProductForAI {
-  id: string;
-  name: string;
-  description: string;
-  affiliateLink: string; 
-  category: string;
-  keywords?: string[];
-}
-
 export async function suggestProductsAction(
   input: SuggestProductsActionInput
 ): Promise<ProductSuggestionOutput> {
   try {
     // Map the WellnessAid[] from the client to ProductForAI[] expected by the AI flow
-    const productsForAI: ProductForAI[] = input.allProducts.map(p => ({
+    const productsForAI: ProductForAI[] = input.allProducts.map(p => ({ // Using ProductForAI directly
       id: p.id,
       name: p.name,
       description: p.description,
-      affiliateLink: p.affiliateLink, // This should already be a string
+      affiliateLink: p.affiliateLink,
       category: p.category,
-      keywords: p.keywords || [], // Ensure keywords is an array, even if undefined
+      keywords: p.keywords || [],
     }));
 
-    // Call the corrected function name from the AI flow
     const result = await suggestProductSuggestions({
       userSymptoms: input.userSymptoms,
-      allProducts: productsForAI, // Pass the mapped products
+      allProducts: productsForAI,
     });
     return result;
   } catch (error) {
