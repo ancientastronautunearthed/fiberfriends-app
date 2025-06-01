@@ -1,8 +1,9 @@
 
 'use server';
 
-import type { ProductSuggestionOutput, ProductSuggestionInput } from '@/ai/flows/product-suggestion-flow';
-import { suggestProductSuggestions } from '@/ai/flows/product-suggestion-flow'; // Corrected import
+// Changed from alias to relative path
+import type { ProductSuggestionOutput, ProductSuggestionInput } from '../../../ai/flows/product-suggestion-flow';
+import { suggestProductSuggestions } from '../../../ai/flows/product-suggestion-flow';
 import type { WellnessAid } from './page'; // Type definition from the page component
 
 // Interface for the data structure expected by this server action
@@ -31,7 +32,7 @@ export async function suggestProductsAction(
       id: p.id,
       name: p.name,
       description: p.description,
-      affiliateLink: p.affiliateLink,
+      affiliateLink: p.affiliateLink, // This should already be a string
       category: p.category,
       keywords: p.keywords || [], // Ensure keywords is an array, even if undefined
     }));
