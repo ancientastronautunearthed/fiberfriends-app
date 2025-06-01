@@ -1,8 +1,9 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { HeartHandshake } from "lucide-react";
+import { HeartHandshake, Gem } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 export default function SupportUsPage() {
   return (
@@ -30,29 +31,43 @@ export default function SupportUsPage() {
               Fiber Friends is a community-driven platform committed to providing support, validation, and resources for individuals affected by Morgellons disease. Your generous support plays a crucial role in our mission.
             </p>
             <p className="text-foreground/90 leading-relaxed">
-              Contributions help us cover operational costs, develop new and improved features for the app, and most importantly, fund vital research aimed at understanding this complex condition and exploring potential avenues for relief and treatment.
+              Subscriptions and contributions help us cover operational costs, develop new and improved features for the app, and most importantly, fund vital research aimed at understanding this complex condition and exploring potential avenues for relief and treatment.
             </p>
           </section>
 
           <section className="p-4 border-l-4 border-accent bg-accent/10 rounded-r-md">
             <h3 className="font-semibold text-accent-foreground mb-2">Our Commitment to Transparency</h3>
             <p className="text-sm text-accent-foreground/80">
-              <strong>100% of the proceeds</strong> from donations are dedicated to running this site and advancing our research efforts. We believe in full transparency and are committed to using every contribution effectively to benefit the Morgellons community.
+              <strong>A significant portion of proceeds</strong> from subscriptions and 100% of direct donations are dedicated to running this site and advancing our research efforts. We believe in full transparency and are committed to using every contribution effectively to benefit the Morgellons community.
             </p>
           </section>
           
-          <section>
-            <p className="text-foreground/90 leading-relaxed mb-4">
-              Every contribution, no matter the size, makes a significant difference and brings us closer to a future where those with Morgellons feel understood, supported, and hopeful.
-            </p>
-            <Button size="lg" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
-              <a href="#donate-link"> {/* Placeholder link */}
-                Donate Now and Make a Difference
-              </a>
-            </Button>
-            <p className="text-xs text-muted-foreground mt-2 text-center sm:text-left">
-              (You will be redirected to our secure donation partner)
-            </p>
+          <section className="space-y-4">
+            <div>
+              <h3 className="text-xl font-semibold font-headline text-primary mb-2">Become a Subscriber</h3>
+              <p className="text-foreground/90 leading-relaxed mb-3">
+                The best way to support ongoing development and gain access to premium features is by subscribing to one of our plans.
+              </p>
+              <Button size="lg" className="w-full sm:w-auto" asChild>
+                <Link href="/landing#pricing"> 
+                  <Gem className="mr-2 h-4 w-4"/> View Subscription Plans
+                </Link>
+              </Button>
+            </div>
+            <div>
+                <h3 className="text-xl font-semibold font-headline text-primary mb-2">Make a Direct Donation</h3>
+                 <p className="text-foreground/90 leading-relaxed mb-3">
+                    If you prefer to make a one-time or recurring donation, every amount helps us continue our work.
+                </p>
+                <Button size="lg" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
+                  <a href="#donate-link"> {/* Placeholder link */}
+                    Donate Now 
+                  </a>
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2 text-center sm:text-left">
+                  (You will be redirected to our secure donation partner)
+                </p>
+            </div>
           </section>
         </CardContent>
       </Card>
@@ -62,15 +77,16 @@ export default function SupportUsPage() {
           <CardTitle className="font-headline">Other Ways to Support</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>Besides monetary donations, you can support our mission by:</p>
+            <p>Besides monetary contributions, you can support our mission by:</p>
             <ul className="list-disc list-inside pl-4">
-                <li>Sharing your experiences and insights within the app.</li>
+                <li>Sharing your experiences and insights within the app (respectfully and constructively).</li>
                 <li>Inviting others who might benefit from our community.</li>
                 <li>Providing feedback on how we can improve the platform.</li>
-                <li>Raising awareness about Morgellons disease.</li>
+                <li>Raising awareness about Morgellons disease in your circles.</li>
             </ul>
         </CardContent>
       </Card>
     </div>
   );
 }
+
