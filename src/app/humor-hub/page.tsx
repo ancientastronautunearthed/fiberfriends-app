@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Share2, Copy } from "lucide-react";
+import { Download, Share2, Copy, Smile } from "lucide-react"; // Added Smile
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 
@@ -31,6 +31,13 @@ const bingoItems = [
 export default function HumorHubPage() {
   return (
     <div className="space-y-8">
+      <Card>
+        <CardHeader>
+            <CardTitle className="font-headline flex items-center gap-2"><Smile className="h-6 w-6 text-primary"/>Humor Hub</CardTitle>
+            <CardDescription>Lighten the mood with some relatable humor. Laughter can be good medicine!</CardDescription>
+        </CardHeader>
+      </Card>
+
       <section id="belief-badges">
         <h2 className="text-2xl font-headline font-semibold mb-4 text-foreground">Belief Badges</h2>
         <CardDescription className="mb-4">Shareable badges to express your journey with a touch of humor.</CardDescription>
@@ -89,3 +96,4 @@ export default function HumorHubPage() {
     </div>
   );
 }
+
