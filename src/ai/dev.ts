@@ -1,3 +1,4 @@
+
 import { config } from 'dotenv';
 config();
 
@@ -16,3 +17,5 @@ import '@/ai/flows/message-quality-flow.ts';
 import '@/ai/flows/monster-banter-flow.ts';
 import '@/ai/flows/prescription-grading-flow.ts';
 import '@/ai/flows/thought-challenger-flow.ts';
+import '@/ai/flows/knowledge-nugget-quiz-flow.ts';
+import '@/ai/flows/affirmation-generation-flow.ts';

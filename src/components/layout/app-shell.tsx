@@ -17,14 +17,16 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Atom, LogOut, ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart, Dumbbell, Trophy, LayoutDashboard, Pill, Wind, Brain as BrainIcon } from 'lucide-react'; // Renamed Brain to BrainIcon
+import { HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Atom, LogOut, ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart, Dumbbell, Trophy, LayoutDashboard, Pill, Wind, Brain as BrainIcon, Lightbulb, ShieldCheck as AffirmationIcon } from 'lucide-react';
 
 const navItems = [
   { href: '/landing', label: 'About Fiber Friends', icon: LayoutDashboard, pageTitle: 'Welcome to Fiber Friends' },
   { href: '/', label: 'Belief Circle', icon: HeartHandshake, pageTitle: 'Belief Circle' },
   { href: '/symptom-journal', label: 'Symptom Journal', icon: BookText, pageTitle: 'Symptom Journal' },
   { href: '/pattern-recognition', label: 'Pattern Recognition', icon: BrainCircuit, pageTitle: 'Pattern Recognition' },
-  { href: '/thought-challenger', label: 'Thought Challenger', icon: BrainIcon, pageTitle: 'Thought Challenger (CBT)' }, // Used BrainIcon
+  { href: '/thought-challenger', label: 'Thought Challenger', icon: BrainIcon, pageTitle: 'Thought Challenger (CBT)' },
+  { href: '/knowledge-nugget-quiz', label: 'Knowledge Quiz', icon: Lightbulb, pageTitle: 'Knowledge Nugget Quiz' },
+  { href: '/affirmation-amplifier', label: 'Affirmation Amplifier', icon: AffirmationIcon, pageTitle: 'Affirmation Amplifier' },
   { href: '/product-tracker', label: 'Product Tracker', icon: ListChecks, pageTitle: 'Product Tracker' },
   { href: '/prescription-tracker', label: 'Prescription Tracker', icon: Pill, pageTitle: 'Prescription Tracker' },
   { href: '/food-log', label: 'Food Log', icon: Apple, pageTitle: 'Daily Food Log' },
@@ -55,6 +57,8 @@ const infoTips = [
   "Self-care: Remember to prioritize your well-being, both physically and mentally.",
   "Exercise Tip: Even gentle movement like stretching or a short walk can be beneficial.",
   "Thought Tip: Challenging negative thoughts can shift your perspective. Try the Thought Challenger!",
+  "Quiz Tip: Boost your knowledge (and weaken your monster!) with the Knowledge Nugget Quiz.",
+  "Affirmation Tip: Amplify positive thoughts with the Affirmation Amplifier. It's a small act with big impact.",
 ];
 
 function InfoBar() {
@@ -85,8 +89,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const currentPage = navItems.find(item => {
     if (item.href === '/') return pathname === '/';
-    // Ensure deeper paths still match their parent nav item for title
-    // Special handling for landing page to not conflict with root if it becomes root.
     if (item.href === '/landing') return pathname === '/landing';
     return pathname.startsWith(item.href) && (pathname.length === item.href.length || pathname[item.href.length] === '/');
   });
@@ -143,4 +145,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
-
