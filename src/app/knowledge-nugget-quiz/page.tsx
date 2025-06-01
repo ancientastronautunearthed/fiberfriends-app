@@ -47,10 +47,20 @@ interface TombEntry {
   diedAt: string;
 }
 
+function LoadingPlaceholder() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[300px]">
+      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <p className="mt-4 text-muted-foreground">Loading Knowledge Quiz...</p>
+    </div>
+  );
+}
+
 export default function KnowledgeNuggetQuizPage() {
   const [monsterImageUrl, setMonsterImageUrl] = useState<string | null>(null);
   const [monsterName, setMonsterName] = useState<string | null>(null);
   const [monsterHealth, setMonsterHealth] = useState<number | null>(null);
+  const [monsterGeneratedState, setMonsterGeneratedState] = useState<boolean | null>(null);
   
   const [currentQuizLevel, setCurrentQuizLevel] = useState<number>(1);
   const [lastQuizAttemptDate, setLastQuizAttemptDate] = useState<string | null>(null);
@@ -69,9 +79,13 @@ export default function KnowledgeNuggetQuizPage() {
 
   const getCurrentDateString = () => new Date().toISOString().split('T')[0];
 
+  useEffect(() => {
+    setMonsterGeneratedState(localStorage.getItem(MONSTER_GENERATED_KEY) === 'true');
+  }, []);
+
   const performNightlyRecovery = useCallback(() => {
-    const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
-    if (monsterGenerated !== 'true') return;
+    const isMonsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+    if (!isMonsterGenerated) return;
     const storedName = localStorage.getItem(MONSTER_NAME_KEY);
     const storedHealthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
     if (!storedHealthStr || !storedName) return;
@@ -110,33 +124,32 @@ export default function KnowledgeNuggetQuizPage() {
   }, [toast, currentQuizLevel, hasAttemptedQuizToday]);
 
   useEffect(() => {
-    const storedImage = localStorage.getItem(MONSTER_IMAGE_KEY);
-    const storedName = localStorage.getItem(MONSTER_NAME_KEY);
-    const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
+    const isMonsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+    if (isMonsterGenerated) {
+        const storedLevel = localStorage.getItem(KNOWLEDGE_NUGGET_QUIZ_LEVEL_KEY);
+        if (storedLevel) setCurrentQuizLevel(parseInt(storedLevel, 10));
 
-    const storedLevel = localStorage.getItem(KNOWLEDGE_NUGGET_QUIZ_LEVEL_KEY);
-    if (storedLevel) setCurrentQuizLevel(parseInt(storedLevel, 10));
+        const storedLastAttemptDate = localStorage.getItem(KNOWLEDGE_NUGGET_LAST_ATTEMPT_DATE_KEY);
+        setLastQuizAttemptDate(storedLastAttemptDate);
+        const today = getCurrentDateString();
+        if (storedLastAttemptDate === today) {
+          setHasAttemptedQuizToday(true);
+        }
 
-    const storedLastAttemptDate = localStorage.getItem(KNOWLEDGE_NUGGET_LAST_ATTEMPT_DATE_KEY);
-    setLastQuizAttemptDate(storedLastAttemptDate);
-    if (storedLastAttemptDate === getCurrentDateString()) {
-      setHasAttemptedQuizToday(true);
+        setMonsterImageUrl(localStorage.getItem(MONSTER_IMAGE_KEY));
+        setMonsterName(localStorage.getItem(MONSTER_NAME_KEY));
+        const storedHealth = localStorage.getItem(MONSTER_HEALTH_KEY);
+        if (storedHealth) setMonsterHealth(parseFloat(storedHealth));
+        else {
+            const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
+            setMonsterHealth(initialHealth); localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
+        }
+        performNightlyRecovery();
+        if (storedLastAttemptDate !== today) {
+            fetchQuizQuestion();
+        }
     }
-
-    if (monsterGenerated === 'true' && storedImage && storedName) {
-      setMonsterImageUrl(storedImage); setMonsterName(storedName);
-      const storedHealth = localStorage.getItem(MONSTER_HEALTH_KEY);
-      if (storedHealth) setMonsterHealth(parseFloat(storedHealth));
-      else {
-        const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
-        setMonsterHealth(initialHealth); localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
-      }
-      performNightlyRecovery();
-      if (storedLastAttemptDate !== getCurrentDateString()) {
-         fetchQuizQuestion();
-      }
-    }
-  }, [performNightlyRecovery, fetchQuizQuestion]);
+  }, [performNightlyRecovery, fetchQuizQuestion]); // currentQuizLevel removed from deps as it's managed by fetchQuizQuestion itself
 
   useEffect(() => {
     localStorage.setItem(KNOWLEDGE_NUGGET_QUIZ_LEVEL_KEY, String(currentQuizLevel));
@@ -206,6 +219,7 @@ export default function KnowledgeNuggetQuizPage() {
       }
     } else {
       toastDescription = `${monsterName} scoffs: "Your ignorance at Level ${currentQuizLevel} is amusing." The correct answer was: ${quizData.correctAnswer}.`;
+      // Level does not decrease on incorrect answer for now
       toast({ title: "Incorrect!", description: toastDescription, variant: "destructive", duration: 7000 });
     }
 
@@ -220,7 +234,11 @@ export default function KnowledgeNuggetQuizPage() {
       return Math.max(0, Math.min((currentValInRange / range) * 100, 100));
   };
 
-  if (localStorage.getItem(MONSTER_GENERATED_KEY) !== 'true') {
+  if (monsterGeneratedState === null) {
+    return <LoadingPlaceholder />;
+  }
+
+  if (!monsterGeneratedState) {
     return (
       <Card className="max-w-lg mx-auto">
         <CardHeader><CardTitle className="font-headline flex items-center gap-2"><HelpCircle />Monster Required</CardTitle></CardHeader>
@@ -323,7 +341,7 @@ export default function KnowledgeNuggetQuizPage() {
             )}
           </CardContent>
           <CardFooter>
-            <Button onClick={fetchQuizQuestion} disabled={isLoadingQuiz || hasAttemptedQuizToday || isAnswered} className="w-full sm:w-auto">
+            <Button onClick={fetchQuizQuestion} disabled={isLoadingQuiz || hasAttemptedQuizToday || (isAnswered && selectedAnswer === quizData?.correctAnswer)} className="w-full sm:w-auto">
               {isLoadingQuiz ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4"/>}
               {hasAttemptedQuizToday ? "Quiz Done For Today" : (isLoadingQuiz ? "Conjuring..." : (quizData ? "Next Question (If Incorrect)" : "Get Question"))}
             </Button>

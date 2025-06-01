@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Sparkles, Skull, HeartPulse, ShieldCheck, VenetianMask, Speaker, HelpCircle, Info } from "lucide-react"; // Added HelpCircle, Info
+import { Loader2, Sparkles, Skull, HeartPulse, ShieldCheck, VenetianMask, Speaker, HelpCircle, Info } from "lucide-react"; 
 import Image from "next/image";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -51,11 +51,20 @@ interface MonsterVoiceConfig {
 const defaultDemonicPitch = () => parseFloat((Math.random() * (0.5 - 0.1) + 0.1).toFixed(2));
 const defaultDemonicRate = () => parseFloat((Math.random() * (0.8 - 0.5) + 0.5).toFixed(2));
 
+function LoadingPlaceholder() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[300px]">
+      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <p className="mt-4 text-muted-foreground">Loading Affirmation Amplifier...</p>
+    </div>
+  );
+}
 
 export default function AffirmationAmplifierPage() {
   const [monsterImageUrl, setMonsterImageUrl] = useState<string | null>(null);
   const [monsterName, setMonsterName] = useState<string | null>(null);
   const [monsterHealth, setMonsterHealth] = useState<number | null>(null);
+  const [monsterGeneratedState, setMonsterGeneratedState] = useState<boolean | null>(null);
   
   const [affirmationData, setAffirmationData] = useState<AffirmationOutput | null>(null);
   const [isAmplifying, setIsAmplifying] = useState(false);
@@ -75,28 +84,34 @@ export default function AffirmationAmplifierPage() {
   const getCurrentDateString = () => new Date().toISOString().split('T')[0];
 
   useEffect(() => {
-    const storedConfig = localStorage.getItem(MONSTER_VOICE_CONFIG_KEY);
-    if (storedConfig) {
-      try {
-        setUserMonsterVoiceConfig(JSON.parse(storedConfig));
-      } catch (e) { 
-        setUserMonsterVoiceConfig({ voiceURI: null, pitch: defaultDemonicPitch(), rate: defaultDemonicRate() });
-      }
-    } else {
-       setUserMonsterVoiceConfig({ voiceURI: null, pitch: defaultDemonicPitch(), rate: defaultDemonicRate() });
-    }
+    setMonsterGeneratedState(localStorage.getItem(MONSTER_GENERATED_KEY) === 'true');
+  }, []);
 
-    const lastCompletedDate = localStorage.getItem(AFFIRMATION_AMPLIFIER_LAST_COMPLETED_DATE_KEY);
-    if (lastCompletedDate === getCurrentDateString()) {
-      setHasAmplifiedToday(true);
-    }
+  useEffect(() => {
+    const isMonsterActuallyGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+    if (isMonsterActuallyGenerated) {
+        const storedConfig = localStorage.getItem(MONSTER_VOICE_CONFIG_KEY);
+        if (storedConfig) {
+          try {
+            setUserMonsterVoiceConfig(JSON.parse(storedConfig));
+          } catch (e) { 
+            setUserMonsterVoiceConfig({ voiceURI: null, pitch: defaultDemonicPitch(), rate: defaultDemonicRate() });
+          }
+        } else {
+           setUserMonsterVoiceConfig({ voiceURI: null, pitch: defaultDemonicPitch(), rate: defaultDemonicRate() });
+        }
 
+        const lastCompletedDate = localStorage.getItem(AFFIRMATION_AMPLIFIER_LAST_COMPLETED_DATE_KEY);
+        if (lastCompletedDate === getCurrentDateString()) {
+          setHasAmplifiedToday(true);
+        }
+    }
   }, []);
 
 
   const performNightlyRecovery = useCallback(() => {
-    const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
-    if (monsterGenerated !== 'true') return;
+    const isMonsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+    if (!isMonsterGenerated) return;
     const storedName = localStorage.getItem(MONSTER_NAME_KEY);
     const storedHealthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
     if (!storedHealthStr || !storedName) return;
@@ -129,19 +144,21 @@ export default function AffirmationAmplifierPage() {
   }, [toast]);
 
   useEffect(() => {
-    const storedImage = localStorage.getItem(MONSTER_IMAGE_KEY);
-    const storedName = localStorage.getItem(MONSTER_NAME_KEY);
-    const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
-    if (monsterGenerated === 'true' && storedImage && storedName) {
-      setMonsterImageUrl(storedImage); setMonsterName(storedName);
-      const storedHealth = localStorage.getItem(MONSTER_HEALTH_KEY);
-      if (storedHealth) setMonsterHealth(parseFloat(storedHealth));
-      else {
-        const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
-        setMonsterHealth(initialHealth); localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
+    const isMonsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+    if (isMonsterGenerated) {
+      const storedImage = localStorage.getItem(MONSTER_IMAGE_KEY);
+      const storedName = localStorage.getItem(MONSTER_NAME_KEY);
+      if (storedImage && storedName) {
+        setMonsterImageUrl(storedImage); setMonsterName(storedName);
+        const storedHealth = localStorage.getItem(MONSTER_HEALTH_KEY);
+        if (storedHealth) setMonsterHealth(parseFloat(storedHealth));
+        else {
+          const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
+          setMonsterHealth(initialHealth); localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
+        }
+        performNightlyRecovery();
+        fetchAffirmation();
       }
-      performNightlyRecovery();
-      fetchAffirmation();
     }
   }, [performNightlyRecovery, fetchAffirmation]);
 
@@ -233,7 +250,11 @@ export default function AffirmationAmplifierPage() {
     speechSynthesis.speak(utterance);
   };
 
-  if (localStorage.getItem(MONSTER_GENERATED_KEY) !== 'true') {
+  if (monsterGeneratedState === null) {
+    return <LoadingPlaceholder />;
+  }
+
+  if (!monsterGeneratedState) {
     return (
       <Card className="max-w-lg mx-auto">
         <CardHeader><CardTitle className="font-headline flex items-center gap-2"><HelpCircle />Monster Required</CardTitle></CardHeader>

@@ -70,10 +70,20 @@ interface TombEntry {
   diedAt: string;
 }
 
+function LoadingPlaceholder() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[300px]">
+      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <p className="mt-4 text-muted-foreground">Loading Kindness Challenge...</p>
+    </div>
+  );
+}
+
 export default function KindnessChallengePage() {
   const [monsterImageUrl, setMonsterImageUrl] = useState<string | null>(null);
   const [monsterName, setMonsterName] = useState<string | null>(null);
   const [monsterHealth, setMonsterHealth] = useState<number | null>(null);
+  const [monsterGeneratedState, setMonsterGeneratedState] = useState<boolean | null>(null);
   
   const [currentTask, setCurrentTask] = useState<TaskDefinition | null>(null);
   const [hasCompletedTaskToday, setHasCompletedTaskToday] = useState(false);
@@ -89,9 +99,13 @@ export default function KindnessChallengePage() {
 
   const getCurrentDateString = () => new Date().toISOString().split('T')[0];
 
+  useEffect(() => {
+    setMonsterGeneratedState(localStorage.getItem(MONSTER_GENERATED_KEY) === 'true');
+  }, []);
+
   const performNightlyRecovery = useCallback(() => {
-    const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
-    if (monsterGenerated !== 'true') return;
+    const isMonsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+    if (!isMonsterGenerated) return;
 
     const storedName = localStorage.getItem(MONSTER_NAME_KEY);
     const storedHealthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
@@ -158,12 +172,10 @@ export default function KindnessChallengePage() {
 
 
   useEffect(() => {
-    const storedImage = localStorage.getItem(MONSTER_IMAGE_KEY);
-    const storedName = localStorage.getItem(MONSTER_NAME_KEY);
-    const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
-
-    if (monsterGenerated === 'true' && storedImage && storedName) {
-      setMonsterImageUrl(storedImage); setMonsterName(storedName);
+    const isMonsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+    if (isMonsterGenerated) {
+      setMonsterImageUrl(localStorage.getItem(MONSTER_IMAGE_KEY));
+      setMonsterName(localStorage.getItem(MONSTER_NAME_KEY));
       const storedHealth = localStorage.getItem(MONSTER_HEALTH_KEY);
       if (storedHealth) setMonsterHealth(parseFloat(storedHealth));
       else {
@@ -183,26 +195,28 @@ export default function KindnessChallengePage() {
     const todayStr = getCurrentDateString();
     const storedTaskData = localStorage.getItem(KINDNESS_CHALLENGE_CURRENT_TASK_KEY);
     let taskForToday: StoredTask | null = null;
+    let resolvedCurrentTask: TaskDefinition | null = null;
 
     if (storedTaskData) {
         taskForToday = JSON.parse(storedTaskData);
         if (taskForToday && taskForToday.date === todayStr) {
             const foundTask = taskDefinitions.find(t => t.id === taskForToday!.taskId);
-            if (foundTask) setCurrentTask(foundTask);
+            if (foundTask) resolvedCurrentTask = foundTask;
             setHasCompletedTaskToday(taskForToday.isCompleted);
         } else {
             taskForToday = null; // Stored task is for a previous day
         }
     }
 
-    if (!taskForToday || !currentTask) { // If no task for today or currentTask not set
+    if (!taskForToday || !resolvedCurrentTask) { // If no task for today or currentTask not set
         // Select a new task (initially from level 1)
         const availableTasks = taskDefinitions.filter(t => t.level <= 3); // For now, up to level 3
         const newTask = availableTasks[Math.floor(Math.random() * availableTasks.length)];
-        setCurrentTask(newTask);
+        resolvedCurrentTask = newTask;
         setHasCompletedTaskToday(false);
         localStorage.setItem(KINDNESS_CHALLENGE_CURRENT_TASK_KEY, JSON.stringify({ date: todayStr, taskId: newTask.id, isCompleted: false }));
     }
+    setCurrentTask(resolvedCurrentTask); // Set the state for currentTask
     updateKindnessStreak(); // Update streak status on load
   }, [performNightlyRecovery, updateKindnessStreak]);
 
@@ -281,9 +295,11 @@ export default function KindnessChallengePage() {
       return Math.max(0, Math.min((currentValInRange / range) * 100, 100));
   };
 
-  const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+  if (monsterGeneratedState === null) {
+    return <LoadingPlaceholder />;
+  }
 
-  if (!monsterGenerated) {
+  if (!monsterGeneratedState) {
     return (
       <Card className="max-w-lg mx-auto">
         <CardHeader><CardTitle className="font-headline flex items-center gap-2"><Info />Monster Required</CardTitle></CardHeader>

@@ -61,10 +61,20 @@ interface DailyUsageData {
     minutesCompletedToday: number;
 }
 
+function LoadingPlaceholder() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[300px]">
+      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <p className="mt-4 text-muted-foreground">Loading Mindful Moment...</p>
+    </div>
+  );
+}
+
 export default function MindfulMomentPage() {
   const [monsterImageUrl, setMonsterImageUrl] = useState<string | null>(null);
   const [monsterName, setMonsterName] = useState<string | null>(null);
   const [monsterHealth, setMonsterHealth] = useState<number | null>(null);
+  const [monsterGeneratedState, setMonsterGeneratedState] = useState<boolean | null>(null);
   
   const [selectedDuration, setSelectedDuration] = useState(DURATION_OPTIONS[0].value);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -82,6 +92,10 @@ export default function MindfulMomentPage() {
   const [mindfulStreak, setMindfulStreak] = useState<StreakData>({ date: '', count: 0 });
   const [streakBonusDamage, setStreakBonusDamage] = useState(0);
   const [dailyUsage, setDailyUsage] = useState<DailyUsageData>({ date: '', minutesCompletedToday: 0 });
+
+  useEffect(() => {
+    setMonsterGeneratedState(localStorage.getItem(MONSTER_GENERATED_KEY) === 'true');
+  }, []);
 
   const updateStreak = useCallback(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -121,8 +135,8 @@ export default function MindfulMomentPage() {
 
 
   const performNightlyRecovery = useCallback(() => {
-    const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
-    if (monsterGenerated !== 'true') return;
+    const isMonsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+    if (!isMonsterGenerated) return;
 
     const storedName = localStorage.getItem(MONSTER_NAME_KEY);
     const storedHealthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
@@ -151,12 +165,10 @@ export default function MindfulMomentPage() {
   }, [toast]);
 
   useEffect(() => {
-    const storedImage = localStorage.getItem(MONSTER_IMAGE_KEY);
-    const storedName = localStorage.getItem(MONSTER_NAME_KEY);
-    const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
-
-    if (monsterGenerated === 'true' && storedImage && storedName) {
-      setMonsterImageUrl(storedImage); setMonsterName(storedName);
+    const isMonsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+    if (isMonsterGenerated) {
+      setMonsterImageUrl(localStorage.getItem(MONSTER_IMAGE_KEY));
+      setMonsterName(localStorage.getItem(MONSTER_NAME_KEY));
       const storedHealth = localStorage.getItem(MONSTER_HEALTH_KEY);
       if (storedHealth) setMonsterHealth(parseFloat(storedHealth));
       else {
@@ -327,9 +339,11 @@ export default function MindfulMomentPage() {
       return Math.max(0, Math.min((currentValInRange / range) * 100, 100));
   };
 
-  const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+  if (monsterGeneratedState === null) {
+    return <LoadingPlaceholder />;
+  }
 
-  if (!monsterGenerated) {
+  if (!monsterGeneratedState) {
     return (
       <Card className="max-w-lg mx-auto">
         <CardHeader><CardTitle className="font-headline flex items-center gap-2"><Info />Monster Required</CardTitle></CardHeader>
