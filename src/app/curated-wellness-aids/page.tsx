@@ -5,7 +5,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import { ShoppingCart, ExternalLink, BookOpen } from "lucide-react";
+import { ShoppingCart, ExternalLink, BookOpen, Package, Apple, GlassWater, Droplets, ToyBrick } from "lucide-react"; // Added new icons
 import { Separator } from '@/components/ui/separator';
 
 interface WellnessAid {
@@ -88,6 +88,16 @@ const wellnessAids: WellnessAid[] = [
   { id: 'b4', name: "Man's Search for Meaning by Viktor Frankl", description: "A psychiatrist's experience in Nazi death camps and his logotherapy. (Paid Book)", affiliateLink: "https://www.amazon.com/Mans-Search-Meaning-Viktor-Frankl/dp/080701429X/", imageUrl: 'https://placehold.co/300x450.png', imageAiHint: 'meaningful book', category: 'Books', subCategory: 'Not Free' },
 ];
 
+const categoryIcons: Record<string, React.ElementType> = {
+  'Supplements': Package,
+  'Food Items': Apple,
+  'Beverages': GlassWater,
+  'Topicals': Droplets,
+  'Wellness Tools': ToyBrick,
+  'Books': BookOpen,
+};
+
+
 const renderProductCard = (aid: WellnessAid) => (
   <Card key={aid.id} className="flex flex-col overflow-hidden transition-shadow hover:shadow-xl">
     <div className="relative w-full h-48 sm:h-56">
@@ -129,9 +139,14 @@ export default function CuratedWellnessAidsPage() {
   }, {} as Record<string, WellnessAid[]>);
 
   const orderedCategories = Object.keys(groupedAids).sort((a, b) => {
-    // Ensure 'Books' category comes last
     if (a === 'Books') return 1;
     if (b === 'Books') return -1;
+    const order = ['Supplements', 'Food Items', 'Beverages', 'Topicals', 'Wellness Tools'];
+    const indexA = order.indexOf(a);
+    const indexB = order.indexOf(b);
+    if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+    if (indexA !== -1) return -1;
+    if (indexB !== -1) return 1;
     return a.localeCompare(b);
   });
 
@@ -154,15 +169,18 @@ export default function CuratedWellnessAidsPage() {
       </Card>
 
       {orderedCategories.map((category) => {
+        const CategoryIcon = categoryIcons[category] || ShoppingCart; // Fallback icon
+        const categoryId = category.toLowerCase().replace(/\s+/g, '-');
+
         if (category === 'Books') {
           const books = groupedAids[category];
           const freeBooks = books.filter(book => book.subCategory === 'Free');
           const notFreeBooks = books.filter(book => book.subCategory === 'Not Free');
 
           return (
-            <section key={category} className="space-y-6">
+            <section key={category} id={categoryId} className="space-y-6 scroll-mt-20">
               <div className="flex items-center gap-2 pt-2">
-                <BookOpen className="h-7 w-7 text-primary" />
+                <CategoryIcon className="h-7 w-7 text-primary" />
                 <h2 className="text-2xl font-headline font-semibold text-primary">{category}</h2>
                 <Separator className="flex-grow bg-primary/30" />
               </div>
@@ -191,10 +209,10 @@ export default function CuratedWellnessAidsPage() {
           );
         }
         
-        // Default rendering for other categories
         return (
-          <section key={category} className="space-y-4">
+          <section key={category} id={categoryId} className="space-y-4 scroll-mt-20">
             <div className="flex items-center gap-2 pt-2">
+              <CategoryIcon className="h-7 w-7 text-primary" />
               <h2 className="text-2xl font-headline font-semibold text-primary">{category}</h2>
               <Separator className="flex-grow bg-primary/30" />
             </div>
@@ -218,5 +236,3 @@ export default function CuratedWellnessAidsPage() {
     </div>
   );
 }
-
-    

@@ -27,7 +27,8 @@ import {
   ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart, Dumbbell, Trophy, 
   LayoutDashboard, Pill, Wind, Lightbulb, ShieldCheck as AffirmationIcon,
   Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown, Smile,
-  HandHeart, LogInIcon, UserPlus as UserPlusIcon, AlertTriangle, ShoppingCart
+  HandHeart, LogInIcon, UserPlus as UserPlusIcon, AlertTriangle, ShoppingCart,
+  Package, GlassWater, Droplets, ToyBrick, BookOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -43,6 +44,7 @@ interface NavItem {
   isParent?: boolean;
   authRequired?: boolean; 
   noAuthOnly?: boolean; 
+  isSubItem?: boolean; // For visual distinction if needed, not used in current accordion
 }
 
 const navItemsConfig: NavItem[] = [
@@ -87,13 +89,28 @@ const navItemsConfig: NavItem[] = [
     ]
   },
   {
+    label: 'Curated Wellness Aids', // New Top-Level Parent
+    icon: ShoppingCart,
+    pageTitle: 'Curated Wellness Aids',
+    isParent: true,
+    authRequired: false,
+    children: [
+      { href: '/curated-wellness-aids#supplements', label: 'Supplements', icon: Package, pageTitle: 'Curated Wellness Aids' },
+      { href: '/curated-wellness-aids#food-items', label: 'Food Items', icon: Apple, pageTitle: 'Curated Wellness Aids' },
+      { href: '/curated-wellness-aids#beverages', label: 'Beverages', icon: GlassWater, pageTitle: 'Curated Wellness Aids' },
+      { href: '/curated-wellness-aids#topicals', label: 'Topicals', icon: Droplets, pageTitle: 'Curated Wellness Aids' },
+      { href: '/curated-wellness-aids#wellness-tools', label: 'Wellness Tools', icon: ToyBrick, pageTitle: 'Curated Wellness Aids' },
+      { href: '/curated-wellness-aids#books', label: 'Books', icon: BookOpen, pageTitle: 'Curated Wellness Aids' },
+    ]
+  },
+  {
     label: 'Resources',
     icon: BookText, 
     pageTitle: 'Resources',
     isParent: true,
+    authRequired: false,
     children: [
-      { href: '/curated-wellness-aids', label: 'Curated Wellness Aids', icon: ShoppingCart, pageTitle: 'Curated Wellness Aids' },
-      { href: '/provider-directory', label: 'Provider Directory', icon: Stethoscope, pageTitle: 'Provider Directory' },
+      { href: '/provider-directory', label: 'Provider Directory', icon: Stethoscope, pageTitle: 'Provider Directory', authRequired: false },
     ]
   },
   {
@@ -169,19 +186,31 @@ function InfoBar() {
 
 const findCurrentPage = (items: NavItem[], currentPath: string): NavItem | undefined => {
   for (const item of items) {
+    // Check current item
     if (item.href) {
-      if (item.href === '/' && currentPath === '/') return item;
-      if (item.href === '/landing' && currentPath === '/landing') return item;
-      if (item.href !== '/' && item.href !== '/landing' && currentPath.startsWith(item.href)) {
-        if (currentPath.length === item.href.length || currentPath[item.href.length] === '/') {
-            return item;
+      const baseItemPath = item.href.split('#')[0];
+      if (baseItemPath === '/' && currentPath === '/') return item;
+      if (baseItemPath === '/landing' && currentPath === '/landing') return item;
+      if (baseItemPath !== '/' && baseItemPath !== '/landing' && currentPath.startsWith(baseItemPath)) {
+        if (currentPath.length === baseItemPath.length || currentPath[baseItemPath.length] === '/') {
+          return item;
         }
       }
     }
+    // Check children recursively
     if (item.children) {
       const childPage = findCurrentPage(item.children, currentPath);
       if (childPage) return childPage;
     }
+  }
+  // Fallback for parent if only hash differs
+  for (const item of items) {
+      if (item.isParent && item.children && item.children.some(c => currentPath.startsWith(c.href?.split('#')[0] || ''))) {
+          // A child's base path matches, so return parent's page title.
+          // We need to find the *actual* parent item in the original config that contains these children.
+          const parentCandidate = navItemsConfig.find(parent => parent.label === item.label && parent.isParent);
+          if (parentCandidate) return parentCandidate;
+      }
   }
   return undefined;
 };
@@ -193,9 +222,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading, configError } = useAuth(); 
   const { toast } = useToast();
   
-  const currentPage = findCurrentPage(navItemsConfig, pathname);
   const { state: sidebarState, isMobile } = useSidebar(); 
   const [openAccordionItem, setOpenAccordionItem] = useState<string | undefined>(undefined);
+  
+  const currentPage = findCurrentPage(navItemsConfig, pathname);
+
 
   const handleLogout = async () => {
     if (!firebaseAuthInstance) {
@@ -245,7 +276,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     for (const item of filteredNavItems) {
       if (item.isParent && item.children) {
         for (const child of item.children) {
-          if (child.href && (pathname === child.href || (child.href !== '/' && pathname.startsWith(child.href)))) {
+          if (child.href && (pathname === child.href.split('#')[0] || (child.href !== '/' && pathname.startsWith(child.href.split('#')[0])))) {
             activeParentLabel = item.label;
             break;
           }
@@ -293,7 +324,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             className={cn(
                               "flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring outline-none transition-colors",
                               "group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:size-8",
-                              (openAccordionItem === item.label || item.children.some(child => child.href && (pathname === child.href || (child.href !== '/' && pathname.startsWith(child.href))))) && "bg-sidebar-accent text-sidebar-accent-foreground"
+                              (openAccordionItem === item.label || item.children.some(child => child.href && (pathname === child.href.split('#')[0] || (child.href !== '/' && pathname.startsWith(child.href.split('#')[0]))))) && "bg-sidebar-accent text-sidebar-accent-foreground"
                             )}
                           >
                             <div className="flex items-center gap-2">
@@ -317,7 +348,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             <SidebarMenuItem key={child.href} className="p-0">
                               <Link href={child.href} legacyBehavior passHref>
                                 <SidebarMenuButton
-                                  isActive={(pathname === child.href || (child.href !== '/' && child.href !== '/landing' && pathname.startsWith(child.href!)))}
+                                  isActive={(pathname === child.href.split('#')[0] || (child.href !== '/' && child.href !== '/landing' && pathname.startsWith(child.href.split('#')[0])))}
                                   tooltip={{ children: child.label, side: 'right' }}
                                   className="w-full justify-start text-xs h-[1.875rem] pl-1.5 py-1" 
                                   variant="ghost"
