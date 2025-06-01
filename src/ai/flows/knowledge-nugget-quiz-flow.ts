@@ -6,11 +6,17 @@
  * chronic conditions. THIS FLOW MUST NOT PROVIDE MEDICAL ADVICE.
  *
  * - generateQuizQuestion - Generates a question, options, correct answer, and explanation.
+ * - QuizQuestionInput - The input type for the generateQuizQuestion function.
  * - QuizQuestionOutput - The return type for the generateQuizQuestion function.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+
+const QuizQuestionInputSchema = z.object({
+  difficultyLevel: z.number().min(1).max(10).optional().describe('The desired difficulty level for the quiz question (1-10, where 1 is very easy and 10 is expert/very nuanced).'),
+});
+export type QuizQuestionInput = z.infer<typeof QuizQuestionInputSchema>;
 
 const QuizQuestionOutputSchema = z.object({
   question: z.string().describe('The quiz question text. It should be focused on general wellness, resilience, or common non-medical experiences.'),
@@ -20,12 +26,13 @@ const QuizQuestionOutputSchema = z.object({
 });
 export type QuizQuestionOutput = z.infer<typeof QuizQuestionOutputSchema>;
 
-export async function generateQuizQuestion(): Promise<QuizQuestionOutput> {
-  return quizQuestionFlow({});
+export async function generateQuizQuestion(input?: QuizQuestionInput): Promise<QuizQuestionOutput> {
+  return quizQuestionFlow(input || {});
 }
 
 const prompt = ai.definePrompt({
   name: 'knowledgeNuggetQuizPrompt',
+  input: {schema: QuizQuestionInputSchema},
   output: {schema: QuizQuestionOutputSchema},
   prompt: `You are an AI assistant creating a single multiple-choice quiz question for a "Knowledge Nugget" section in an app for people dealing with chronic conditions.
 The question MUST be about general wellness, resilience, coping mechanisms (non-medical), or understanding common emotional/social experiences related to long-term health challenges.
@@ -36,6 +43,14 @@ Your task is to generate:
 2.  **options**: An array of 3 or 4 plausible answer options.
 3.  **correctAnswer**: The exact text of the correct option.
 4.  **explanation**: (Optional but recommended) A brief, neutral explanation for the correct answer, or helpful context related to the topic. This explanation must also avoid medical advice.
+
+{{#if difficultyLevel}}
+The question should be appropriate for difficulty level {{{difficultyLevel}}} (where 1 is very easy, requiring straightforward recall or common knowledge, and 10 is expert-level, potentially requiring nuanced understanding, recall of less common facts related to general wellness/resilience, or distinguishing between subtly different concepts).
+For example, a level 1 question might be "True or False: Getting enough sleep is important for well-being."
+A level 10 question might be "Which of the following non-pharmacological techniques has shown the most consistent, moderate evidence for improving sleep quality in adults with chronic pain: a) Valerian Root, b) Cognitive Behavioral Therapy for Insomnia (CBT-I), c) Warm Milk, d) ASMR videos?"
+{{else}}
+The question should be of general, moderate difficulty (around level 3-5).
+{{/if}}
 
 Example Topic Areas (General Wellness/Resilience - NOT MEDICAL):
 - The benefits of mindfulness for stress.
@@ -68,10 +83,11 @@ Return ONLY the JSON object.
 const quizQuestionFlow = ai.defineFlow(
   {
     name: 'quizQuestionFlow',
+    inputSchema: QuizQuestionInputSchema,
     outputSchema: QuizQuestionOutputSchema,
   },
-  async () => {
-    const {output} = await prompt({});
+  async (input) => {
+    const {output} = await prompt(input);
     if (!output || !output.question || !output.options || output.options.length < 3 || !output.correctAnswer) {
       throw new Error("The AI model did not return a valid quiz question with options and a correct answer.");
     }
@@ -82,3 +98,4 @@ const quizQuestionFlow = ai.defineFlow(
     return output;
   }
 );
+
