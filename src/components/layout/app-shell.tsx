@@ -7,7 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { auth as firebaseAuthInstance } from '@/lib/firebase'; // Renamed to avoid conflict
 import { signOut } from 'firebase/auth';
 import { useAuth } from '@/context/auth-context';
-import {
+import { 
   Sidebar,
   SidebarHeader,
   SidebarTrigger,
@@ -26,7 +26,7 @@ import {
   ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart, Dumbbell, Trophy, 
   LayoutDashboard, Pill, Wind, Lightbulb, ShieldCheck as AffirmationIcon,
   Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown, Smile,
-  HandHeart, LogIn as LogInIcon, UserPlus as UserPlusIcon, AlertTriangle // Added AlertTriangle
+  HandHeart, LogIn as LogInIcon, UserPlus as UserPlusIcon, AlertTriangle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -180,7 +180,7 @@ const findCurrentPage = (items: NavItem[], currentPath: string): NavItem | undef
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, loading, configError } = useAuth(); // Get configError from AuthContext
+  const { user, loading, configError } = useAuth(); 
   const { toast } = useToast();
   
   const currentPage = findCurrentPage(navItemsConfig, pathname);
@@ -252,10 +252,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {configError && (
         <div className="fixed top-0 left-0 right-0 bg-destructive text-destructive-foreground p-3 text-sm text-center shadow-lg z-[9999] flex items-center justify-center gap-2">
           <AlertTriangle className="h-5 w-5 shrink-0" />
-          <span><strong>Configuration Error:</strong> {configError}</span>
+          <span><strong>Configuration Error:</strong> {configError}. Authentication and Firebase features are disabled. Please check your <code>.env</code> file and restart the server.</span>
         </div>
       )}
-      <div className={cn("flex min-h-screen bg-background", configError ? "pt-12" : "")}> {/* Adjust pt if banner shows */}
+      <div className={cn("flex min-h-screen bg-background", configError ? "pt-12" : "")}>
         <Sidebar collapsible="icon" variant="sidebar" side="left" className="border-r bg-sidebar text-sidebar-foreground">
           <SidebarHeader className="p-4 flex items-center justify-between border-b border-sidebar-border">
             <Link href="/landing" className="flex items-center gap-2 group">
@@ -356,8 +356,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </main>
         </SidebarInset>
       </div>
-      {!configError && <InfoBar />} {/* Conditionally render InfoBar */}
+      {!configError && <InfoBar />}
     </>
   );
 }
-
