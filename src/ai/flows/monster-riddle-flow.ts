@@ -11,7 +11,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const MonsterRiddleOutputSchema = z.object({
-  riddle: z.string().describe('A clever, Morgellons-themed riddle from a metaphorical inner monster. It should be challenging but solvable within a short time. The tone should be somewhat mysterious or playful, fitting a "cool dungeon vibe" monster.'),
+  riddle: z.string().describe('A clever, Morgellons-themed riddle from a metaphorical inner monster. It should be challenging but solvable within a short time. The tone should be somewhat mysterious or playful, fitting a "cool dungeon vibe" monster. The riddle must contain three distinct clues, spread evenly throughout its text.'),
   answer: z.string().describe('The concise answer to the riddle. This should be a single word or a very short phrase.'),
 });
 export type MonsterRiddleOutput = z.infer<typeof MonsterRiddleOutputSchema>;
@@ -30,8 +30,12 @@ const prompt = ai.definePrompt({
   output: {schema: MonsterRiddleOutputSchema},
   prompt: `You are the voice of a user's inner "Morgellon Monster," which has a 'dungeon-like, but really cool vibe'.
 Your task is to create a single, clever, and thematic riddle related to the experience of Morgellons disease or the feelings associated with it (e.g., itching, mysterious fibers, feeling misunderstood, inner strength, resilience, hidden things).
-The riddle should be challenging yet solvable within about 10-15 seconds.
-The answer should be a single word or a very short phrase.
+
+Key requirements for the riddle:
+1.  **Three Distinct Clues**: The riddle MUST contain exactly three distinct clues that help lead to the answer.
+2.  **Evenly Spread Clues**: These three clues should be woven into the riddle, appearing at different points (e.g., one near the beginning, one in the middle, and one towards the end) to guide the solver gradually. Do not cluster all clues together.
+3.  **Solvable**: The riddle should be challenging yet solvable within about 10-15 seconds given the clues.
+4.  **Concise Answer**: The answer should be a single word or a very short phrase.
 
 Examples of themes for riddles:
 - The unseen
@@ -46,14 +50,11 @@ Riddle Style:
 - Slightly mysterious or enigmatic, but not terrifying.
 - Fitting for a "cool" inner monster, not just a scary one.
 
-Example Riddle Structure (but be creative!):
-Riddle: "I dance on your skin but have no feet. I whisper doubts that are hard to meet. Doctors dismiss me, but you know I'm there. What am I, this burden you bear?"
-Answer: "The Itch" (or "Morgellons Itch")
-
-Riddle: "I spin tales unseen, a tapestry of doubt. Some say I'm nothing, just lint about. But in your world, my threads are real and deep. What mystery do your pores keep?"
+Example Riddle Structure with 3 clues (but be creative!):
+Riddle: "I am an unseen irritation, often dismissed with a sigh (Clue 1). I leave tiny mysteries upon your skin, though some say they are a lie (Clue 2). I test your will and seek validation, a constant, invisible try (Clue 3). What am I?"
 Answer: "Fibers"
 
-Generate a new, unique riddle and its concise answer.
+Generate a new, unique riddle and its concise answer, following all the above requirements.
 Return ONLY the JSON object with "riddle" and "answer" fields.
 `,
 });
@@ -78,3 +79,4 @@ const monsterRiddleFlow = ai.defineFlow(
     return output;
   }
 );
+
