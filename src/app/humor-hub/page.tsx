@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Share2, Copy, Smile, Gamepad2 } from "lucide-react"; 
+import { Download, Share2, Copy, Smile, Gamepad2, Zap } from "lucide-react"; 
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
