@@ -39,27 +39,6 @@ export default function HumorHubPage() {
         </CardHeader>
       </Card>
 
-      <section id="fiber-frenzy-game">
-        <h2 className="text-2xl font-headline font-semibold mb-4 text-foreground">Arcade Corner</h2>
-        <Card className="bg-gradient-to-br from-primary/10 via-accent/10 to-primary/20 shadow-lg border-primary/30 hover:shadow-primary/20 transition-shadow">
-          <CardHeader className="items-center text-center">
-            <Gamepad2 className="h-10 w-10 text-primary mb-2"/>
-            <CardTitle className="text-xl font-headline">Play Fiber Frenzy!</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center">
-            <Image src="https://placehold.co/300x150.png" alt="Fiber Frenzy Game Teaser" width={300} height={150} className="mx-auto rounded-md border object-cover mb-3" data-ai-hint="arcade game fun"/>
-            <p className="text-sm text-muted-foreground mb-4">
-              Take a break and zap some mischievous fibers in our fun mini-game! How high can you score?
-            </p>
-            <Button asChild>
-              <Link href="/fiber-frenzy">
-                <Zap className="mr-2 h-4 w-4"/> Play Fiber Frenzy Now
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </section>
-
       <section id="belief-badges">
         <h2 className="text-2xl font-headline font-semibold mb-4 text-foreground">Belief Badges</h2>
         <CardDescription className="mb-4">Shareable badges to express your journey with a touch of humor.</CardDescription>
