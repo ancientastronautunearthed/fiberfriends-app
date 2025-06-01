@@ -55,6 +55,72 @@ const commonNegativeThoughts = [
   "I'm alone in this struggle."
 ];
 
+const commonEvidenceFor = [
+  "I feel this way physically right now.",
+  "It has happened before many times.",
+  "A doctor once said something similar.",
+  "My symptoms are very strong today.",
+  "I read an article that supports this fear.",
+  "My energy levels are extremely low.",
+  "I can't do things I used to.",
+  "People don't seem to understand.",
+  "The test results weren't good.",
+  "I've been struggling for a long time.",
+];
+
+const commonEvidenceAgainst = [
+  "There have been good days/moments.",
+  "I've overcome challenges before.",
+  "Some people do try to understand.",
+  "My body has shown resilience in the past.",
+  "This feeling/symptom isn't always this intense.",
+  "I've found small ways to cope.",
+  "Not all information I read is accurate or applies to me.",
+  "I have support from someone/a group.",
+  "One bad day doesn't mean all days are bad.",
+  "I am still here, fighting.",
+];
+
+const commonAlternativePerspectives = [
+  "This is temporary, even if it feels permanent now.",
+  "I can focus on what I *can* control.",
+  "This is a challenge, not a definition of who I am.",
+  "It's okay to not be okay sometimes.",
+  "I'm learning more about my body and needs.",
+  "Even small steps are progress.",
+  "This feeling is valid, but it doesn't have to consume me.",
+  "Perhaps there are other factors at play I haven't considered.",
+  "I can seek out different perspectives or support.",
+  "My worth isn't tied to my physical condition.",
+];
+
+const commonAdviceToFriend = [
+  "I understand why you feel that way, but it's not entirely true.",
+  "You are stronger than you think.",
+  "Be kind to yourself; you're doing your best.",
+  "Let's look at the facts together, not just the fear.",
+  "Remember that time you overcame something similar?",
+  "This feeling is valid, but it doesn't define your future.",
+  "You're not alone in this; I'm here for you.",
+  "Focus on small, manageable steps.",
+  "It's okay to ask for help or support.",
+  "This doesn't make you any less of a person.",
+];
+
+const commonBalancedReframeStarters = [
+  "While it's true that..., it's also possible that...",
+  "Even though I feel..., I can still try to...",
+  "It might seem like..., but looking at it another way,...",
+  "I acknowledge that..., however,...",
+  "Instead of focusing on..., I will try to focus on...",
+  "This is a difficult situation because..., but I am capable of...",
+  "My thought says..., but the facts suggest...",
+  "It's understandable to feel..., but it's important to remember...",
+  "I will challenge this thought by reminding myself that...",
+  "A more helpful way to think about this is: ...",
+];
+
+
 interface TombEntry {
   name: string;
   imageUrl: string;
@@ -87,8 +153,13 @@ export default function ThoughtChallengerPage() {
   const [alternativePerspective, setAlternativePerspective] = useState('');
   const [adviceToFriend, setAdviceToFriend] = useState('');
   const [balancedReframe, setBalancedReframe] = useState('');
+  
   const [selectedCommonThought, setSelectedCommonThought] = useState<string>('');
-
+  const [selectedEvidenceFor, setSelectedEvidenceFor] = useState<string>('');
+  const [selectedEvidenceAgainst, setSelectedEvidenceAgainst] = useState<string>('');
+  const [selectedAlternativePerspective, setSelectedAlternativePerspective] = useState<string>('');
+  const [selectedAdviceToFriend, setSelectedAdviceToFriend] = useState<string>('');
+  const [selectedBalancedReframe, setSelectedBalancedReframe] = useState<string>('');
 
   const [aiAnalysisResult, setAiAnalysisResult] = useState<ThoughtChallengerOutput | null>(null);
   const [thoughtLog, setThoughtLog] = useState<ThoughtChallengerLogEntry[]>([]);
@@ -98,6 +169,37 @@ export default function ThoughtChallengerPage() {
   const [showDamageEffect, setShowDamageEffect] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+
+  const handleSelectChange = (
+    value: string, 
+    setTextareaState: React.Dispatch<React.SetStateAction<string>>,
+    setSelectedState: React.Dispatch<React.SetStateAction<string>>,
+    optionsList: string[]
+  ) => {
+    setSelectedState(value);
+    if (value === "other" || value === "") {
+      // If "Other" or placeholder selected, don't clear, let user type or clear manually.
+      // If text area already has custom text, keep it. If not, maybe clear.
+      // For now, if "Other" selected, we only change the select. Textarea is free.
+    } else {
+      setTextareaState(value);
+    }
+  };
+
+  const handleTextareaChange = (
+    value: string,
+    setTextareaState: React.Dispatch<React.SetStateAction<string>>,
+    setSelectedState: React.Dispatch<React.SetStateAction<string>>,
+    optionsList: string[]
+  ) => {
+    setTextareaState(value);
+    if (optionsList.includes(value)) {
+      setSelectedState(value);
+    } else {
+      setSelectedState("other");
+    }
+  };
+
 
   const performNightlyRecovery = useCallback(() => {
     const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
@@ -218,10 +320,13 @@ export default function ThoughtChallengerPage() {
       toast({ title: "Thought Reframed!", description: `${monsterName} flinches! Its mental grip weakens. Health: ${newHealth.toFixed(1)}% (-${MONSTER_HP_REDUCTION_PER_REFRAME}). You earned ${POINTS_PER_REFRAME} points!`, duration: Number.MAX_SAFE_INTEGER });
     }
 
-    // Reset fields
-    setDistressingThought(''); setEvidenceFor(''); setEvidenceAgainst('');
-    setAlternativePerspective(''); setAdviceToFriend(''); setAiAnalysisResult(null); setBalancedReframe('');
-    setSelectedCommonThought(''); // Reset select
+    setDistressingThought(''); setSelectedCommonThought('');
+    setEvidenceFor(''); setSelectedEvidenceFor('');
+    setEvidenceAgainst(''); setSelectedEvidenceAgainst('');
+    setAlternativePerspective(''); setSelectedAlternativePerspective('');
+    setAdviceToFriend(''); setSelectedAdviceToFriend('');
+    setAiAnalysisResult(null);
+    setBalancedReframe(''); setSelectedBalancedReframe('');
   };
   
   const getHealthBarValue = () => {
@@ -241,6 +346,42 @@ export default function ThoughtChallengerPage() {
       </Card>
     );
   }
+
+  const renderSelectAndTextarea = (
+    label: string,
+    selectValue: string,
+    selectOptions: string[],
+    textareaValue: string,
+    textareaPlaceholder: string,
+    setTextareaState: React.Dispatch<React.SetStateAction<string>>,
+    setSelectedState: React.Dispatch<React.SetStateAction<string>>
+  ) => (
+    <div>
+      <Label htmlFor={`${label.toLowerCase().replace(/\s+/g, '-')}-select`}>{label}:</Label>
+      <Select
+        value={selectValue}
+        onValueChange={(value) => handleSelectChange(value, setTextareaState, setSelectedState, selectOptions)}
+      >
+        <SelectTrigger id={`${label.toLowerCase().replace(/\s+/g, '-')}-select`} className="mt-1 mb-1">
+          <SelectValue placeholder={`Choose or type your own...`} />
+        </SelectTrigger>
+        <SelectContent>
+          {selectOptions.map((option, index) => (
+            <SelectItem key={index} value={option}>{option}</SelectItem>
+          ))}
+          <SelectItem value="other">Other (type below)...</SelectItem>
+        </SelectContent>
+      </Select>
+      <Textarea
+        id={`${label.toLowerCase().replace(/\s+/g, '-')}-textarea`}
+        value={textareaValue}
+        onChange={(e) => handleTextareaChange(e.target.value, setTextareaState, setSelectedState, selectOptions)}
+        placeholder={textareaPlaceholder}
+        className="min-h-[60px]"
+      />
+    </div>
+  );
+
 
   return (
     <div className="grid lg:grid-cols-3 gap-6">
@@ -292,64 +433,53 @@ export default function ThoughtChallengerPage() {
             <CardDescription>Identify, analyze, and reframe distressing thoughts with AI assistance.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="common-thoughts-select">1. Select a common thought or type your own below:</Label>
-              <Select
-                value={selectedCommonThought}
-                onValueChange={(value) => {
-                  setSelectedCommonThought(value);
-                  if (value !== "other" && value !== "") {
-                    setDistressingThought(value);
-                  } else if (value === "other") {
-                     setDistressingThought(''); // Clear if "Other" is re-selected
-                  }
-                }}
-              >
-                <SelectTrigger id="common-thoughts-select" className="mt-1">
-                  <SelectValue placeholder="Choose a common thought..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {commonNegativeThoughts.map((thought, index) => (
-                    <SelectItem key={index} value={thought}>{thought}</SelectItem>
-                  ))}
-                  <SelectItem value="other">Other (type below)...</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="distressing-thought">Your Distressing Thought:</Label>
-              <Textarea 
-                id="distressing-thought" 
-                value={distressingThought} 
-                onChange={(e) => {
-                  setDistressingThought(e.target.value);
-                  // If user types, assume it's custom, deselect common thought
-                  if (selectedCommonThought !== "other" && selectedCommonThought !== "") {
-                    setSelectedCommonThought("other");
-                  }
-                }}
-                placeholder="e.g., This itching will never stop." 
-                className="min-h-[60px] mt-1" 
-              />
-            </div>
+            {renderSelectAndTextarea(
+                "1. Your Distressing Thought",
+                selectedCommonThought,
+                commonNegativeThoughts,
+                distressingThought,
+                "e.g., This itching will never stop.",
+                setDistressingThought,
+                setSelectedCommonThought
+              )}
             <Separator />
             <h3 className="text-md font-semibold pt-2">2. Challenge the Thought:</h3>
-            <div>
-              <Label htmlFor="evidence-for">Evidence FOR this thought (as 100% true):</Label>
-              <Textarea id="evidence-for" value={evidenceFor} onChange={(e) => setEvidenceFor(e.target.value)} placeholder="What makes you believe it's absolutely true?" className="min-h-[50px]" />
-            </div>
-            <div>
-              <Label htmlFor="evidence-against">Evidence AGAINST this thought (or times it wasn't true):</Label>
-              <Textarea id="evidence-against" value={evidenceAgainst} onChange={(e) => setEvidenceAgainst(e.target.value)} placeholder="Are there exceptions or counter-examples?" className="min-h-[50px]" />
-            </div>
-            <div>
-              <Label htmlFor="alternative-perspective">An alternative, less distressing way to see this:</Label>
-              <Textarea id="alternative-perspective" value={alternativePerspective} onChange={(e) => setAlternativePerspective(e.target.value)} placeholder="Is there another viewpoint?" className="min-h-[50px]" />
-            </div>
-            <div>
-              <Label htmlFor="advice-to-friend">If a friend had this thought, what would you tell them?</Label>
-              <Textarea id="advice-to-friend" value={adviceToFriend} onChange={(e) => setAdviceToFriend(e.target.value)} placeholder="What compassionate advice would you offer?" className="min-h-[50px]" />
-            </div>
+             {renderSelectAndTextarea(
+                "Evidence FOR this thought (as 100% true)",
+                selectedEvidenceFor,
+                commonEvidenceFor,
+                evidenceFor,
+                "What makes you believe it's absolutely true?",
+                setEvidenceFor,
+                setSelectedEvidenceFor
+              )}
+              {renderSelectAndTextarea(
+                "Evidence AGAINST this thought (or times it wasn't true)",
+                selectedEvidenceAgainst,
+                commonEvidenceAgainst,
+                evidenceAgainst,
+                "Are there exceptions or counter-examples?",
+                setEvidenceAgainst,
+                setSelectedEvidenceAgainst
+              )}
+              {renderSelectAndTextarea(
+                "An alternative, less distressing way to see this",
+                selectedAlternativePerspective,
+                commonAlternativePerspectives,
+                alternativePerspective,
+                "Is there another viewpoint?",
+                setAlternativePerspective,
+                setSelectedAlternativePerspective
+              )}
+              {renderSelectAndTextarea(
+                "If a friend had this thought, what would you tell them?",
+                selectedAdviceToFriend,
+                commonAdviceToFriend,
+                adviceToFriend,
+                "What compassionate advice would you offer?",
+                setAdviceToFriend,
+                setSelectedAdviceToFriend
+              )}
             <Button onClick={handleAnalyzeThought} disabled={isAnalyzing || !distressingThought.trim()} className="w-full sm:w-auto">
               {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Lightbulb className="mr-2 h-4 w-4"/>}
               Get AI Insights
@@ -389,11 +519,16 @@ export default function ThoughtChallengerPage() {
                 </ul>
               </div>
               <Separator />
-              <div>
-                <Label htmlFor="balanced-reframe">4. Write Your Balanced Reframe:</Label>
-                <p className="text-xs text-muted-foreground mb-1">{aiAnalysisResult.reframeSupportMessage}</p>
-                <Textarea id="balanced-reframe" value={balancedReframe} onChange={(e) => setBalancedReframe(e.target.value)} placeholder="e.g., While the itching is very unpleasant now, it has eased before, and I can try X to cope." className="min-h-[70px]" />
-              </div>
+               {renderSelectAndTextarea(
+                "4. Write Your Balanced Reframe",
+                selectedBalancedReframe,
+                commonBalancedReframeStarters,
+                balancedReframe,
+                "e.g., While the itching is unpleasant, it has eased before...",
+                setBalancedReframe,
+                setSelectedBalancedReframe
+              )}
+              <p className="text-xs text-muted-foreground mb-1">{aiAnalysisResult.reframeSupportMessage}</p>
               <Button onClick={handleSaveReframe} disabled={!balancedReframe.trim()} className="w-full sm:w-auto">
                 <CheckCircle className="mr-2 h-4 w-4"/> Save Reframe & Weaken {monsterName || "Monster"}
               </Button>
@@ -405,3 +540,4 @@ export default function ThoughtChallengerPage() {
     </div>
   );
 }
+
