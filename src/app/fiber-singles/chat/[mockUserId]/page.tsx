@@ -9,15 +9,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Send, Sparkles, Heart, MessageCircle, ArrowLeft, VenetianMask, ClipboardList, Puzzle } from "lucide-react";
+import { Loader2, Send, Sparkles, Heart, MessageCircle, ArrowLeft, VenetianMask, ClipboardList } from "lucide-react";
 import Image from "next/image";
 import { useToast } from '@/hooks/use-toast';
 import { analyzeMessageQualityAction, generateMonsterBanterAction } from '../../actions';
 import Link from 'next/link';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Input } from "@/components/ui/input";
 import { cn } from '@/lib/utils';
 
 const ROMANTIC_MONSTER_IMAGE_KEY = 'romanticMonsterImageUrl';
@@ -38,10 +36,9 @@ const mockOpponentsDatabase: Record<string, MockOpponent> = {
 
 interface ChatMessage {
     id: string;
-    sender: 'user' | 'opponent' | 'system' | 'game_statements';
+    sender: 'user' | 'opponent' | 'system';
     text: string;
     timestamp: Date;
-    statements?: string[]; // For game_statements type
 }
 
 interface MonsterBanterMessage {
@@ -59,30 +56,6 @@ interface MessageQualityLogEntry {
 }
 
 type ConversationTone = "positive" | "neutral" | "negative" | "flirty" | "awkward";
-
-// Examples for "Two Truths & a Monster Whimsy"
-const truthExamples = [
-  "My favorite season is autumn.",
-  "I'm a surprisingly good cook.",
-  "I've traveled to more than 5 countries.",
-  "I enjoy stargazing on clear nights.",
-  "I prefer tea over coffee.",
-  "My hidden talent is juggling."
-];
-
-const monsterWhimsyExamples = [
-  "My monster's laughter sounds like wind chimes.",
-  "My monster collects lost buttons and calls them 'tiny shields'.",
-  "My monster can only sleep if it's cuddling a glowing mushroom.",
-  "My monster hums ancient lullabies that make plants grow faster.",
-  "My monster's favorite snack is moonbeams.",
-  "My monster gets shy around butterflies."
-];
-
-function getRandomExamples(arr: string[], count: number): string[] {
-  const shuffled = [...arr].sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, count);
-}
 
 
 export default function SimulatedChatPage() {
@@ -108,19 +81,6 @@ export default function SimulatedChatPage() {
   const [error, setError] = useState<string | null>(null);
   const humanChatLogRef = useRef<HTMLDivElement>(null);
   const monsterChatLogRef = useRef<HTMLDivElement>(null);
-
-  // State for "Two Truths & a Monster Whimsy" Modal
-  const [isWhimsyModalOpen, setIsWhimsyModalOpen] = useState(false);
-  const [truth1, setTruth1] = useState('');
-  const [truth2, setTruth2] = useState('');
-  const [monsterWhimsy, setMonsterWhimsy] = useState('');
-  const [customTruth1, setCustomTruth1] = useState('');
-  const [customTruth2, setCustomTruth2] = useState('');
-  const [customMonsterWhimsy, setCustomMonsterWhimsy] = useState('');
-
-  const [truth1Options, setTruth1Options] = useState<string[]>([]);
-  const [truth2Options, setTruth2Options] = useState<string[]>([]);
-  const [monsterWhimsyOptions, setMonsterWhimsyOptions] = useState<string[]>([]);
 
 
   useEffect(() => {
@@ -262,46 +222,6 @@ export default function SimulatedChatPage() {
     });
   };
 
-  const handleOpenWhimsyGameModal = () => {
-    setTruth1Options(getRandomExamples(truthExamples, 3));
-    setTruth2Options(getRandomExamples(truthExamples.filter(ex => !truth1Options.includes(ex)), 3));
-    setMonsterWhimsyOptions(getRandomExamples(monsterWhimsyExamples, 3));
-    setTruth1(''); setCustomTruth1('');
-    setTruth2(''); setCustomTruth2('');
-    setMonsterWhimsy(''); setCustomMonsterWhimsy('');
-    setIsWhimsyModalOpen(true);
-  };
-
-  const handleSubmitWhimsyStatements = () => {
-    const finalTruth1 = customTruth1.trim() || truth1;
-    const finalTruth2 = customTruth2.trim() || truth2;
-    const finalMonsterWhimsy = customMonsterWhimsy.trim() || monsterWhimsy;
-
-    if (!finalTruth1 || !finalTruth2 || !finalMonsterWhimsy) {
-      toast({ title: "Missing Statements", description: "Please provide or select all three statements.", variant: "destructive" });
-      return;
-    }
-
-    if (finalTruth1 === finalTruth2 || finalTruth1 === finalMonsterWhimsy || finalTruth2 === finalMonsterWhimsy) {
-        toast({ title: "Duplicate Statements", description: "Please ensure all three statements are unique.", variant: "destructive"});
-        return;
-    }
-
-    const statements = [finalTruth1, finalTruth2, finalMonsterWhimsy];
-    // Shuffle the statements so the whimsy isn't always last
-    const shuffledStatements = [...statements].sort(() => Math.random() - 0.5);
-
-    const gameMessage: ChatMessage = {
-      id: `game_statements-${Date.now()}`,
-      sender: 'game_statements', // Or 'user' if preferred, styled distinctly
-      text: `${userRomanticMonsterName || 'I'} present my 'Two Truths & a Monster Whimsy'! One of these is about my monster, the other two are true about me. Can you guess the Monster Whimsy, ${mockOpponent?.name}?`,
-      statements: shuffledStatements,
-      timestamp: new Date(),
-    };
-    setChatLog(prev => [...prev, gameMessage]);
-    setIsWhimsyModalOpen(false);
-  };
-
 
   if (!userRomanticMonsterName || !userRomanticMonsterImageUrl || !mockOpponent) {
     return (
@@ -421,15 +341,6 @@ export default function SimulatedChatPage() {
                         <div className="my-2 p-2 text-xs text-center text-muted-foreground bg-accent/50 rounded-md shadow-sm w-full max-w-md whitespace-pre-wrap">
                             {msg.text}
                         </div>
-                    ) : msg.sender === 'game_statements' && msg.statements ? (
-                        <Card className="my-2 p-3 bg-purple-100 dark:bg-purple-900/40 border-purple-300 dark:border-purple-700 w-full max-w-md shadow-md">
-                           <CardDescription className="text-xs text-purple-700 dark:text-purple-300 mb-2">{msg.text}</CardDescription>
-                            <ul className="list-disc list-inside pl-2 space-y-1">
-                                {msg.statements.map((stmt, idx) => (
-                                    <li key={idx} className="text-sm text-purple-800 dark:text-purple-200 italic">"{stmt}"</li>
-                                ))}
-                            </ul>
-                        </Card>
                     ) : (
                         <div className={cn("max-w-[70%] p-2 rounded-lg text-sm shadow-md",
                             msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'
@@ -466,9 +377,6 @@ export default function SimulatedChatPage() {
                         <span className="ml-2 hidden sm:inline">Send</span>
                     </Button>
                 </div>
-                <Button onClick={handleOpenWhimsyGameModal} variant="outline" size="sm" className="w-full mt-2" disabled={isProcessing || monstersSynced}>
-                    <Puzzle className="mr-2 h-4 w-4"/> Play 'Two Truths &amp; a Monster Whimsy'
-                </Button>
             </CardFooter>
             {error && (
                 <CardContent>
@@ -498,85 +406,6 @@ export default function SimulatedChatPage() {
             </CardContent>
         </Card>
       </div>
-
-      {/* "Two Truths & a Monster Whimsy" Modal */}
-      <Dialog open={isWhimsyModalOpen} onOpenChange={setIsWhimsyModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Puzzle className="text-primary"/>Two Truths &amp; a Monster Whimsy</DialogTitle>
-            <DialogDescription>
-              Prepare your three statements. Your opponent will try to guess which one is about your Romantic Monster!
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="max-h-[60vh] p-1">
-            <div className="space-y-6 pr-3">
-                {/* Truth 1 */}
-                <div className="space-y-2">
-                    <Label className="font-semibold">Truth 1 (About You)</Label>
-                    <RadioGroup onValueChange={setTruth1} value={truth1}>
-                    {truth1Options.map((opt, i) => (
-                        <div key={`t1-${i}`} className="flex items-center space-x-2">
-                        <RadioGroupItem value={opt} id={`t1-opt-${i}`} />
-                        <Label htmlFor={`t1-opt-${i}`} className="font-normal text-sm">{opt}</Label>
-                        </div>
-                    ))}
-                    </RadioGroup>
-                    <Input 
-                    value={customTruth1} 
-                    onChange={(e) => { setCustomTruth1(e.target.value); if (e.target.value) setTruth1(''); }} 
-                    placeholder="Or write your own truth..." 
-                    className="mt-2 text-sm"
-                    />
-                </div>
-
-                {/* Truth 2 */}
-                <div className="space-y-2">
-                    <Label className="font-semibold">Truth 2 (About You)</Label>
-                    <RadioGroup onValueChange={setTruth2} value={truth2}>
-                    {truth2Options.map((opt, i) => (
-                        <div key={`t2-${i}`} className="flex items-center space-x-2">
-                        <RadioGroupItem value={opt} id={`t2-opt-${i}`} />
-                        <Label htmlFor={`t2-opt-${i}`} className="font-normal text-sm">{opt}</Label>
-                        </div>
-                    ))}
-                    </RadioGroup>
-                    <Input 
-                    value={customTruth2} 
-                    onChange={(e) => { setCustomTruth2(e.target.value); if (e.target.value) setTruth2(''); }} 
-                    placeholder="Or write another truth..." 
-                    className="mt-2 text-sm"
-                    />
-                </div>
-
-                {/* Monster Whimsy */}
-                <div className="space-y-2">
-                    <Label className="font-semibold">Monster Whimsy (About Your Romantic Monster)</Label>
-                    <RadioGroup onValueChange={setMonsterWhimsy} value={monsterWhimsy}>
-                    {monsterWhimsyOptions.map((opt, i) => (
-                        <div key={`w-${i}`} className="flex items-center space-x-2">
-                        <RadioGroupItem value={opt} id={`w-opt-${i}`} />
-                        <Label htmlFor={`w-opt-${i}`} className="font-normal text-sm">{opt}</Label>
-                        </div>
-                    ))}
-                    </RadioGroup>
-                    <Input 
-                    value={customMonsterWhimsy} 
-                    onChange={(e) => { setCustomMonsterWhimsy(e.target.value); if (e.target.value) setMonsterWhimsy(''); }} 
-                    placeholder="Or write your own monster whimsy..." 
-                    className="mt-2 text-sm"
-                    />
-                </div>
-            </div>
-          </ScrollArea>
-          <DialogFooter className="mt-4">
-            <DialogClose asChild>
-                <Button type="button" variant="outline">Cancel</Button>
-            </DialogClose>
-            <Button type="button" onClick={handleSubmitWhimsyStatements}>Share Statements in Chat</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
     </div>
   );
 }
