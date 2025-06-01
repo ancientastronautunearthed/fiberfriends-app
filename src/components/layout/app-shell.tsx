@@ -7,7 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { auth as firebaseAuthInstance } from '@/lib/firebase'; // Renamed to avoid conflict
 import { signOut } from 'firebase/auth';
 import { useAuth } from '@/context/auth-context';
-import Image from 'next/image'; // Added for logo
+import Image from 'next/image'; 
 import { 
   Sidebar,
   SidebarHeader,
@@ -27,7 +27,7 @@ import {
   ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart, Dumbbell, Trophy, 
   LayoutDashboard, Pill, Wind, Lightbulb, ShieldCheck as AffirmationIcon,
   Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown, Smile,
-  HandHeart, LogIn as LogInIcon, UserPlus as UserPlusIcon, AlertTriangle
+  HandHeart, LogInIcon, UserPlus as UserPlusIcon, AlertTriangle, ShoppingCart
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -83,8 +83,17 @@ const navItemsConfig: NavItem[] = [
     children: [
       { href: '/', label: 'Belief Circle', icon: HeartHandshake, pageTitle: 'Belief Circle' },
       { href: '/doctor-forum', label: 'Doctor Forum', icon: MessageSquareQuote, pageTitle: 'Doctor Forum' },
-      { href: '/provider-directory', label: 'Provider Directory', icon: Stethoscope, pageTitle: 'Provider Directory' },
       { href: '/humor-hub', label: 'Humor Hub', icon: Smile, pageTitle: 'Humor Hub' },
+    ]
+  },
+  {
+    label: 'Resources',
+    icon: BookText, 
+    pageTitle: 'Resources',
+    isParent: true,
+    children: [
+      { href: '/curated-wellness-aids', label: 'Curated Wellness Aids', icon: ShoppingCart, pageTitle: 'Curated Wellness Aids' },
+      { href: '/provider-directory', label: 'Provider Directory', icon: Stethoscope, pageTitle: 'Provider Directory' },
     ]
   },
   {
