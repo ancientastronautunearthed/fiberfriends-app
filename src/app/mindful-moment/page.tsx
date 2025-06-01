@@ -26,6 +26,7 @@ const USER_POINTS_KEY = 'userPoints';
 const MONSTER_LAST_RECOVERY_DATE_KEY = 'monsterLastRecoveryDate';
 const MINDFUL_MOMENT_STREAK_KEY = 'mindfulMomentStreak';
 const MINDFUL_STREAK_BONUS_KEY = 'mindfulStreakBonusDamage';
+const MINDFUL_MOMENT_DAILY_USAGE_KEY = 'mindfulMomentDailyUsage';
 
 const MONSTER_DEATH_THRESHOLD = -50;
 const MAX_MONSTER_HEALTH = 200;
@@ -33,6 +34,7 @@ const INITIAL_HEALTH_MIN = 80;
 const INITIAL_HEALTH_MAX = 100;
 const MIN_RECOVERY = 10;
 const MAX_RECOVERY = 20;
+const MAX_MINDFUL_MINUTES_PER_DAY = 3;
 
 const BREATHING_CYCLE = { inhale: 4, hold: 4, exhale: 6 }; // seconds
 const TOTAL_CYCLE_DURATION = BREATHING_CYCLE.inhale + BREATHING_CYCLE.hold + BREATHING_CYCLE.exhale;
@@ -52,6 +54,11 @@ interface TombEntry {
 interface StreakData {
   date: string; // YYYY-MM-DD
   count: number;
+}
+
+interface DailyUsageData {
+    date: string; // YYYY-MM-DD
+    minutesCompletedToday: number;
 }
 
 export default function MindfulMomentPage() {
@@ -74,13 +81,14 @@ export default function MindfulMomentPage() {
 
   const [mindfulStreak, setMindfulStreak] = useState<StreakData>({ date: '', count: 0 });
   const [streakBonusDamage, setStreakBonusDamage] = useState(0);
+  const [dailyUsage, setDailyUsage] = useState<DailyUsageData>({ date: '', minutesCompletedToday: 0 });
 
   const updateStreak = useCallback(() => {
     const today = new Date().toISOString().split('T')[0];
     let currentStreak = { ...mindfulStreak };
     let currentBonus = streakBonusDamage;
 
-    if (currentStreak.date === today) { // Already did it today, no change to streak count or bonus
+    if (currentStreak.date === today) { 
       // No change to streak count if already done today
     } else {
       const lastDate = currentStreak.date ? new Date(currentStreak.date) : null;
@@ -93,15 +101,14 @@ export default function MindfulMomentPage() {
 
       if (diffDays === 1) {
         currentStreak.count += 1;
-      } else { // Streak broken or first time
+      } else { 
         currentStreak.count = 1;
-        currentBonus = 0; // Reset bonus if streak broken
+        currentBonus = 0; 
       }
       currentStreak.date = today;
 
-      // Update bonus damage every 3 days of streak
       if (currentStreak.count > 0 && currentStreak.count % 3 === 0) {
-        currentBonus = Math.min(5, currentBonus + 1); // Max +5 bonus
+        currentBonus = Math.min(5, currentBonus + 1); 
       }
     }
     
@@ -164,6 +171,21 @@ export default function MindfulMomentPage() {
     const storedBonus = localStorage.getItem(MINDFUL_STREAK_BONUS_KEY);
     if (storedBonus) setStreakBonusDamage(parseInt(storedBonus, 10));
 
+    const storedDailyUsage = localStorage.getItem(MINDFUL_MOMENT_DAILY_USAGE_KEY);
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (storedDailyUsage) {
+        const parsedUsage: DailyUsageData = JSON.parse(storedDailyUsage);
+        if (parsedUsage.date === todayStr) {
+            setDailyUsage(parsedUsage);
+        } else {
+            setDailyUsage({ date: todayStr, minutesCompletedToday: 0 });
+            localStorage.setItem(MINDFUL_MOMENT_DAILY_USAGE_KEY, JSON.stringify({ date: todayStr, minutesCompletedToday: 0 }));
+        }
+    } else {
+        setDailyUsage({ date: todayStr, minutesCompletedToday: 0 });
+        localStorage.setItem(MINDFUL_MOMENT_DAILY_USAGE_KEY, JSON.stringify({ date: todayStr, minutesCompletedToday: 0 }));
+    }
+
   }, [performNightlyRecovery]);
 
   useEffect(() => {
@@ -203,7 +225,8 @@ export default function MindfulMomentPage() {
       phaseTimerRef.current = setTimeout(() => {
         setBreathingPhase('exhale');
         phaseTimerRef.current = setTimeout(() => {
-          if (isSessionActive) runBreathingCycle(); // Loop if session still active
+          // Check isSessionActive before calling runBreathingCycle again
+          if (isSessionActive && timeLeft > 0) runBreathingCycle(); 
           else setBreathingPhase('idle');
         }, BREATHING_CYCLE.exhale * 1000);
       }, BREATHING_CYCLE.hold * 1000);
@@ -219,6 +242,7 @@ export default function MindfulMomentPage() {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSessionActive, timeLeft]);
 
 
@@ -232,12 +256,17 @@ export default function MindfulMomentPage() {
     return () => {
         if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSessionActive]);
 
 
   const handleStartSession = () => {
     if (!monsterName || monsterHealth === null) {
       setError("Monster data not loaded. Please ensure your monster is created."); return;
+    }
+    if (dailyUsage.minutesCompletedToday + selectedDuration > MAX_MINDFUL_MINUTES_PER_DAY) {
+        setError(`You can only complete ${MAX_MINDFUL_MINUTES_PER_DAY} minutes of mindful moments per day. You have ${MAX_MINDFUL_MINUTES_PER_DAY - dailyUsage.minutesCompletedToday} minutes remaining today.`);
+        return;
     }
     setTimeLeft(selectedDuration * 60);
     setIsSessionActive(true);
@@ -255,6 +284,11 @@ export default function MindfulMomentPage() {
 
       const durationOption = DURATION_OPTIONS.find(opt => opt.value === selectedDuration);
       if (!durationOption) return;
+
+      const newMinutesCompletedToday = dailyUsage.minutesCompletedToday + durationOption.value;
+      const newDailyUsage: DailyUsageData = { date: new Date().toISOString().split('T')[0], minutesCompletedToday: newMinutesCompletedToday };
+      setDailyUsage(newDailyUsage);
+      localStorage.setItem(MINDFUL_MOMENT_DAILY_USAGE_KEY, JSON.stringify(newDailyUsage));
 
       const currentStreakCount = updateStreak();
       const totalDamage = durationOption.baseDamage + streakBonusDamage;
@@ -312,6 +346,8 @@ export default function MindfulMomentPage() {
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+  const minutesRemainingToday = MAX_MINDFUL_MINUTES_PER_DAY - dailyUsage.minutesCompletedToday;
+
   return (
     <div className="grid lg:grid-cols-3 gap-6">
       <div className="lg:col-span-1 space-y-6">
@@ -338,25 +374,49 @@ export default function MindfulMomentPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline flex items-center gap-2"><Wind className="h-6 w-6 text-primary"/>Mindful Moment: Calm the Chaos</CardTitle>
-            <CardDescription>Engage in a guided breathing exercise to reduce stress and weaken {monsterName || 'your monster'}.</CardDescription>
+            <CardDescription>Engage in a guided breathing exercise. Max {MAX_MINDFUL_MINUTES_PER_DAY} minutes per day. You have {minutesRemainingToday} minutes remaining today.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {!isSessionActive ? (
               <>
                 <div>
                   <Label htmlFor="duration-select">Select Duration</Label>
-                  <Select value={String(selectedDuration)} onValueChange={(val) => setSelectedDuration(Number(val))}>
-                    <SelectTrigger id="duration-select">
+                  <Select 
+                    value={String(selectedDuration)} 
+                    onValueChange={(val) => setSelectedDuration(Number(val))}
+                    disabled={minutesRemainingToday <= 0}
+                  >
+                    <SelectTrigger id="duration-select" disabled={minutesRemainingToday <= 0}>
                       <SelectValue placeholder="Choose duration" />
                     </SelectTrigger>
                     <SelectContent>
                       {DURATION_OPTIONS.map(opt => (
-                        <SelectItem key={opt.value} value={String(opt.value)}>{opt.label} (Monster -{opt.baseDamage + streakBonusDamage}HP, You +{opt.points}pts)</SelectItem>
+                        <SelectItem 
+                          key={opt.value} 
+                          value={String(opt.value)}
+                          disabled={opt.value > minutesRemainingToday}
+                        >
+                          {opt.label} (Monster -{opt.baseDamage + streakBonusDamage}HP, You +{opt.points}pts)
+                          {opt.value > minutesRemainingToday && <span className="text-xs text-muted-foreground ml-2">(Exceeds daily limit)</span>}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <Button onClick={handleStartSession} className="w-full" disabled={isProcessingCompletion}>
+                {minutesRemainingToday <= 0 && (
+                    <Alert variant="default" className="bg-accent/20 border-accent">
+                        <Zap className="h-4 w-4 text-accent-foreground" />
+                        <AlertTitle>Daily Limit Reached</AlertTitle>
+                        <AlertDescription>
+                        You've completed your {MAX_MINDFUL_MINUTES_PER_DAY} minutes of mindful moments for today. Great job! Come back tomorrow.
+                        </AlertDescription>
+                    </Alert>
+                )}
+                <Button 
+                    onClick={handleStartSession} 
+                    className="w-full" 
+                    disabled={isProcessingCompletion || minutesRemainingToday <= 0 || selectedDuration > minutesRemainingToday}
+                >
                   <Brain className="mr-2 h-4 w-4" /> Start Moment
                 </Button>
               </>
