@@ -5,7 +5,6 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  SidebarProvider,
   Sidebar,
   SidebarHeader,
   SidebarTrigger,
@@ -15,7 +14,7 @@ import {
   SidebarMenuButton,
   SidebarInset,
   SidebarFooter,
-  useSidebar, // Import useSidebar to access state for tooltips
+  useSidebar, 
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -23,7 +22,7 @@ import {
   HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Atom, LogOut, 
   ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart, Dumbbell, Trophy, 
   LayoutDashboard, Pill, Wind, Brain as BrainIcon, Lightbulb, ShieldCheck as AffirmationIcon,
-  Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown, Smile // Added Smile here
+  Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown, Smile
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -32,7 +31,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 interface NavItem {
   href?: string;
   label: string;
-  icon: React.ElementType; // LucideIcon type
+  icon: React.ElementType; 
   pageTitle: string;
   children?: NavItem[];
   isParent?: boolean;
@@ -148,12 +147,9 @@ function InfoBar() {
 const findCurrentPage = (items: NavItem[], currentPath: string): NavItem | undefined => {
   for (const item of items) {
     if (item.href) {
-      // Exact match for root or landing
       if (item.href === '/' && currentPath === '/') return item;
       if (item.href === '/landing' && currentPath === '/landing') return item;
-      // StartsWith for other pages
       if (item.href !== '/' && item.href !== '/landing' && currentPath.startsWith(item.href)) {
-         // Ensure it's not just a partial match of a longer path segment
         if (currentPath.length === item.href.length || currentPath[item.href.length] === '/') {
             return item;
         }
@@ -171,7 +167,7 @@ const findCurrentPage = (items: NavItem[], currentPath: string): NavItem | undef
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const currentPage = findCurrentPage(navItems, pathname);
-  const { state: sidebarState, isMobile } = useSidebar(); // Get sidebar state for tooltips
+  const { state: sidebarState, isMobile } = useSidebar(); 
 
   const [openAccordionItem, setOpenAccordionItem] = useState<string | undefined>(undefined);
 
@@ -193,7 +189,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 
   return (
-    <SidebarProvider defaultOpen={true}>
+    <>
       <div className="flex min-h-screen bg-background">
         <Sidebar collapsible="icon" variant="sidebar" side="left" className="border-r bg-sidebar text-sidebar-foreground">
           <SidebarHeader className="p-4 flex items-center justify-between border-b border-sidebar-border">
@@ -290,6 +286,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </SidebarInset>
       </div>
       <InfoBar />
-    </SidebarProvider>
+    </>
   );
 }
+
