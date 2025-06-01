@@ -15,6 +15,9 @@ const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
 const MONSTER_NAME_KEY = 'morgellonMonsterName';
 const USER_POINTS_KEY = 'userPoints';
 
+// DEMO_MODE constant to align with auth-context
+const DEMO_MODE_PROFILE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true' || true; // Default to true if not set, or use auth-context's decision
+
 const TIERS = {
   NONE: { name: "Contributor", points: 0, icon: null, benefits: "Keep contributing to unlock rewards!" },
   BRONZE: { name: "Bronze Tier", points: 250, icon: Gem, benefits: "10% site-wide discount active!" },
@@ -29,14 +32,16 @@ export default function MyProfilePage() {
   const [monsterName, setMonsterName] = useState<string | null>(null);
   const [userPoints, setUserPoints] = useState(0);
   const [currentTier, setCurrentTier] = useState(TIERS.NONE);
-  const [isLoading, setIsLoading] = useState(true); // Combined loading state
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Use the DEMO_MODE flag from this file, or align with AuthContext's demo mode logic
+    const effectiveDemoMode = DEMO_MODE_PROFILE; 
+
     if (!authLoading) {
-      if (!user) {
-        router.push('/login'); // Redirect if not logged in
+      if (!user && !effectiveDemoMode) { // Only redirect if not in demo mode and no user
+        router.push('/login');
       } else {
-        // User is logged in, proceed to load profile data
         const storedImage = localStorage.getItem(MONSTER_IMAGE_KEY);
         const storedName = localStorage.getItem(MONSTER_NAME_KEY);
         const storedPoints = localStorage.getItem(USER_POINTS_KEY);
@@ -70,14 +75,9 @@ export default function MyProfilePage() {
     );
   }
   
-  if (!user) {
-    // This should ideally not be reached if redirection works, but as a fallback:
-    return (
-        <div className="flex items-center justify-center min-h-screen">
-            <p>Redirecting to login...</p>
-        </div>
-    );
-  }
+  // If not in demo mode and no user, this content won't be reached due to redirect.
+  // If in demo mode, user will be the mock user.
+  const displayEmail = user?.email || "demo@example.com"; // Fallback for safety
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -102,11 +102,11 @@ export default function MyProfilePage() {
             )}
           </div>
           <CardTitle className="font-headline text-3xl">
-            {monsterName ? monsterName : "My Profile"}
+            {monsterName ? monsterName : user?.displayName || "My Profile"}
           </CardTitle>
           <CardDescription>
             {monsterName ? `Your unique, unchangeable Morgellon Monster.` : "This is your personal space within Fiber Friends."}
-            {user && <span className="block text-xs mt-1">Email: {user.email}</span>}
+            {user && <span className="block text-xs mt-1">Email: {displayEmail}</span>}
           </CardDescription>
         </CardHeader>
         <CardContent className="text-center">
