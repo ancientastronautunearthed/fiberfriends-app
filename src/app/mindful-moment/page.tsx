@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showSocialProofToast } from '@/lib/social-proof-toast';
+import { Badge } from "@/components/ui/badge";
 
 const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
 const MONSTER_NAME_KEY = 'morgellonMonsterName';
@@ -391,3 +392,4 @@ export default function MindfulMomentPage() {
     </div>
   );
 }
+
