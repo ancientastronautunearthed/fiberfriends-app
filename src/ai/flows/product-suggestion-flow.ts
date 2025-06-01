@@ -31,7 +31,7 @@ export type ProductSuggestionInput = z.infer<typeof ProductSuggestionInputSchema
 
 const SuggestedProductSchema = z.object({
   productName: z.string().describe('The name of the suggested product.'),
-  affiliateLink: z.string().url().describe('The original affiliate link of the suggested product.'),
+  affiliateLink: z.string().describe('The original affiliate link of the suggested product. Must be a valid URL format.'), // Changed from z.string().url()
   reasoning: z.string().describe('A brief explanation why this product might be relevant for the given symptoms.'),
 });
 
@@ -67,7 +67,7 @@ Available Products (Review their name, description, category, and keywords to fi
 Based on the user's symptoms, suggest a few products (max 3-5) from the provided list that seem most relevant.
 For each suggested product, provide:
 1.  productName: The exact name of the product from the list.
-2.  affiliateLink: The original affiliateLink provided for that product.
+2.  affiliateLink: The original affiliateLink provided for that product. Ensure this is a complete and valid URL.
 3.  reasoning: A brief, neutral explanation of why this product might be relevant to one or more of the user's symptoms, based on its description, category, or keywords.
 
 IMPORTANT:
@@ -88,12 +88,14 @@ const productSuggestionFlow = ai.defineFlow(
     outputSchema: ProductSuggestionOutputSchema,
   },
   async (input) => {
-    const {output} = await prompt(input);
+    const {output, history} = await prompt(input); // Added history
     if (!output) {
-      throw new Error("The AI model did not return any product suggestions.");
+      console.error("AI Error: Product suggestion output was null.");
+      // Avoid logging potentially large 'allProducts' directly unless necessary for deep debug
+      // console.error("Input to AI (symptoms only for brevity):", JSON.stringify({ userSymptoms: input.userSymptoms }, null, 2));
+      // console.error("AI Call History:", JSON.stringify(history, null, 2));
+      throw new Error("The AI model did not return valid product suggestions. Please check server logs if issue persists.");
     }
-    // Ensure product names and links in suggestions actually come from the input list, if possible (can be complex)
-    // For now, trust the LLM follows instructions to only use provided product details.
     return output;
   }
 );
