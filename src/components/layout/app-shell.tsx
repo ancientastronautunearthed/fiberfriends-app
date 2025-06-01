@@ -21,9 +21,9 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { 
   HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, Atom, LogOut, 
   ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart, Dumbbell, Trophy, 
-  LayoutDashboard, Pill, Wind, Brain as BrainIcon, Lightbulb, ShieldCheck as AffirmationIcon,
+  LayoutDashboard, Pill, Wind, /* Brain as BrainIcon, */ Lightbulb, ShieldCheck as AffirmationIcon, // BrainIcon removed
   Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown, Smile,
-  HandHeart // Added HandHeart import
+  HandHeart
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -60,11 +60,11 @@ const navItems: NavItem[] = [
     pageTitle: 'Mind & Wellness',
     isParent: true,
     children: [
-      { href: '/thought-challenger', label: 'Thought Challenger', icon: BrainIcon, pageTitle: 'Thought Challenger (CBT)' },
+      // { href: '/thought-challenger', label: 'Thought Challenger', icon: BrainIcon, pageTitle: 'Thought Challenger (CBT)' }, // Removed
       { href: '/knowledge-nugget-quiz', label: 'Knowledge Quiz', icon: Lightbulb, pageTitle: 'Knowledge Nugget Quiz' },
       { href: '/affirmation-amplifier', label: 'Affirmation Amplifier', icon: AffirmationIcon, pageTitle: 'Affirmation Amplifier' },
       { href: '/mindful-moment', label: 'Mindful Moment', icon: Wind, pageTitle: 'Mindful Moment' },
-      { href: '/kindness-challenge', label: 'Kindness Connection', icon: HandHeart, pageTitle: 'Kindness Connection Challenge' }, // Added Kindness Connection
+      { href: '/kindness-challenge', label: 'Kindness Connection', icon: HandHeart, pageTitle: 'Kindness Connection Challenge' },
     ]
   },
   {
@@ -118,7 +118,7 @@ const infoTips = [
   "Connection Tip: Reaching out can make a big difference. Consider messaging someone today.",
   "Self-care: Remember to prioritize your well-being, both physically and mentally.",
   "Exercise Tip: Even gentle movement like stretching or a short walk can be beneficial.",
-  "Thought Tip: Challenging negative thoughts can shift your perspective. Try the Thought Challenger!",
+  // "Thought Tip: Challenging negative thoughts can shift your perspective. Try the Thought Challenger!", // Removed
   "Quiz Tip: Boost your knowledge (and weaken your monster!) with the Knowledge Nugget Quiz.",
   "Affirmation Tip: Amplify positive thoughts with the Affirmation Amplifier. It's a small act with big impact.",
   "Kindness Tip: Completing a small act of kindness in the 'Kindness Connection' can brighten your day and someone else's!",

@@ -16,6 +16,7 @@ import '@/ai/flows/romantic-monster-image-generation-flow.ts';
 import '@/ai/flows/message-quality-flow.ts';
 import '@/ai/flows/monster-banter-flow.ts';
 import '@/ai/flows/prescription-grading-flow.ts';
-import '@/ai/flows/thought-challenger-flow.ts';
+// import '@/ai/flows/thought-challenger-flow.ts'; // Removed
 import '@/ai/flows/knowledge-nugget-quiz-flow.ts';
 import '@/ai/flows/affirmation-generation-flow.ts';
+
