@@ -210,7 +210,7 @@ export default function FiberSinglesPage() {
             <Card className="mb-6 p-4 bg-gradient-to-r from-pink-100 via-purple-100 to-indigo-100 dark:from-pink-900/30 dark:via-purple-900/30 dark:to-indigo-900/30 border-pink-300 dark:border-pink-700">
                 <CardHeader className="p-0 pb-2 flex flex-row items-center gap-3">
                      {userRomanticMonsterImageUrl && userRomanticMonsterName && (
-                        <Image src={userRomanticMonsterImageUrl} alt={userRomanticMonsterName} width={128} height={128} className="rounded-lg border-2 border-pink-400 shadow-md object-cover" data-ai-hint="romantic monster user"/>
+                        <Image src={userRomanticMonsterImageUrl} alt={userRomanticMonsterName} width={256} height={256} className="rounded-lg border-2 border-pink-400 shadow-md object-cover" data-ai-hint="user romantic monster"/>
                      )}
                     <div>
                         <CardTitle className="text-xl text-pink-700 dark:text-pink-300">{userRomanticMonsterName}</CardTitle>
@@ -313,3 +313,4 @@ export default function FiberSinglesPage() {
     </div>
   );
 }
+
