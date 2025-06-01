@@ -19,5 +19,5 @@ import '@/ai/flows/prescription-grading-flow.ts';
 // import '@/ai/flows/thought-challenger-flow.ts'; // Removed
 import '@/ai/flows/knowledge-nugget-quiz-flow.ts';
 import '@/ai/flows/affirmation-generation-flow.ts';
-import '@/ai/flows/ai-companion-chat-flow.ts';
+// import '@/ai/flows/ai-companion-chat-flow.ts'; // Removed
 
