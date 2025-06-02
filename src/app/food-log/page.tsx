@@ -8,19 +8,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Apple, ThumbsUp, ThumbsDown, MinusCircle, Info, Sparkles, Skull, Ghost, Sunrise, Sun, Moon, Coffee, ChefHat, ShoppingCart } from "lucide-react";
+import { Loader2, Apple, ThumbsUp, ThumbsDown, MinusCircle, Info, Sparkles, Skull, Ghost, Sunrise, Sun, Moon, Coffee, ChefHat, ShoppingCart, HelpCircle, FileQuestion } from "lucide-react";
 import Image from "next/image";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { gradeFoodItemAction, suggestMealAction, generateRecipeAction } from './actions';
 import type { FoodGradingOutput } from '@/ai/flows/food-grading-flow';
 import type { MealSuggestionOutput } from '@/ai/flows/meal-suggestion-flow';
-import type { RecipeGenerationOutput, RecipeGenerationInput } from '@/ai/flows/recipe-generation-flow';
+import type { RecipeGenerationOutput } from '@/ai/flows/recipe-generation-flow'; // RecipeGenerationInput removed as it's not directly used in this file for type def
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import MonsterRiddleModal from '@/components/features/monster-riddle-modal';
 import { Separator } from '@/components/ui/separator';
-
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
 const MONSTER_NAME_KEY = 'morgellonMonsterName';
@@ -47,6 +47,8 @@ interface FoodLogEntry extends FoodGradingOutput {
   loggedAt: string;
   healthBefore: number;
   healthAfter: number;
+  // Nutritional fields (calories, proteinGrams, etc.), servingDescription,
+  // nutritionDisclaimer, and clarifyingQuestions are now part of FoodGradingOutput
 }
 
 interface TombEntry {
@@ -251,11 +253,18 @@ export default function FoodLogPage() {
             toastTitle = `${monsterName} HISSES about the Garlic!`;
             toastDescription = `THAT STUFF AGAIN?! My health is now ${newHealth.toFixed(1)}%! ${monsterName} shrieks: "${monsterQuote}"`;
         }
+        
+        let nutritionMessage = "";
+        if (result.clarifyingQuestions && result.clarifyingQuestions.length > 0) {
+            nutritionMessage = `\n${monsterName} needs more info for nutrition details: ${result.clarifyingQuestions.join(' ')}`;
+        } else if (result.calories !== undefined) {
+            nutritionMessage = `\nEst. Nutrition (${result.servingDescription || 'standard serving'}): ~${result.calories}kcal. ${result.nutritionDisclaimer || ''}`;
+        }
 
         if (!checkMonsterDeath(newHealth, result.foodName || "unknown food")) {
           toast({
             title: toastTitle,
-            description: toastDescription,
+            description: toastDescription + nutritionMessage,
             variant: toastVariant,
             duration: Number.MAX_SAFE_INTEGER, 
           });
@@ -399,6 +408,7 @@ export default function FoodLogPage() {
   }
 
   return (
+    <TooltipProvider>
     <>
     <div className="grid lg:grid-cols-3 gap-6">
       <div className="lg:col-span-1 space-y-6">
@@ -428,7 +438,7 @@ export default function FoodLogPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline flex items-center gap-2"><Apple className="h-6 w-6 text-primary"/>Log Food Item</CardTitle>
-            <CardDescription>Enter a food item. {monsterName} will react to how it affects its health, based on AI grading!</CardDescription>
+            <CardDescription>Enter a food item. {monsterName} will react to how it affects its health, based on AI grading, and may provide nutritional info or ask for clarification!</CardDescription>
           </CardHeader>
           <form onSubmit={handleFoodSubmit}>
             <CardContent className="space-y-4">
@@ -442,7 +452,7 @@ export default function FoodLogPage() {
                   disabled={isGradingFood}
                 />
               </div>
-              {error && !suggestedMeal && !generatedRecipe && ( // Only show general error if not showing meal/recipe specific errors
+              {error && !suggestedMeal && !generatedRecipe && ( 
                 <Alert variant="destructive">
                   <AlertTitle>Error</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
@@ -479,7 +489,7 @@ export default function FoodLogPage() {
               <Loader2 className="mr-2 h-5 w-5 animate-spin"/> Searching for a terrible meal for {monsterName}...
             </CardContent>
           )}
-          {error && (suggestedMeal || generatedRecipe) && ( // Show specific errors if they occurred during these actions
+          {error && (suggestedMeal || generatedRecipe) && ( 
             <CardContent>
                 <Alert variant="destructive">
                 <AlertTitle>Suggestion/Recipe Error</AlertTitle>
@@ -578,6 +588,53 @@ export default function FoodLogPage() {
                   <p className="text-xs text-muted-foreground mt-0.5 text-right flex-shrink-0">Health after: {entry.healthAfter.toFixed(1)}%</p>
                 </div>
                 <p className="text-sm text-foreground/80 mt-1 pl-1 border-l-2 border-accent/50 ml-1.5 "> <span className="italic text-muted-foreground">{monsterName} said:</span> "{entry.reasoning}"</p>
+                
+                {/* Nutritional Info Display */}
+                {(entry.calories !== undefined || (entry.clarifyingQuestions && entry.clarifyingQuestions.length > 0)) && (
+                  <div className="mt-2 pt-2 border-t border-dashed border-muted-foreground/30">
+                    {entry.calories !== undefined && (
+                      <>
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                           <HelpCircle className="h-3.5 w-3.5"/> 
+                           <span className="font-medium">AI Nutrition Estimate</span>
+                           {entry.servingDescription && (<span> (for {entry.servingDescription})</span>)}
+                        </div>
+                        <ul className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs pl-2">
+                          <li>Calories: ~{entry.calories} kcal</li>
+                          {entry.proteinGrams !== undefined && <li>Protein: ~{entry.proteinGrams}g</li>}
+                          {entry.carbGrams !== undefined && <li>Carbs: ~{entry.carbGrams}g</li>}
+                          {entry.fatGrams !== undefined && <li>Fat: ~{entry.fatGrams}g</li>}
+                          {entry.sugarGrams !== undefined && <li>Sugar: ~{entry.sugarGrams}g</li>}
+                          {entry.sodiumMilligrams !== undefined && <li>Sodium: ~{entry.sodiumMilligrams}mg</li>}
+                        </ul>
+                        {entry.nutritionDisclaimer && (
+                           <Tooltip>
+                            <TooltipTrigger asChild>
+                                <p className="text-xxs text-muted-foreground/70 mt-1 cursor-help flex items-center gap-0.5">
+                                    <Info className="h-2.5 w-2.5"/> {entry.nutritionDisclaimer.split('.')[0]}.
+                                </p>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                                <p className="text-xs">{entry.nutritionDisclaimer}</p>
+                            </TooltipContent>
+                           </Tooltip>
+                        )}
+                      </>
+                    )}
+                    {entry.clarifyingQuestions && entry.clarifyingQuestions.length > 0 && (
+                      <div className="mt-1.5">
+                        <div className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400 mb-0.5">
+                          <FileQuestion className="h-3.5 w-3.5" />
+                          <span className="font-medium">{monsterName} needs more info for nutrition:</span>
+                        </div>
+                        <ul className="list-disc list-inside pl-4 text-xs text-amber-600 dark:text-amber-500">
+                          {entry.clarifyingQuestions.map((q, i) => <li key={i}>{q}</li>)}
+                        </ul>
+                         <p className="text-xxs text-muted-foreground mt-0.5">Please log this food again with more details for an estimate.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </Card>
             ))}
           </CardContent>
@@ -590,6 +647,7 @@ export default function FoodLogPage() {
         onChallengeComplete={handleRiddleChallengeComplete}
     />
     </>
+    </TooltipProvider>
   );
 }
 
