@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ThumbsUp, MessageSquareText, Award, PlusCircle, ShieldCheck } from "lucide-react"; // Added ShieldCheck
+import { ThumbsUp, MessageSquareText, Award, PlusCircle, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import { useToast } from '@/hooks/use-toast';
@@ -35,7 +35,7 @@ const initialForumPosts: ForumPost[] = [
   {
     id: "doc-post-1",
     author: TRUSTED_DOCTOR_NAME,
-    avatar: "https://placehold.co/40x40.png", // Use a specific avatar if desired
+    avatar: "https://placehold.co/40x40.png",
     avatarAiHint: "professional doctor",
     time: "2 days ago",
     title: "Understanding Symptom Fluctuation in Morgellons",
@@ -69,7 +69,6 @@ const initialForumPosts: ForumPost[] = [
     upvotes: 98,
     comments: 15,
   },
-  // ... (keep other existing posts)
   {
     id: "3",
     author: "TruthSeeker22",
@@ -161,7 +160,7 @@ export default function DoctorForumPage() {
     setNewPostTags('');
     toast({
       title: "Post Submitted!",
-      description: "Your story has been added to the forum (locally for this session).",
+      description: "Your story has been added to the Intel on Obstructions forum (locally for this session).",
     });
   };
 
@@ -222,14 +221,14 @@ export default function DoctorForumPage() {
                     <AvatarFallback>{post.author.substring(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="text-sm font-semibold flex items-center">
+                    <div className="text-sm font-semibold flex items-center"> {/* Changed from p to div */}
                       {post.author}
                       {post.isTrustedDoctorPost && (
                         <Badge variant="default" className="ml-2 text-xs">
                           <ShieldCheck className="mr-1 h-3 w-3" /> Trusted Advisor
                         </Badge>
                       )}
-                    </p>
+                    </div>
                     <p className="text-xs text-muted-foreground">{post.time}</p>
                   </div>
                 </div>
