@@ -28,7 +28,7 @@ import {
   LayoutDashboard, Pill, Wind, Lightbulb, ShieldCheck as AffirmationIcon,
   Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown, Smile,
   HandHeart, LogInIcon, UserPlus as UserPlusIcon, AlertTriangle, ShoppingCart,
-  Package, GlassWater, Droplets, ToyBrick, BookOpen
+  Package, GlassWater, Droplets, ToyBrick, BookOpen, UtensilsCross
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -59,6 +59,7 @@ const navItemsConfig: NavItem[] = [
       { href: '/symptom-journal', label: 'Symptom Journal', icon: BookText, pageTitle: 'Symptom Journal' },
       { href: '/pattern-recognition', label: 'Pattern Recognition', icon: BrainCircuit, pageTitle: 'Pattern Recognition' },
       { href: '/food-log', label: 'Food Log', icon: Apple, pageTitle: 'Daily Food Log' },
+      { href: '/nutrition-tracker', label: 'Nutrition Tracker', icon: UtensilsCross, pageTitle: 'Nutrition Tracker & Coach' },
       { href: '/exercise-log', label: 'Exercise Log', icon: Dumbbell, pageTitle: 'Exercise Log Tracker' },
       { href: '/product-tracker', label: 'Product Tracker', icon: ListChecks, pageTitle: 'Product Tracker' },
       { href: '/prescription-tracker', label: 'Prescription Tracker', icon: Pill, pageTitle: 'Prescription Tracker' },
@@ -433,4 +434,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </>
   );
 }
-
