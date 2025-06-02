@@ -38,58 +38,65 @@ const features = [
 
 const pricingPlans = [
   {
-    tierName: "Emergent Spore",
-    priceMonthly: "Free",
-    billingCycle: "",
-    description: "Core tools to begin your journey of understanding and connection.",
+    tierName: "Monster Companion",
+    priceMonthly: "$7.99",
+    billingCycle: "/month",
+    description: "Core tools to begin your journey. Annual: $79.90 (save $15.98).",
     features: [
-      "Personal Morgellon Monster",
-      "Basic Health Tracking (Food, Exercise, Product - limited AI grading/entries)",
-      "Symptom Journal (limited entries)",
-      "Belief Circle & Doctor Forum (read-only or limited posts)",
-      "Limited Provider Directory Access",
-      "Mind & Wellness features (limited access)",
+      "Core monster creation & basic personalization",
+      "Food logging with AI grading (5 meals/day)",
+      "Basic monster health management",
+      "Daily affirmations and mindful moments (1/day each)",
+      "Basic symptom journaling (no AI analysis)",
+      "Access to curated wellness product recommendations",
+      "Unlimited product/prescription tracking (points capped at 10 products/day)",
+      "Monster riddles (1/day)",
+      "Knowledge quizzes (3/week)",
     ],
-    cta: "Start for Free",
-    icon: Atom,
+    cta: "Choose Companion",
+    icon: ShieldCheck,
     tierHighlight: false,
   },
   {
-    tierName: "Resilient Filament",
-    priceMonthly: "$9.99",
+    tierName: "Monster Tamer",
+    priceMonthly: "$14.99",
     billingCycle: "/month",
-    description: "Enhanced tools for deeper insights and fuller community participation.",
+    description: "Enhanced tools for deeper insights. Annual: $149.90 (save $29.98).",
     features: [
-      "All Emergent Spore features, PLUS:",
-      "Full Symptom Journal & Basic AI Pattern Analysis",
-      "Full Food, Exercise, Product Trackers with detailed AI grading",
-      "Full Community Access (posting rights in Belief Circle & Doctor Forum)",
-      "Full Provider Directory Access",
-      "All Mind & Wellness features (standard limits/streaks)",
-      "Resilient Filament Profile Badge",
+      "All Basic tier features, PLUS:",
+      "Enhanced monster personalization",
+      "Full food (5/day), exercise (2/day), product, and prescription tracking",
+      "Symptom pattern analysis with basic AI insights (1/week)",
+      "Recipe generation (3/week)",
+      "Enhanced meal suggestions",
+      "Monster riddles (2/day)",
+      "Affirmations (2/day)",
+      "Knowledge quizzes (5/week)",
+      "Limited access to Fiber Singles feature",
     ],
-    cta: "Choose Resilient Filament",
+    cta: "Choose Tamer",
     icon: Gem,
     tierHighlight: false,
   },
   {
-    tierName: "Crystalline Matrix",
-    priceMonthly: "$19.99",
+    tierName: "Monster Master",
+    priceMonthly: "$24.99",
     billingCycle: "/month",
-    description: "The ultimate toolkit for comprehensive analysis, peak wellness engagement, and premium support.",
+    description: "The ultimate toolkit for comprehensive analysis. Annual: $249.90 (save $49.98).",
     features: [
-      "All Resilient Filament features, PLUS:",
-      "Advanced AI Pattern Recognition (weather & community data insights)",
-      "Higher limits/streaks on Mind & Wellness features",
-      "Enhanced Monster Customization Options (future)",
-      "Exclusive 'Crystalline Matrix' Profile Badge",
-      "Priority Support (future)",
-      "Early Access to New Features (future)",
+      "All Standard tier features, PLUS:",
+      "Priority access to new features",
+      "Unlimited monster personalization",
+      "Advanced symptom pattern analysis with weather correlation (2+/week)",
+      "Full access to Fiber Singles feature",
+      "Exclusive monster evolutions & customizations (future)",
+      "Premium product recommendations",
+      "Advanced recipe and meal planning",
+      "Increased limits: Exercise (3+/day), Riddles (3+/day), Affirmations (2+/day), Knowledge Quizzes (Unlimited), Recipe Gen (5+/week)",
     ],
-    cta: "Choose Crystalline Matrix",
+    cta: "Choose Master",
     icon: TierAwardIcon,
     tierHighlight: true,
-    specialOffer: "Launch Price! First 50 subscribers lock in this rate.",
   },
 ];
 
@@ -175,9 +182,9 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto items-stretch">
             {pricingPlans.map((plan) => (
               <Card key={plan.tierName} className={`flex flex-col shadow-lg ${plan.tierHighlight ? 'border-2 border-primary ring-2 ring-primary/50' : 'border-border'}`}>
-                {plan.tierHighlight && plan.specialOffer && (
+                {plan.tierHighlight && ( // Removed specialOffer condition for now
                   <div className="py-1.5 px-4 bg-primary text-primary-foreground text-xs font-semibold text-center rounded-t-md">
-                    {plan.specialOffer}
+                    Premium Choice
                   </div>
                 )}
                 <CardHeader className="text-center">
@@ -202,7 +209,7 @@ export default function LandingPage() {
                 <CardContent className="mt-auto">
                   <Button 
                     className={`w-full ${plan.tierHighlight ? 'bg-primary hover:bg-primary/90 text-primary-foreground' : ''}`}
-                    variant={plan.priceMonthly === "Free" ? "outline" : "default"}
+                    variant={"default"} // All are paid tiers now
                   >
                     {plan.cta}
                   </Button>
