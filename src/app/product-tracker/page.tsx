@@ -18,7 +18,7 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Image from "next/image";
-import { showSocialProofToast } from '@/lib/social-proof-toast'; // Ensure this path is correct after rename
+import { showSocialProofToast } from '@/lib/social-proof-toast'; 
 
 
 interface ProductEntryClient extends ProductEffectGradingOutput {
@@ -47,8 +47,15 @@ const NOT_WORKING_PRODUCTS_KEY = 'notWorkingProducts';
 const USER_POINTS_KEY = 'userPoints';
 const MONSTER_LAST_RECOVERY_DATE_KEY = 'monsterLastRecoveryDate';
 const POSITIVE_PRODUCT_USAGE_STREAK_KEY = 'positiveProductUsageStreak';
-const PRODUCT_LOG_MILESTONE_INTERVAL = 5; // Show social proof every 5 products logged
+const PRODUCT_LOG_MILESTONE_INTERVAL = 5; 
 
+const PRODUCT_GRADE_CACHE_PREFIX = 'product_grade_cache_';
+const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+interface CachedAIResponse<T> {
+  timestamp: number;
+  data: T;
+}
 
 const MONSTER_DEATH_THRESHOLD = -50;
 const MAX_MONSTER_HEALTH = 200;
@@ -107,16 +114,14 @@ export default function ProductTrackerPage() {
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
       if (today === currentStreak.date) {
-        // Same day, streak continues (count already reflects this day if it's not the first action of the day)
-        // If it's the first action *of this type* for the day, it might need specific handling
-        // For now, let's assume it's a continuation or the first log of the day for this streak.
+        // Already counted for today
       } else if (diffDays === 1) {
-        currentStreak.count += 1; // Consecutive day
+        currentStreak.count += 1; 
       } else {
-        currentStreak.count = 1; // Streak broken, reset
+        currentStreak.count = 1; 
       }
     } else {
-      currentStreak.count = 1; // First time logging this type of action
+      currentStreak.count = 1; 
     }
     currentStreak.date = today;
     localStorage.setItem(streakKey, JSON.stringify(currentStreak));
@@ -213,13 +218,42 @@ export default function ProductTrackerPage() {
 
   const addPoints = () => setUserPoints(prevPoints => prevPoints + POINTS_PER_PRODUCT);
 
+  const processProductGradingResult = (
+    productId: string, 
+    aiResult: ProductEffectGradingOutput,
+    isCached: boolean
+) => {
+    setWorkingProducts(prev => prev.map(p => p.id === productId ? {
+      ...p,
+      benefitScore: aiResult.benefitScore,
+      reasoning: aiResult.reasoning,
+      productName: aiResult.productName,
+      isGraded: true,
+    } : p));
+    addPoints();
+    toast({
+      title: `${isCached ? "[Cache] " : ""}AI Analysis: ${aiResult.productName}`,
+      description: `It has a ${aiResult.benefitScore}/5 benefit. ${monsterName || 'The AI'} scoffs: 'As if I'd let that weaken me! ${aiResult.reasoning.substring(0,70)}...'`,
+      duration: Number.MAX_SAFE_INTEGER
+    });
+
+    const totalProductsLogged = workingProducts.length + notWorkingProducts.length;
+    if (totalProductsLogged > 0 && totalProductsLogged % PRODUCT_LOG_MILESTONE_INTERVAL === 0) {
+        showSocialProofToast(`${totalProductsLogged} product insights shared`, POINTS_PER_PRODUCT, true);
+    }
+};
+
+
   const handleAddWorkingProduct = () => {
     if (!currentProductName.trim() || !monsterName) return;
     const tempId = Date.now().toString();
+    const productNameForGrading = currentProductName.trim();
+    const productNotesForGrading = currentProductNotes.trim();
+
     const newProductPending: ProductEntryClient = {
       id: tempId,
-      productName: currentProductName.trim(),
-      clientNotes: currentProductNotes.trim(),
+      productName: productNameForGrading,
+      clientNotes: productNotesForGrading,
       loggedAt: new Date().toISOString(),
       benefitScore: 0,
       reasoning: "Awaiting assessment...",
@@ -227,38 +261,43 @@ export default function ProductTrackerPage() {
     };
     setWorkingProducts(prev => [newProductPending, ...prev]);
 
+    const cacheKey = `${PRODUCT_GRADE_CACHE_PREFIX}${productNameForGrading.toLowerCase()}_${(productNotesForGrading || "").toLowerCase()}`;
+    if (typeof window !== 'undefined') {
+        const cachedItemRaw = localStorage.getItem(cacheKey);
+        if (cachedItemRaw) {
+            try {
+                const cachedItem: CachedAIResponse<ProductEffectGradingOutput> = JSON.parse(cachedItemRaw);
+                if (Date.now() - cachedItem.timestamp < CACHE_DURATION_MS) {
+                    processProductGradingResult(tempId, cachedItem.data, true);
+                    setCurrentProductName(''); setCurrentProductNotes('');
+                    return; 
+                } else {
+                    localStorage.removeItem(cacheKey); // Stale
+                }
+            } catch (e) {
+                console.error("Error parsing product cache:", e);
+                localStorage.removeItem(cacheKey);
+            }
+        }
+    }
+
     startGradingProductTransition(async () => {
       try {
         const aiResult = await gradeProductEffectAction({
-          productName: newProductPending.productName,
-          notes: newProductPending.clientNotes
+          productName: productNameForGrading,
+          notes: productNotesForGrading
         });
-        setWorkingProducts(prev => prev.map(p => p.id === tempId ? {
-          ...p,
-          benefitScore: aiResult.benefitScore,
-          reasoning: aiResult.reasoning,
-          productName: aiResult.productName,
-          isGraded: true,
-        } : p));
-        addPoints();
-        toast({
-          title: `AI Analysis: ${aiResult.productName}`,
-          description: `It has a ${aiResult.benefitScore}/5 benefit. ${monsterName} scoffs: 'As if I'd let that weaken me! ${aiResult.reasoning.substring(0,70)}...'`,
-          duration: Number.MAX_SAFE_INTEGER
-        });
-
-        const totalProductsLogged = workingProducts.length + notWorkingProducts.length;
-        if (totalProductsLogged > 0 && totalProductsLogged % PRODUCT_LOG_MILESTONE_INTERVAL === 0) {
-            showSocialProofToast(`${totalProductsLogged} product insights shared`, POINTS_PER_PRODUCT, true);
+        if (typeof window !== 'undefined') {
+            const newCachedItem: CachedAIResponse<ProductEffectGradingOutput> = { timestamp: Date.now(), data: aiResult };
+            localStorage.setItem(cacheKey, JSON.stringify(newCachedItem));
         }
-
-
+        processProductGradingResult(tempId, aiResult, false);
       } catch (e) {
         const errorMsg = e instanceof Error ? e.message : "AI grading failed.";
         setWorkingProducts(prev => prev.filter(p => p.id !== tempId));
         toast({
             title: "Grading Error",
-            description: `${monsterName} cackles: 'The AI couldn't handle assessing ${newProductPending.productName}! Pathetic! Error: ${errorMsg}'`,
+            description: `${monsterName} cackles: 'The AI couldn't handle assessing ${productNameForGrading}! Pathetic! Error: ${errorMsg}'`,
             variant: "destructive",
             duration: Number.MAX_SAFE_INTEGER
         });
@@ -354,7 +393,7 @@ export default function ProductTrackerPage() {
         variant: "default",
         duration: Number.MAX_SAFE_INTEGER,
       });
-      if (currentStreakCount >= 5 && currentStreakCount % 5 === 0) { // Social proof for usage streak
+      if (currentStreakCount >= 5 && currentStreakCount % 5 === 0) { 
           showSocialProofToast(`${currentStreakCount}-day streak using helpful products like ${product.productName}`, undefined, true);
       }
     }
@@ -467,7 +506,7 @@ export default function ProductTrackerPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline">Currently Using & Working</CardTitle>
-            <CardDescription>List products that help. AI will grade their benefit (1-5 score). Using a product reduces monster health by its score, amplified by consistency streaks.</CardDescription>
+            <CardDescription>List products that help. AI will grade their benefit (1-5 score, cached for 24hrs). Using a product reduces monster health by its score, amplified by consistency streaks.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -595,3 +634,4 @@ export default function ProductTrackerPage() {
   );
 }
 
+    

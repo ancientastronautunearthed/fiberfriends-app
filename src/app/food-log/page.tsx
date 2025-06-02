@@ -35,6 +35,13 @@ const USER_POINTS_KEY = 'userPoints';
 const MONSTER_LAST_RECOVERY_DATE_KEY = 'monsterLastRecoveryDate';
 const ALL_NUTRITIONAL_FOOD_ENTRIES_KEY = 'allNutritionalFoodEntries';
 
+const FOOD_GRADE_CACHE_PREFIX = 'food_grade_cache_';
+const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+interface CachedAIResponse<T> {
+  timestamp: number;
+  data: T;
+}
 
 const MONSTER_DEATH_THRESHOLD = -50;
 const MAX_MONSTER_HEALTH = 200;
@@ -202,7 +209,7 @@ export default function FoodLogPage() {
       const newNutritionalEntry: NutritionalFoodLogEntry = {
         id: Date.now().toString() + '_nutr',
         loggedAt: new Date().toISOString(),
-        foodName: foodName, // Use the potentially modified foodName
+        foodName: foodName, 
         calories: gradingResult.calories,
         proteinGrams: gradingResult.proteinGrams,
         carbGrams: gradingResult.carbGrams,
@@ -222,96 +229,101 @@ export default function FoodLogPage() {
     }
   };
 
+  const processFoodGradingResult = (result: FoodGradingOutput, originalFoodInput: string, isCached: boolean) => {
+    if (monsterHealth === null || !monsterName) return;
+
+    const healthBefore = monsterHealth;
+    let newHealth = healthBefore + result.healthImpactPercentage;
+    newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth);
+
+    setMonsterHealth(newHealth);
+
+    if (result.grade === 'bad' || result.healthImpactPercentage > 0) {
+      // No damage flash
+    } else if (result.grade === 'good' || result.healthImpactPercentage < 0) {
+      setShowDamageEffect(true);
+      setTimeout(() => setShowDamageEffect(false), 700);
+    }
+
+    const newLogEntry: FoodLogEntry = {
+      ...result,
+      foodName: originalFoodInput, // Use the user's input for display in this specific log
+      id: Date.now().toString(),
+      loggedAt: new Date().toISOString(),
+      healthBefore,
+      healthAfter: newHealth,
+    };
+    setFoodLogEntries(prev => [newLogEntry, ...prev].slice(0, 20));
+    saveNutritionalEntry(result.foodName, result); // Save AI's recognized name + nutrition
+
+    let toastTitle = "";
+    let monsterQuote = result.reasoning;
+    let toastVariant: "default" | "destructive" = "default";
+    let toastDescription = "";
+
+    if (newHealth < 0 && result.grade === 'good') monsterQuote = `No... please... ${result.reasoning} It's too much... I'm fading...`;
+    else if (newHealth < 25 && result.grade === 'good') monsterQuote = `Why are you doing this?! ${result.reasoning} I feel so weak...`;
+    else if (newHealth < 50 && result.grade === 'good') monsterQuote = `Stop! ${result.reasoning} That actually hurts!`;
+
+    toastTitle = result.grade === "good" ? `${monsterName} wails!` : result.grade === "bad" ? `${monsterName} rejoices!` : `${monsterName} is indifferent.`;
+    toastDescription = `My health is now ${newHealth.toFixed(1)}% (${result.healthImpactPercentage >= 0 ? '+' : ''}${result.healthImpactPercentage.toFixed(1)}%). ${monsterName} says: "${monsterQuote}"`;
+    toastVariant = result.grade === "bad" ? "destructive" : "default";
+    
+    if (result.foodName && result.foodName.toLowerCase().includes('garlic') && result.grade === 'good') {
+        toastTitle = `${monsterName} HISSES about the Garlic!`;
+        toastDescription = `THAT STUFF AGAIN?! My health is now ${newHealth.toFixed(1)}%! ${monsterName} shrieks: "${monsterQuote}"`;
+    }
+
+    let nutritionMessage = "";
+    if (result.clarifyingQuestions && result.clarifyingQuestions.length > 0) nutritionMessage = `\n${monsterName} needs more info for nutrition: ${result.clarifyingQuestions.join(' ')}`;
+    else if (result.calories !== undefined) nutritionMessage = `\nEst. Nutrition (${result.servingDescription || 'standard serving'}): ~${result.calories}kcal. ${result.nutritionDisclaimer || ''}`;
+
+    if (!checkMonsterDeath(newHealth, result.foodName || "unknown food")) {
+      toast({
+        title: (isCached ? "[Cache] " : "") + toastTitle,
+        description: toastDescription + nutritionMessage,
+        variant: toastVariant,
+        duration: Number.MAX_SAFE_INTEGER,
+      });
+    }
+  };
 
   const handleFoodSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!foodInput.trim()) {
-      setError("Please enter a food item.");
-      return;
-    }
-    if (monsterHealth === null || !monsterName || !monsterImageUrl) {
-        setError("Monster not found or health not initialized. Please create a monster first.");
-        return;
-    }
+    const currentFoodInput = foodInput.trim();
+    if (!currentFoodInput) { setError("Please enter a food item."); return; }
+    if (monsterHealth === null || !monsterName || !monsterImageUrl) { setError("Monster not found. Create a monster first."); return; }
     setError(null);
+
+    const cacheKey = `${FOOD_GRADE_CACHE_PREFIX}${currentFoodInput.toLowerCase()}`;
+    if (typeof window !== 'undefined') {
+      const cachedItemRaw = localStorage.getItem(cacheKey);
+      if (cachedItemRaw) {
+        try {
+          const cachedItem: CachedAIResponse<FoodGradingOutput> = JSON.parse(cachedItemRaw);
+          if (Date.now() - cachedItem.timestamp < CACHE_DURATION_MS) {
+            processFoodGradingResult(cachedItem.data, currentFoodInput, true);
+            setFoodInput('');
+            return;
+          } else {
+            localStorage.removeItem(cacheKey); // Stale cache
+          }
+        } catch (e) {
+          console.error("Error parsing cache for food item:", e);
+          localStorage.removeItem(cacheKey);
+        }
+      }
+    }
 
     startGradingFoodTransition(async () => {
       try {
-        const result = await gradeFoodItemAction({ foodItem: foodInput });
-        
-        const healthBefore = monsterHealth;
-        let newHealth = healthBefore + result.healthImpactPercentage;
-        newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth); 
-        
-        setMonsterHealth(newHealth);
+        const result = await gradeFoodItemAction({ foodItem: currentFoodInput });
+        if (typeof window !== 'undefined') {
+          const newCachedItem: CachedAIResponse<FoodGradingOutput> = { timestamp: Date.now(), data: result };
+          localStorage.setItem(cacheKey, JSON.stringify(newCachedItem));
+        }
+        processFoodGradingResult(result, currentFoodInput, false);
         setFoodInput('');
-
-        if (result.grade === 'bad' || result.healthImpactPercentage > 0) {
-          // No damage flash for bad food
-        } else if (result.grade === 'good' || result.healthImpactPercentage < 0) {
-          setShowDamageEffect(true);
-          setTimeout(() => setShowDamageEffect(false), 700);
-        }
-
-        const newLogEntry: FoodLogEntry = {
-          ...result,
-          id: Date.now().toString(),
-          loggedAt: new Date().toISOString(),
-          healthBefore,
-          healthAfter: newHealth,
-        };
-        setFoodLogEntries(prev => [newLogEntry, ...prev].slice(0, 20)); 
-        saveNutritionalEntry(result.foodName, result);
-
-
-        let toastTitle = "";
-        let monsterQuote = result.reasoning;
-        let toastVariant: "default" | "destructive" = "default";
-        let toastDescription = "";
-
-        if (newHealth < 0 && result.grade === 'good') {
-            monsterQuote = `No... please... ${result.reasoning} It's too much... I'm fading...`;
-        } else if (newHealth < 25 && result.grade === 'good') {
-            monsterQuote = `Why are you doing this to me?! ${result.reasoning} I feel so weak...`;
-        } else if (newHealth < 50 && result.grade === 'good') {
-            monsterQuote = `Stop! ${result.reasoning} That actually hurts, you know!`;
-        }
-
-        if (result.grade === "good") {
-          toastTitle = `${monsterName} wails!`;
-          toastDescription = `My health drops to ${newHealth.toFixed(1)}% (-${Math.abs(result.healthImpactPercentage).toFixed(1)}%). ${monsterName} cries: "${monsterQuote}"`;
-          toastVariant = "default"; 
-        } else if (result.grade === "bad") {
-          toastTitle = `${monsterName} rejoices!`;
-          toastDescription = `My power surges to ${newHealth.toFixed(1)}% (+${result.healthImpactPercentage.toFixed(1)}%)! ${monsterName} gloats: "${monsterQuote}"`;
-          toastVariant = "destructive";
-        } else { 
-          toastTitle = `${monsterName} is indifferent.`;
-          toastDescription = `${result.foodName}? Means nothing to me. Health remains ${newHealth.toFixed(1)}%. ${monsterName} mutters: "${monsterQuote}"`;
-          toastVariant = "default";
-        }
-        
-        if (result.foodName && result.foodName.toLowerCase().includes('garlic') && result.grade === 'good') {
-            toastTitle = `${monsterName} HISSES about the Garlic!`;
-            toastDescription = `THAT STUFF AGAIN?! My health is now ${newHealth.toFixed(1)}%! ${monsterName} shrieks: "${monsterQuote}"`;
-        }
-        
-        let nutritionMessage = "";
-        if (result.clarifyingQuestions && result.clarifyingQuestions.length > 0) {
-            nutritionMessage = `\n${monsterName} needs more info for nutrition details: ${result.clarifyingQuestions.join(' ')}`;
-        } else if (result.calories !== undefined) {
-            nutritionMessage = `\nEst. Nutrition (${result.servingDescription || 'standard serving'}): ~${result.calories}kcal. ${result.nutritionDisclaimer || ''}`;
-        }
-
-        if (!checkMonsterDeath(newHealth, result.foodName || "unknown food")) {
-          toast({
-            title: toastTitle,
-            description: toastDescription + nutritionMessage,
-            variant: toastVariant,
-            duration: Number.MAX_SAFE_INTEGER, 
-          });
-        }
-
       } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "Failed to grade food item.";
         setError(errorMessage);
@@ -410,64 +422,41 @@ export default function FoodLogPage() {
 
   const handleLogRecipeAsEaten = async () => {
     if (!generatedRecipe || monsterHealth === null || !monsterName) {
-      setError("No recipe to log or monster data missing.");
-      return;
+      setError("No recipe to log or monster data missing."); return;
     }
     setError(null);
 
     const foodItemDescription = `${generatedRecipe.recipeName}${recipePreparationNotes ? ` (My Notes: ${recipePreparationNotes})` : ''}`;
+    const cacheKey = `${FOOD_GRADE_CACHE_PREFIX}${foodItemDescription.toLowerCase().trim()}`;
+
+    if (typeof window !== 'undefined') {
+      const cachedItemRaw = localStorage.getItem(cacheKey);
+      if (cachedItemRaw) {
+        try {
+          const cachedItem: CachedAIResponse<FoodGradingOutput> = JSON.parse(cachedItemRaw);
+          if (Date.now() - cachedItem.timestamp < CACHE_DURATION_MS) {
+            processFoodGradingResult(cachedItem.data, foodItemDescription, true);
+            setRecipePreparationNotes(''); setSuggestedMeal(null); setGeneratedRecipe(null);
+            return;
+          } else {
+            localStorage.removeItem(cacheKey);
+          }
+        } catch (e) {
+            console.error("Error parsing cache for recipe:", e);
+            localStorage.removeItem(cacheKey);
+        }
+      }
+    }
 
     startGradingFoodTransition(async () => {
       try {
         const result = await gradeFoodItemAction({ foodItem: foodItemDescription });
-        
-        const healthBefore = monsterHealth;
-        let newHealth = healthBefore + result.healthImpactPercentage;
-        newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth); 
-        
-        setMonsterHealth(newHealth);
-        setRecipePreparationNotes(''); 
-        setSuggestedMeal(null);
-        setGeneratedRecipe(null);
-
-        if (result.grade === 'bad' || result.healthImpactPercentage > 0) {
-          // No damage flash for bad food
-        } else if (result.grade === 'good' || result.healthImpactPercentage < 0) {
-          setShowDamageEffect(true);
-          setTimeout(() => setShowDamageEffect(false), 700);
+        if (typeof window !== 'undefined') {
+          const newCachedItem: CachedAIResponse<FoodGradingOutput> = { timestamp: Date.now(), data: result };
+          localStorage.setItem(cacheKey, JSON.stringify(newCachedItem));
         }
-
-        const newLogEntry: FoodLogEntry = {
-          ...result,
-          foodName: foodItemDescription, // Ensure the logged name includes notes
-          id: Date.now().toString(),
-          loggedAt: new Date().toISOString(),
-          healthBefore,
-          healthAfter: newHealth,
-        };
-        setFoodLogEntries(prev => [newLogEntry, ...prev].slice(0, 20)); 
-        saveNutritionalEntry(foodItemDescription, result);
-
-
-        let toastTitle = result.grade === "good" ? `${monsterName} wails!` : result.grade === "bad" ? `${monsterName} rejoices!` : `${monsterName} is indifferent.`;
-        let monsterQuote = result.reasoning;
-        let toastDescription = `Health: ${newHealth.toFixed(1)}% (${result.healthImpactPercentage >= 0 ? '+' : ''}${result.healthImpactPercentage.toFixed(1)}%). ${monsterName} says: "${monsterQuote}"`;
-
-        let nutritionMessage = "";
-        if (result.clarifyingQuestions && result.clarifyingQuestions.length > 0) {
-            nutritionMessage = `\n${monsterName} needs more info for nutrition details: ${result.clarifyingQuestions.join(' ')}`;
-        } else if (result.calories !== undefined) {
-            nutritionMessage = `\nEst. Nutrition (${result.servingDescription || 'standard serving'}): ~${result.calories}kcal. ${result.nutritionDisclaimer || ''}`;
-        }
-        
-        if (!checkMonsterDeath(newHealth, result.foodName || "prepared recipe")) {
-          toast({
-            title: toastTitle,
-            description: toastDescription + nutritionMessage,
-            variant: result.grade === "bad" ? "destructive" : "default",
-            duration: Number.MAX_SAFE_INTEGER, 
-          });
-        }
+        processFoodGradingResult(result, foodItemDescription, false);
+        setRecipePreparationNotes(''); setSuggestedMeal(null); setGeneratedRecipe(null);
       } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "Failed to grade recipe.";
         setError(errorMessage);
@@ -554,7 +543,7 @@ export default function FoodLogPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline flex items-center gap-2"><Apple className="h-6 w-6 text-primary"/>Log Food Item</CardTitle>
-            <CardDescription>Enter a food item. {monsterName} will react to how it affects its health, based on AI grading, and may provide nutritional info or ask for clarification!</CardDescription>
+            <CardDescription>Enter a food item. {monsterName} will react to how it affects its health, based on AI grading, and may provide nutritional info or ask for clarification! Identical items are cached for 24hrs.</CardDescription>
           </CardHeader>
           <form onSubmit={handleFoodSubmit}>
             <CardContent className="space-y-4">
@@ -635,7 +624,7 @@ export default function FoodLogPage() {
         </Card>
 
         {generatedRecipe && (
-          <Card> {/* Card to display the generated recipe */}
+          <Card> 
             <CardHeader>
               <CardTitle className="font-headline">Recipe from {monsterName}'s Lair: {generatedRecipe.recipeName}</CardTitle>
               {generatedRecipe.prepTime && <CardDescription>Prep: {generatedRecipe.prepTime} | Cook: {generatedRecipe.cookTime} | Servings: {generatedRecipe.servings}</CardDescription>}
@@ -804,3 +793,5 @@ export default function FoodLogPage() {
     </TooltipProvider>
   );
 }
+
+    

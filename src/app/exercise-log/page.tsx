@@ -27,6 +27,14 @@ const EXERCISE_LOG_KEY = 'morgellonExerciseLogEntries';
 const MONSTER_TOMB_KEY = 'morgellonMonsterTomb';
 const MONSTER_LAST_RECOVERY_DATE_KEY = 'monsterLastRecoveryDate';
 
+const EXERCISE_GRADE_CACHE_PREFIX = 'exercise_grade_cache_';
+const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+interface CachedAIResponse<T> {
+  timestamp: number;
+  data: T;
+}
+
 const MONSTER_DEATH_THRESHOLD = -50;
 const MAX_MONSTER_HEALTH = 200;
 const INITIAL_HEALTH_MIN = 80;
@@ -139,7 +147,7 @@ export default function ExerciseLogPage() {
   useEffect(() => {
     if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true' && monsterName) {
       localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
-      checkMonsterDeath(monsterHealth, "the strain of existence"); // Default cause
+      checkMonsterDeath(monsterHealth, "the strain of existence"); 
     }
   }, [monsterHealth, monsterName]);
 
@@ -176,6 +184,37 @@ export default function ExerciseLogPage() {
       return false; 
   };
 
+  const processExerciseGradingResult = (result: ExerciseGradingOutput, duration: number, isCached: boolean) => {
+    if (monsterHealth === null || !monsterName) return;
+
+    const healthBefore = monsterHealth;
+    let newHealth = healthBefore - result.benefitScore;
+    newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth);
+
+    setMonsterHealth(newHealth);
+    setShowDamageEffect(true);
+    setTimeout(() => setShowDamageEffect(false), 700);
+
+    const newLogEntry: ExerciseLogEntry = {
+      ...result,
+      durationMinutes: duration,
+      id: Date.now().toString(),
+      loggedAt: new Date().toISOString(),
+      healthBefore,
+      healthAfter: newHealth,
+    };
+    setExerciseLogEntries(prev => [newLogEntry, ...prev].slice(0, 20));
+
+    if (!checkMonsterDeath(newHealth, `the exertion of ${result.exerciseName}`)) {
+      toast({
+        title: (isCached ? "[Cache] " : "") + `${monsterName} Groans!`,
+        description: `Exercising with ${result.exerciseName} for ${duration} minutes? My health is now ${newHealth.toFixed(1)}% (-${result.benefitScore.toFixed(1)}%). ${monsterName} says: '${result.reasoning.substring(0, 70)}...' Must you?`,
+        variant: "default",
+        duration: Number.MAX_SAFE_INTEGER,
+      });
+    }
+  };
+
   const handlePredefinedExerciseChange = (value: string) => {
     setSelectedPredefinedExercise(value);
     if (value === CUSTOM_EXERCISE_VALUE) {
@@ -187,11 +226,14 @@ export default function ExerciseLogPage() {
 
   const handleExerciseSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!exerciseInput.trim() || !durationInput.trim()) {
+    const currentExerciseInput = exerciseInput.trim();
+    const currentDurationInput = durationInput.trim();
+
+    if (!currentExerciseInput || !currentDurationInput) {
       setError("Please enter an exercise description and duration.");
       return;
     }
-    const duration = parseInt(durationInput, 10);
+    const duration = parseInt(currentDurationInput, 10);
     if (isNaN(duration) || duration <= 0) {
       setError("Please enter a valid positive number for duration.");
       return;
@@ -202,41 +244,35 @@ export default function ExerciseLogPage() {
     }
     setError(null);
 
+    const cacheKey = `${EXERCISE_GRADE_CACHE_PREFIX}${currentExerciseInput.toLowerCase()}_${duration}`;
+    if (typeof window !== 'undefined') {
+      const cachedItemRaw = localStorage.getItem(cacheKey);
+      if (cachedItemRaw) {
+        try {
+          const cachedItem: CachedAIResponse<ExerciseGradingOutput> = JSON.parse(cachedItemRaw);
+          if (Date.now() - cachedItem.timestamp < CACHE_DURATION_MS) {
+            processExerciseGradingResult(cachedItem.data, duration, true);
+            setExerciseInput(''); setSelectedPredefinedExercise(''); setDurationInput('');
+            return;
+          } else {
+            localStorage.removeItem(cacheKey); // Stale cache
+          }
+        } catch(e) {
+            console.error("Error parsing exercise cache:", e);
+            localStorage.removeItem(cacheKey);
+        }
+      }
+    }
+
     startGradingTransition(async () => {
       try {
-        const result = await gradeExerciseAction({ exerciseDescription: exerciseInput, durationMinutes: duration });
-        
-        const healthBefore = monsterHealth;
-        let newHealth = healthBefore - result.benefitScore; 
-        newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth); 
-        
-        setMonsterHealth(newHealth);
-        setExerciseInput('');
-        setSelectedPredefinedExercise('');
-        setDurationInput('');
-
-        setShowDamageEffect(true);
-        setTimeout(() => setShowDamageEffect(false), 700);
-
-        const newLogEntry: ExerciseLogEntry = {
-          ...result,
-          durationMinutes: duration,
-          id: Date.now().toString(),
-          loggedAt: new Date().toISOString(),
-          healthBefore,
-          healthAfter: newHealth,
-        };
-        setExerciseLogEntries(prev => [newLogEntry, ...prev].slice(0, 20)); 
-
-        if (!checkMonsterDeath(newHealth, `the exertion of ${result.exerciseName}`)) {
-          toast({
-            title: `${monsterName} Groans!`,
-            description: `Exercising with ${result.exerciseName} for ${duration} minutes? My health is now ${newHealth.toFixed(1)}% (-${result.benefitScore.toFixed(1)}%). ${monsterName} says: '${result.reasoning.substring(0,70)}...' Must you?`,
-            variant: "default", 
-            duration: Number.MAX_SAFE_INTEGER, 
-          });
+        const result = await gradeExerciseAction({ exerciseDescription: currentExerciseInput, durationMinutes: duration });
+        if (typeof window !== 'undefined') {
+          const newCachedItem: CachedAIResponse<ExerciseGradingOutput> = { timestamp: Date.now(), data: result };
+          localStorage.setItem(cacheKey, JSON.stringify(newCachedItem));
         }
-
+        processExerciseGradingResult(result, duration, false);
+        setExerciseInput(''); setSelectedPredefinedExercise(''); setDurationInput('');
       } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "Failed to grade exercise.";
         setError(errorMessage);
@@ -314,7 +350,7 @@ export default function ExerciseLogPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline flex items-center gap-2"><Dumbbell className="h-6 w-6 text-primary"/>Log Exercise</CardTitle>
-            <CardDescription>Select or enter your exercise. The AI will gauge its impact on {monsterName}'s health, and {monsterName} will react!</CardDescription>
+            <CardDescription>Select or enter your exercise. The AI will gauge its impact on {monsterName}'s health (cached for 24hrs for same exercise/duration), and {monsterName} will react!</CardDescription>
           </CardHeader>
           <form onSubmit={handleExerciseSubmit}>
             <CardContent className="space-y-4">
@@ -413,3 +449,5 @@ export default function ExerciseLogPage() {
     </div>
   );
 }
+
+    

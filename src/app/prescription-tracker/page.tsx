@@ -34,6 +34,13 @@ const MONSTER_LAST_RECOVERY_DATE_KEY = 'monsterLastRecoveryDate';
 const PRESCRIPTION_LOG_MILESTONE_INTERVAL = 3;
 const PRESCRIPTION_USAGE_STREAK_KEY = 'prescriptionUsageStreak';
 
+const PRESCRIPTION_GRADE_CACHE_PREFIX = 'prescription_grade_cache_';
+const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+interface CachedAIResponse<T> {
+  timestamp: number;
+  data: T;
+}
 
 const MONSTER_DEATH_THRESHOLD = -50;
 const MAX_MONSTER_HEALTH = 200;
@@ -47,7 +54,7 @@ interface PrescriptionLogEntryClient extends PrescriptionGradingOutput {
   id: string;
   userComments: string;
   loggedAt: string;
-  isGraded: boolean; // True if AI grading was attempted/completed
+  isGraded: boolean; 
   experienceType: 'beneficial' | 'not-beneficial' | 'neutral';
 }
 
@@ -210,57 +217,93 @@ export default function PrescriptionTrackerPage() {
     localStorage.setItem(USER_POINTS_KEY, String(currentPoints + points));
   };
 
+  const processPrescriptionGradingResult = (
+    prescriptionId: string,
+    aiResult: PrescriptionGradingOutput,
+    isCached: boolean
+  ) => {
+    setBeneficialPrescriptions(prev => prev.map(p => p.id === prescriptionId ? { ...p, ...aiResult, isGraded: true } : p));
+    toast({
+        title: `${isCached ? "[Cache] " : ""}${aiResult.prescriptionName} graded!`,
+        description: `AI assessed a benefit score of ${aiResult.benefitScore}/15. ${monsterName || 'The AI'} quips: '${aiResult.reasoning.substring(0,70)}...'`,
+        duration: Number.MAX_SAFE_INTEGER,
+    });
+  };
+
   const handleLogPrescription = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!prescriptionNameInput.trim()) {
-      setError("Please enter a prescription name."); return;
-    }
-    if (!monsterName) {
-      setError("Monster not found. Please create your monster first."); return;
-    }
+    const currentPrescriptionName = prescriptionNameInput.trim();
+    const currentComments = commentsInput.trim();
+
+    if (!currentPrescriptionName) { setError("Please enter a prescription name."); return; }
+    if (!monsterName) { setError("Monster not found. Please create your monster first."); return; }
     setError(null);
+    
+    const tempId = Date.now().toString();
+    const loggedAt = new Date().toISOString();
+    addPoints(POINTS_PER_PRESCRIPTION_LOG);
 
-    startProcessingTransition(async () => {
-      const tempId = Date.now().toString();
-      const loggedAt = new Date().toISOString();
-      addPoints(POINTS_PER_PRESCRIPTION_LOG);
+    if (experienceTypeInput === 'beneficial') {
+      const cacheKey = `${PRESCRIPTION_GRADE_CACHE_PREFIX}${currentPrescriptionName.toLowerCase()}_${(currentComments || "").toLowerCase()}`;
+      if (typeof window !== 'undefined') {
+        const cachedItemRaw = localStorage.getItem(cacheKey);
+        if (cachedItemRaw) {
+            try {
+                const cachedItem: CachedAIResponse<PrescriptionGradingOutput> = JSON.parse(cachedItemRaw);
+                if (Date.now() - cachedItem.timestamp < CACHE_DURATION_MS) {
+                    const pendingEntry: PrescriptionLogEntryClient = {
+                        id: tempId, prescriptionName: currentPrescriptionName, userComments: currentComments,
+                        loggedAt, benefitScore: cachedItem.data.benefitScore, reasoning: cachedItem.data.reasoning, isGraded: true, experienceType: 'beneficial',
+                    };
+                    setBeneficialPrescriptions(prev => [pendingEntry, ...prev].slice(0, 20));
+                    processPrescriptionGradingResult(tempId, cachedItem.data, true);
+                    setPrescriptionNameInput(''); setCommentsInput('');
+                    return;
+                } else {
+                    localStorage.removeItem(cacheKey);
+                }
+            } catch (e) {
+                console.error("Error parsing prescription cache:", e);
+                localStorage.removeItem(cacheKey);
+            }
+        }
+      }
 
-      if (experienceTypeInput === 'beneficial') {
-        const pendingEntry: PrescriptionLogEntryClient = {
-          id: tempId, prescriptionName: prescriptionNameInput.trim(), userComments: commentsInput.trim(),
-          loggedAt, benefitScore: 0, reasoning: 'Awaiting AI grading...', isGraded: false, experienceType: 'beneficial',
-        };
-        setBeneficialPrescriptions(prev => [pendingEntry, ...prev].slice(0, 20));
-        
+      const pendingEntry: PrescriptionLogEntryClient = {
+        id: tempId, prescriptionName: currentPrescriptionName, userComments: currentComments,
+        loggedAt, benefitScore: 0, reasoning: 'Awaiting AI grading...', isGraded: false, experienceType: 'beneficial',
+      };
+      setBeneficialPrescriptions(prev => [pendingEntry, ...prev].slice(0, 20));
+      
+      startProcessingTransition(async () => {
         try {
-          const aiResult = await gradePrescriptionAction({ prescriptionName: prescriptionNameInput.trim(), userNotes: commentsInput.trim() });
-          setBeneficialPrescriptions(prev => prev.map(p => p.id === tempId ? { ...p, ...aiResult, isGraded: true } : p));
-          toast({
-            title: `${aiResult.prescriptionName} graded!`,
-            description: `AI assessed a benefit score of ${aiResult.benefitScore}/15. ${monsterName} quips: '${aiResult.reasoning.substring(0,70)}...'`,
-            duration: Number.MAX_SAFE_INTEGER,
-          });
+          const aiResult = await gradePrescriptionAction({ prescriptionName: currentPrescriptionName, userNotes: currentComments });
+          if (typeof window !== 'undefined') {
+            const newCachedItem: CachedAIResponse<PrescriptionGradingOutput> = { timestamp: Date.now(), data: aiResult };
+            localStorage.setItem(cacheKey, JSON.stringify(newCachedItem));
+          }
+          processPrescriptionGradingResult(tempId, aiResult, false);
         } catch (e) {
           const errorMsg = e instanceof Error ? e.message : "AI grading failed.";
-          setBeneficialPrescriptions(prev => prev.filter(p => p.id !== tempId)); // Remove pending if grading fails
+          setBeneficialPrescriptions(prev => prev.filter(p => p.id !== tempId)); 
           setError(`Failed to grade prescription: ${errorMsg}`);
-          toast({ title: "Grading Error", description: `${monsterName} gloats: 'My AI minions failed to assess ${prescriptionNameInput}! How typical. Error: ${errorMsg}'`, variant: "destructive", duration: Number.MAX_SAFE_INTEGER });
+          toast({ title: "Grading Error", description: `${monsterName} gloats: 'My AI minions failed to assess ${currentPrescriptionName}! How typical. Error: ${errorMsg}'`, variant: "destructive", duration: Number.MAX_SAFE_INTEGER });
         }
-      } else { // 'not-beneficial' or 'neutral'
-        const otherEntry: OtherPrescriptionLogEntry = {
-          id: tempId, prescriptionName: prescriptionNameInput.trim(), userComments: commentsInput.trim(), loggedAt, experienceType: experienceTypeInput
-        };
-        setOtherPrescriptions(prev => [otherEntry, ...prev].slice(0, 20));
-        toast({ title: "Prescription Logged", description: `${prescriptionNameInput.trim()} logged under '${experienceTypeInput}'.`, duration: 5000 });
-      }
+      });
+    } else { 
+      const otherEntry: OtherPrescriptionLogEntry = {
+        id: tempId, prescriptionName: currentPrescriptionName, userComments: currentComments, loggedAt, experienceType: experienceTypeInput
+      };
+      setOtherPrescriptions(prev => [otherEntry, ...prev].slice(0, 20));
+      toast({ title: "Prescription Logged", description: `${currentPrescriptionName} logged under '${experienceTypeInput}'.`, duration: 5000 });
+    }
 
-      const totalPrescriptionsLogged = beneficialPrescriptions.length + otherPrescriptions.length +1;
-      if (totalPrescriptionsLogged > 0 && totalPrescriptionsLogged % PRESCRIPTION_LOG_MILESTONE_INTERVAL === 0) {
-          showSocialProofToast(`${totalPrescriptionsLogged} prescriptions logged by community`, POINTS_PER_PRESCRIPTION_LOG, true);
-      }
+    const totalPrescriptionsLogged = beneficialPrescriptions.length + otherPrescriptions.length +1;
+    if (totalPrescriptionsLogged > 0 && totalPrescriptionsLogged % PRESCRIPTION_LOG_MILESTONE_INTERVAL === 0) {
+        showSocialProofToast(`${totalPrescriptionsLogged} prescriptions logged by community`, POINTS_PER_PRESCRIPTION_LOG, true);
+    }
 
-      setPrescriptionNameInput(''); setCommentsInput(''); // setExperienceTypeInput('beneficial'); // Keep current selection or reset
-    });
+    setPrescriptionNameInput(''); setCommentsInput(''); 
   };
 
   const handleTakeDose = (prescription: PrescriptionLogEntryClient) => {
@@ -270,8 +313,8 @@ export default function PrescriptionTrackerPage() {
       return;
     }
 
-    const STREAK_BONUS_PER_DAY = 0.025; // 2.5% bonus per streak day
-    const MAX_STREAK_MODIFIER = 0.60; // Max 60% bonus
+    const STREAK_BONUS_PER_DAY = 0.025; 
+    const MAX_STREAK_MODIFIER = 0.60; 
     const currentStreakCount = updateStreak(PRESCRIPTION_USAGE_STREAK_KEY, setPrescriptionUsageStreak);
     const streakModifier = Math.min(currentStreakCount * STREAK_BONUS_PER_DAY, MAX_STREAK_MODIFIER);
     const finalBenefitScore = prescription.benefitScore * (1 + streakModifier);
@@ -347,7 +390,7 @@ export default function PrescriptionTrackerPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline flex items-center gap-2"><Pill className="h-6 w-6 text-primary"/>Log Prescription</CardTitle>
-            <CardDescription>Log prescriptions you're taking or have tried. Beneficial ones can impact {monsterName}'s health when "taken".</CardDescription>
+            <CardDescription>Log prescriptions you're taking or have tried. Beneficial ones (AI-graded, cached for 24hrs) can impact {monsterName}'s health when "taken".</CardDescription>
           </CardHeader>
           <form onSubmit={handleLogPrescription}>
             <CardContent className="space-y-4">
@@ -441,3 +484,5 @@ export default function PrescriptionTrackerPage() {
     </TooltipProvider>
   );
 }
+
+    
