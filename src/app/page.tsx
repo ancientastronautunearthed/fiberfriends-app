@@ -1,12 +1,32 @@
 
+'use client';
+
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Heart, MessageCircle } from "lucide-react";
 import Image from "next/image";
+import { useToast } from '@/hooks/use-toast';
 
-const stories = [
+const MONSTER_NAME_KEY = 'morgellonMonsterName';
+const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
+
+interface Story {
+  id: string;
+  author: string;
+  avatar: string;
+  avatarAiHint: string;
+  time: string;
+  content: string;
+  imageUrl?: string;
+  imageAiHint?: string;
+  likes: number;
+  comments: number;
+}
+
+const initialStories: Story[] = [
   {
     id: "1",
     author: "Elara Vance",
@@ -120,6 +140,48 @@ const stories = [
 ];
 
 export default function BeliefCirclePage() {
+  const [stories, setStories] = useState<Story[]>(initialStories);
+  const [newStoryContent, setNewStoryContent] = useState('');
+  const [userMonsterName, setUserMonsterName] = useState<string | null>(null);
+  const [userMonsterImageUrl, setUserMonsterImageUrl] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    setUserMonsterName(localStorage.getItem(MONSTER_NAME_KEY));
+    setUserMonsterImageUrl(localStorage.getItem(MONSTER_IMAGE_KEY));
+  }, []);
+
+  const handlePostStory = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStoryContent.trim()) {
+      toast({
+        title: "Empty Post",
+        description: "Please write something to share.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newStory: Story = {
+      id: String(Date.now()),
+      author: userMonsterName || "Community Member",
+      avatar: userMonsterImageUrl || "https://placehold.co/40x40.png?text=CM",
+      avatarAiHint: userMonsterImageUrl ? "user monster" : "community member",
+      time: "Just now",
+      content: newStoryContent.trim(),
+      // imageUrl and imageAiHint could be added if we allow image uploads for posts
+      likes: 0,
+      comments: 0,
+    };
+
+    setStories(prevStories => [newStory, ...prevStories]);
+    setNewStoryContent('');
+    toast({
+      title: "Story Shared!",
+      description: "Your thoughts have been added to the Belief Circle (locally for this session).",
+    });
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -127,12 +189,19 @@ export default function BeliefCirclePage() {
           <CardTitle className="font-headline">Share Your Story</CardTitle>
           <CardDescription>This is a safe space. Your experience is real and valid.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <Textarea placeholder="What's on your mind today?" className="min-h-[100px]" />
-        </CardContent>
-        <CardFooter className="flex justify-end">
-          <Button>Post to Belief Circle</Button>
-        </CardFooter>
+        <form onSubmit={handlePostStory}>
+          <CardContent>
+            <Textarea 
+              placeholder="What's on your mind today?" 
+              className="min-h-[100px]"
+              value={newStoryContent}
+              onChange={(e) => setNewStoryContent(e.target.value)}
+            />
+          </CardContent>
+          <CardFooter className="flex justify-end">
+            <Button type="submit">Post to Belief Circle</Button>
+          </CardFooter>
+        </form>
       </Card>
 
       <div className="space-y-4">
@@ -152,7 +221,7 @@ export default function BeliefCirclePage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-sm text-foreground/90 leading-relaxed">{story.content}</p>
+              <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">{story.content}</p>
               {story.imageUrl && (
                 <Image
                   src={story.imageUrl}
