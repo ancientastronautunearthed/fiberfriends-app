@@ -18,7 +18,7 @@ const AggregatedNutritionSchema = z.object({
   totalFatGrams: z.number().optional().describe('Total fat in grams consumed.'),
   totalSugarGrams: z.number().optional().describe('Total sugar in grams consumed. Pay attention to high values.'),
   totalSodiumMilligrams: z.number().optional().describe('Total sodium in milligrams consumed. Note if significantly high.'),
-  foodEntriesSummary: z.array(z.string()).optional().describe('A list of the most frequently logged food items or categories during this period for context (e.g., ["Chicken Breast", "White Rice", "Broccoli", "Soda"]').
+  foodEntriesSummary: z.array(z.string()).optional().describe('A list of the most frequently logged food items or categories during this period for context (e.g., ["Chicken Breast", "White Rice", "Broccoli", "Soda"])'),
 });
 
 const NutritionDataInputSchema = z.object({
@@ -100,3 +100,4 @@ const nutritionAdviceFlow = ai.defineFlow(
     return output;
   }
 );
+

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Brain, BarChart3, Lightbulb, UtensilsCross, Info, AreaChart } from "lucide-react";
+import { Loader2, Brain, BarChart3, Lightbulb, UtensilsCrossed, Info, AreaChart } from "lucide-react";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line, Tooltip as RechartsTooltip } from 'recharts';
 import type { NutritionDataInput, NutritionAdviceOutput } from '@/ai/flows/nutrition-advice-flow';
@@ -173,7 +173,7 @@ export default function NutritionTrackerPage() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline flex items-center gap-2"><UtensilsCross className="h-6 w-6 text-primary"/>Nutrition Tracker & AI Coach</CardTitle>
+          <CardTitle className="font-headline flex items-center gap-2"><UtensilsCrossed className="h-6 w-6 text-primary"/>Nutrition Tracker & AI Coach</CardTitle>
           <CardDescription>Review your nutritional intake and get AI-powered advice to enhance your efforts. Ensure food items are logged with nutritional details for tracking.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
