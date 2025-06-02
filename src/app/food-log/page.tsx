@@ -8,19 +8,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Apple, ThumbsUp, ThumbsDown, MinusCircle, Info, Sparkles, Skull, Ghost, Sunrise, Sun, Moon, Coffee, ChefHat, ShoppingCart, HelpCircle, FileQuestion } from "lucide-react";
+import { Loader2, Apple, ThumbsUp, ThumbsDown, MinusCircle, Info, Sparkles, Skull, Ghost, Sunrise, Sun, Moon, Coffee, ChefHat, ShoppingCart, HelpCircle, FileQuestion, Edit3 } from "lucide-react";
 import Image from "next/image";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { gradeFoodItemAction, suggestMealAction, generateRecipeAction } from './actions';
 import type { FoodGradingOutput } from '@/ai/flows/food-grading-flow';
 import type { MealSuggestionOutput } from '@/ai/flows/meal-suggestion-flow';
-import type { RecipeGenerationOutput } from '@/ai/flows/recipe-generation-flow'; // RecipeGenerationInput removed as it's not directly used in this file for type def
+import type { RecipeGenerationOutput } from '@/ai/flows/recipe-generation-flow';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import MonsterRiddleModal from '@/components/features/monster-riddle-modal';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Textarea } from '@/components/ui/textarea';
+
 
 const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
 const MONSTER_NAME_KEY = 'morgellonMonsterName';
@@ -47,8 +49,6 @@ interface FoodLogEntry extends FoodGradingOutput {
   loggedAt: string;
   healthBefore: number;
   healthAfter: number;
-  // Nutritional fields (calories, proteinGrams, etc.), servingDescription,
-  // nutritionDisclaimer, and clarifyingQuestions are now part of FoodGradingOutput
 }
 
 interface TombEntry {
@@ -76,6 +76,7 @@ export default function FoodLogPage() {
   const [isSuggestingMeal, startSuggestingMealTransition] = useTransition();
   const [generatedRecipe, setGeneratedRecipe] = useState<RecipeGenerationOutput | null>(null);
   const [isGeneratingRecipe, startGeneratingRecipeTransition] = useTransition();
+  const [recipePreparationNotes, setRecipePreparationNotes] = useState('');
 
 
   const performNightlyRecovery = useCallback(() => {
@@ -366,6 +367,78 @@ export default function FoodLogPage() {
     });
   };
 
+  const handleLogRecipeAsEaten = async () => {
+    if (!generatedRecipe || monsterHealth === null || !monsterName) {
+      setError("No recipe to log or monster data missing.");
+      return;
+    }
+    setError(null);
+
+    const foodItemDescription = `${generatedRecipe.recipeName}${recipePreparationNotes ? ` (My Notes: ${recipePreparationNotes})` : ''}`;
+
+    startGradingFoodTransition(async () => {
+      try {
+        const result = await gradeFoodItemAction({ foodItem: foodItemDescription });
+        
+        const healthBefore = monsterHealth;
+        let newHealth = healthBefore + result.healthImpactPercentage;
+        newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth); 
+        
+        setMonsterHealth(newHealth);
+        setRecipePreparationNotes(''); 
+        setSuggestedMeal(null);
+        setGeneratedRecipe(null);
+
+        if (result.grade === 'bad' || result.healthImpactPercentage > 0) {
+          // No damage flash for bad food
+        } else if (result.grade === 'good' || result.healthImpactPercentage < 0) {
+          setShowDamageEffect(true);
+          setTimeout(() => setShowDamageEffect(false), 700);
+        }
+
+        const newLogEntry: FoodLogEntry = {
+          ...result,
+          foodName: foodItemDescription, // Ensure the logged name includes notes
+          id: Date.now().toString(),
+          loggedAt: new Date().toISOString(),
+          healthBefore,
+          healthAfter: newHealth,
+        };
+        setFoodLogEntries(prev => [newLogEntry, ...prev].slice(0, 20)); 
+
+        let toastTitle = result.grade === "good" ? `${monsterName} wails!` : result.grade === "bad" ? `${monsterName} rejoices!` : `${monsterName} is indifferent.`;
+        let monsterQuote = result.reasoning;
+        let toastDescription = `Health: ${newHealth.toFixed(1)}% (${result.healthImpactPercentage >= 0 ? '+' : ''}${result.healthImpactPercentage.toFixed(1)}%). ${monsterName} says: "${monsterQuote}"`;
+
+        let nutritionMessage = "";
+        if (result.clarifyingQuestions && result.clarifyingQuestions.length > 0) {
+            nutritionMessage = `\n${monsterName} needs more info for nutrition details: ${result.clarifyingQuestions.join(' ')}`;
+        } else if (result.calories !== undefined) {
+            nutritionMessage = `\nEst. Nutrition (${result.servingDescription || 'standard serving'}): ~${result.calories}kcal. ${result.nutritionDisclaimer || ''}`;
+        }
+        
+        if (!checkMonsterDeath(newHealth, result.foodName || "prepared recipe")) {
+          toast({
+            title: toastTitle,
+            description: toastDescription + nutritionMessage,
+            variant: result.grade === "bad" ? "destructive" : "default",
+            duration: Number.MAX_SAFE_INTEGER, 
+          });
+        }
+      } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : "Failed to grade recipe.";
+        setError(errorMessage);
+        toast({
+          title: "Error Grading Recipe",
+          description: `${monsterName} scoffs: 'Your so-called recipe was ungradable! Error: ${errorMessage}'`,
+          variant: "destructive",
+          duration: Number.MAX_SAFE_INTEGER,
+        });
+      }
+    });
+  };
+
+
   const getMonsterStatusMessage = () => {
     if (monsterHealth === null || !monsterName) return "Awaiting its creation...";
     if (monsterHealth <= MONSTER_DEATH_THRESHOLD) return `${monsterName} has perished! Its dark reign is over.`;
@@ -499,30 +572,10 @@ export default function FoodLogPage() {
           )}
         </Card>
 
-        {suggestedMeal && !generatedRecipe && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-headline">Suggested Meal: {suggestedMeal.suggestedMealName}</CardTitle>
-              <CardDescription>{suggestedMeal.shortDescription}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="italic text-sm text-muted-foreground p-3 bg-accent/10 rounded-md border-l-4 border-accent">
-                {monsterName} says: "{suggestedMeal.monsterImpactStatement}"
-              </p>
-            </CardContent>
-            <CardFooter>
-              <Button onClick={() => handleGenerateRecipe(suggestedMeal.suggestedMealName)} disabled={isGeneratingRecipe}>
-                {isGeneratingRecipe ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ChefHat className="mr-2 h-4 w-4" />}
-                {isGeneratingRecipe ? `Conjuring Recipe for ${suggestedMeal.suggestedMealName}...` : "Get Recipe"}
-              </Button>
-            </CardFooter>
-          </Card>
-        )}
-
         {generatedRecipe && (
-          <Card>
+          <Card> {/* Card to display the generated recipe */}
             <CardHeader>
-              <CardTitle className="font-headline">Recipe: {generatedRecipe.recipeName}</CardTitle>
+              <CardTitle className="font-headline">Recipe from {monsterName}'s Lair: {generatedRecipe.recipeName}</CardTitle>
               {generatedRecipe.prepTime && <CardDescription>Prep: {generatedRecipe.prepTime} | Cook: {generatedRecipe.cookTime} | Servings: {generatedRecipe.servings}</CardDescription>}
             </CardHeader>
             <CardContent className="space-y-4">
@@ -549,16 +602,49 @@ export default function FoodLogPage() {
                 <>
                 <Separator />
                 <div>
-                    <h4 className="font-semibold text-md mb-1">Chef's Notes:</h4>
+                    <h4 className="font-semibold text-md mb-1">Chef's Notes (from {monsterName}'s grimoire):</h4>
                     <p className="text-sm italic text-muted-foreground">{generatedRecipe.recipeNotes}</p>
                 </div>
                 </>
               )}
             </CardContent>
             <CardFooter>
-                 <Button variant="outline" onClick={() => { setSuggestedMeal(null); setGeneratedRecipe(null); setError(null); }}>
-                    Clear Suggestion & Recipe
+                 <Button variant="outline" onClick={() => { setSuggestedMeal(null); setGeneratedRecipe(null); setError(null); setRecipePreparationNotes(''); }}>
+                    Clear Recipe & Suggestion
                 </Button>
+            </CardFooter>
+          </Card>
+        )}
+
+        {generatedRecipe && ( /* New Card for logging the prepared recipe */
+          <Card className="mt-6 border-primary/50">
+            <CardHeader>
+              <CardTitle className="font-headline text-xl flex items-center gap-2"><Edit3 className="h-5 w-5 text-primary"/>Log Your Prepared Recipe</CardTitle>
+              <CardDescription>
+                Did you make the "{generatedRecipe.recipeName}"? Detail any changes below.
+                The AI will grade your modified meal. Direct ingredient list editing is a future enhancement.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <Label htmlFor="recipe-preparation-notes" className="font-semibold">
+                  My Preparation Notes & Modifications:
+                </Label>
+                <Textarea
+                  id="recipe-preparation-notes"
+                  value={recipePreparationNotes}
+                  onChange={(e) => setRecipePreparationNotes(e.target.value)}
+                  placeholder={`e.g., "For the ${generatedRecipe.recipeName}, I omitted garlic, used almond milk instead of dairy, and added 1/2 tsp ginger." The AI will consider these notes when grading.`}
+                  className="min-h-[100px] mt-1"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Be specific! The AI uses these notes to understand your version of the meal.</p>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button onClick={handleLogRecipeAsEaten} disabled={isGradingFood || !generatedRecipe} className="w-full sm:w-auto">
+                {isGradingFood ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Apple className="mr-2 h-4 w-4"/>}
+                Log My Version of "{generatedRecipe.recipeName}"
+              </Button>
             </CardFooter>
           </Card>
         )}
@@ -589,7 +675,6 @@ export default function FoodLogPage() {
                 </div>
                 <p className="text-sm text-foreground/80 mt-1 pl-1 border-l-2 border-accent/50 ml-1.5 "> <span className="italic text-muted-foreground">{monsterName} said:</span> "{entry.reasoning}"</p>
                 
-                {/* Nutritional Info Display */}
                 {(entry.calories !== undefined || (entry.clarifyingQuestions && entry.clarifyingQuestions.length > 0)) && (
                   <div className="mt-2 pt-2 border-t border-dashed border-muted-foreground/30">
                     {entry.calories !== undefined && (
@@ -650,4 +735,3 @@ export default function FoodLogPage() {
     </TooltipProvider>
   );
 }
-
