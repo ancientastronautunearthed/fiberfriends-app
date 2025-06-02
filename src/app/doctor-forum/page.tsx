@@ -1,13 +1,35 @@
 
+'use client';
+
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ThumbsUp, MessageSquareText, Award } from "lucide-react";
+import { ThumbsUp, MessageSquareText, Award, PlusCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
+import { useToast } from '@/hooks/use-toast';
 
-const forumPosts = [
+const MONSTER_NAME_KEY = 'morgellonMonsterName';
+const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
+
+interface ForumPost {
+  id: string;
+  author: string;
+  avatar: string;
+  avatarAiHint: string;
+  time: string;
+  title: string;
+  content: string;
+  tags: string[];
+  upvotes: number;
+  comments: number;
+}
+
+const initialForumPosts: ForumPost[] = [
   {
     id: "1",
     author: "Patient Advocate",
@@ -114,22 +136,99 @@ const weeklyHighlight = {
 };
 
 export default function DoctorForumPage() {
+  const [forumPosts, setForumPosts] = useState<ForumPost[]>(initialForumPosts);
+  const [newPostTitle, setNewPostTitle] = useState('');
+  const [newPostContent, setNewPostContent] = useState('');
+  const [newPostTags, setNewPostTags] = useState('');
+  const [userMonsterName, setUserMonsterName] = useState<string | null>(null);
+  const [userMonsterImageUrl, setUserMonsterImageUrl] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    setUserMonsterName(localStorage.getItem(MONSTER_NAME_KEY));
+    setUserMonsterImageUrl(localStorage.getItem(MONSTER_IMAGE_KEY));
+  }, []);
+
+  const handlePostSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPostTitle.trim() || !newPostContent.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide a title and content for your post.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const tagsArray = newPostTags.split(',').map(tag => tag.trim()).filter(tag => tag);
+
+    const newPost: ForumPost = {
+      id: String(Date.now()),
+      author: userMonsterName || "Community Member",
+      avatar: userMonsterImageUrl || "https://placehold.co/40x40.png?text=CM",
+      avatarAiHint: userMonsterImageUrl ? "user monster" : "community member",
+      time: "Just now",
+      title: newPostTitle.trim(),
+      content: newPostContent.trim(),
+      tags: tagsArray,
+      upvotes: 0,
+      comments: 0,
+    };
+
+    setForumPosts(prevPosts => [newPost, ...prevPosts]);
+    setNewPostTitle('');
+    setNewPostContent('');
+    setNewPostTags('');
+    toast({
+      title: "Post Submitted!",
+      description: "Your story has been added to the forum (locally for this session).",
+    });
+  };
+
+
   return (
     <div className="grid lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline">Share Your Doctor Story</CardTitle>
+            <CardTitle className="font-headline flex items-center gap-2"><PlusCircle className="h-6 w-6 text-primary"/>Share Your Doctor Story</CardTitle>
             <CardDescription>A safe space to share dismissive or bizarre comments from medical professionals. Transform frustration into camaraderie.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <Textarea placeholder="Title of your story..." className="mb-2" />
-            <Textarea placeholder="Share your experience... (keep it respectful and avoid identifying information)" className="min-h-[120px]" />
-            <Textarea placeholder="Tags (comma-separated, e.g., Dismissal, Funny, Helpful Tip)" />
-          </CardContent>
-          <CardFooter className="flex justify-end">
-            <Button>Submit to Forum</Button>
-          </CardFooter>
+          <form onSubmit={handlePostSubmit}>
+            <CardContent className="space-y-3">
+              <div>
+                <Label htmlFor="post-title">Title</Label>
+                <Input 
+                  id="post-title" 
+                  placeholder="A catchy title for your story..." 
+                  value={newPostTitle}
+                  onChange={(e) => setNewPostTitle(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="post-content">Your Experience</Label>
+                <Textarea 
+                  id="post-content"
+                  placeholder="Share your experience... (keep it respectful and avoid identifying information)" 
+                  className="min-h-[120px]"
+                  value={newPostContent}
+                  onChange={(e) => setNewPostContent(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="post-tags">Tags (comma-separated)</Label>
+                <Input 
+                  id="post-tags"
+                  placeholder="e.g., Dismissal, Funny, Helpful Tip" 
+                  value={newPostTags}
+                  onChange={(e) => setNewPostTags(e.target.value)}
+                />
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-end">
+              <Button type="submit">Submit to Forum</Button>
+            </CardFooter>
+          </form>
         </Card>
 
         <div className="space-y-4">
@@ -150,7 +249,7 @@ export default function DoctorForumPage() {
                 <CardTitle className="text-lg">{post.title}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-foreground/90 leading-relaxed mb-3">{post.content}</p>
+                <p className="text-sm text-foreground/90 leading-relaxed mb-3 whitespace-pre-wrap">{post.content}</p>
                 <div>
                   {post.tags.map(tag => <Badge key={tag} variant="secondary" className="mr-1 mb-1">{tag}</Badge>)}
                 </div>
