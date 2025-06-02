@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Dumbbell, Activity, Info, Sparkles, Skull, HeartPulse } from "lucide-react";
 import Image from "next/image";
 import Link from 'next/link';
@@ -33,6 +34,17 @@ const INITIAL_HEALTH_MAX = 100;
 const MIN_RECOVERY = 10;
 const MAX_RECOVERY = 20;
 
+const predefinedExercises = [
+  "Walking (Brisk)", "Running/Jogging", "Cycling (Outdoor)", "Cycling (Stationary)",
+  "Swimming", "Yoga (Gentle)", "Yoga (Vigorous)", "Pilates",
+  "Strength Training (Weights)", "Strength Training (Bodyweight)",
+  "HIIT (High-Intensity Interval Training)", "Dancing", "Hiking",
+  "Stretching/Flexibility", "Tai Chi", "Water Aerobics", "Rowing",
+  "Elliptical Trainer", "Stair Climbing", "Gardening/Yard Work",
+  "House Cleaning (Active)", "Sports (e.g., Tennis, Basketball)",
+  "Martial Arts", "Jump Rope", "Core Exercises (e.g., Planks, Crunches)"
+];
+const CUSTOM_EXERCISE_VALUE = "custom";
 
 interface ExerciseLogEntry extends ExerciseGradingOutput {
   id: string;
@@ -55,6 +67,7 @@ export default function ExerciseLogPage() {
   const [exerciseLogEntries, setExerciseLogEntries] = useState<ExerciseLogEntry[]>([]);
   
   const [exerciseInput, setExerciseInput] = useState('');
+  const [selectedPredefinedExercise, setSelectedPredefinedExercise] = useState<string>('');
   const [durationInput, setDurationInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isGrading, startGradingTransition] = useTransition();
@@ -72,7 +85,6 @@ export default function ExerciseLogPage() {
     
     let currentHealth = parseFloat(storedHealthStr);
     if (isNaN(currentHealth) || currentHealth <= MONSTER_DEATH_THRESHOLD) return;
-
 
     const lastRecoveryDate = localStorage.getItem(MONSTER_LAST_RECOVERY_DATE_KEY);
     const todayDateStr = new Date().toDateString();
@@ -164,6 +176,14 @@ export default function ExerciseLogPage() {
       return false; 
   };
 
+  const handlePredefinedExerciseChange = (value: string) => {
+    setSelectedPredefinedExercise(value);
+    if (value === CUSTOM_EXERCISE_VALUE) {
+      setExerciseInput('');
+    } else {
+      setExerciseInput(value);
+    }
+  };
 
   const handleExerciseSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -192,6 +212,7 @@ export default function ExerciseLogPage() {
         
         setMonsterHealth(newHealth);
         setExerciseInput('');
+        setSelectedPredefinedExercise('');
         setDurationInput('');
 
         setShowDamageEffect(true);
@@ -293,20 +314,47 @@ export default function ExerciseLogPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline flex items-center gap-2"><Dumbbell className="h-6 w-6 text-primary"/>Log Exercise</CardTitle>
-            <CardDescription>Enter your exercise. The AI will gauge its impact on {monsterName}'s health, and {monsterName} will react!</CardDescription>
+            <CardDescription>Select or enter your exercise. The AI will gauge its impact on {monsterName}'s health, and {monsterName} will react!</CardDescription>
           </CardHeader>
           <form onSubmit={handleExerciseSubmit}>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="exercise-description">Exercise Description</Label>
-                <Input
-                  id="exercise-description"
-                  value={exerciseInput}
-                  onChange={(e) => setExerciseInput(e.target.value)}
-                  placeholder="e.g., Brisk 30-minute walk, Yoga session, Weightlifting"
-                  disabled={isGrading}
-                />
+                <Label htmlFor="exercise-select">Select Exercise or Choose "Other"</Label>
+                <Select value={selectedPredefinedExercise} onValueChange={handlePredefinedExerciseChange}>
+                  <SelectTrigger id="exercise-select">
+                    <SelectValue placeholder="Choose an exercise..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {predefinedExercises.map(ex => (
+                      <SelectItem key={ex} value={ex}>{ex}</SelectItem>
+                    ))}
+                    <SelectItem value={CUSTOM_EXERCISE_VALUE}>Other (Specify below)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+              {(selectedPredefinedExercise === CUSTOM_EXERCISE_VALUE || !selectedPredefinedExercise) && (
+                <div>
+                  <Label htmlFor="exercise-description">Custom Exercise Description</Label>
+                  <Input
+                    id="exercise-description"
+                    value={exerciseInput}
+                    onChange={(e) => setExerciseInput(e.target.value)}
+                    placeholder="e.g., Intense gardening"
+                    disabled={isGrading || (!!selectedPredefinedExercise && selectedPredefinedExercise !== CUSTOM_EXERCISE_VALUE)}
+                  />
+                </div>
+              )}
+               {selectedPredefinedExercise && selectedPredefinedExercise !== CUSTOM_EXERCISE_VALUE && (
+                 <div>
+                    <Label htmlFor="exercise-display">Selected Exercise</Label>
+                    <Input
+                        id="exercise-display"
+                        value={exerciseInput}
+                        readOnly
+                        className="bg-muted/50"
+                    />
+                 </div>
+               )}
               <div>
                 <Label htmlFor="duration-minutes">Duration (minutes)</Label>
                 <Input
@@ -365,4 +413,3 @@ export default function ExerciseLogPage() {
     </div>
   );
 }
-
