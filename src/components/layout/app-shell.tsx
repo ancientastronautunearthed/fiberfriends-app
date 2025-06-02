@@ -28,7 +28,7 @@ import {
   LayoutDashboard, Pill, Wind, Lightbulb, ShieldCheck as AffirmationIcon,
   Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown,
   HandHeart, LogInIcon, UserPlus as UserPlusIcon, AlertTriangle, ShoppingCart,
-  Package, GlassWater, Droplets, ToyBrick, BookOpen, UtensilsCrossed
+  Package, GlassWater, Droplets, ToyBrick, BookOpen, UtensilsCrossed, HelpCircle as TutorialIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -50,6 +50,7 @@ interface NavItem {
 
 const navItemsConfig: NavItem[] = [
   { href: '/landing', label: 'About Fiber Friends', icon: LayoutDashboard, pageTitle: 'Welcome to Fiber Friends' },
+  { href: '/tutorial', label: 'Battle Manual', icon: TutorialIcon, pageTitle: 'Fiber Friends Tutorial' },
   {
     label: 'Your Battle Log',
     icon: Activity,
@@ -227,6 +228,7 @@ const findCurrentPage = (items: NavItem[], currentPath: string): NavItem | undef
       }
   }
   if (currentPath === '/') return items.find(item => item.href === '/');
+  if (currentPath === '/tutorial') return items.find(item => item.href === '/tutorial'); // Ensure tutorial page title
   return undefined;
 };
 
