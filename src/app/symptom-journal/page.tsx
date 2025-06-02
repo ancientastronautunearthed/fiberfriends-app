@@ -10,17 +10,20 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Paperclip, BarChartHorizontalBig, PlusCircle, X } from "lucide-react";
-import { format } from "date-fns";
+import { CalendarIcon, Paperclip, BarChartHorizontalBig, PlusCircle, X, Trash2 } from "lucide-react";
+import { format, parseISO } from "date-fns";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell } from 'recharts';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+const SYMPTOM_JOURNAL_ENTRIES_KEY = 'fiberFriendsSymptomJournalEntries';
 
 interface SymptomEntry {
   id: string;
-  date: Date;
-  symptoms: string[]; 
+  date: string; // Store as YYYY-MM-DD string
+  symptoms: string[];
   notes: string;
   photoDataUri?: string;
   photoAiHint?: string;
@@ -32,14 +35,9 @@ interface ProcessedChartData {
 }
 
 const commonSymptomsList = [
-  "Itching", "Fatigue", "Brain Fog", "Crawling Sensation", 
-  "Skin Lesions", "Joint Pain", "Sleep Disturbance", "Headache", 
+  "Itching", "Fatigue", "Brain Fog", "Crawling Sensation",
+  "Skin Lesions", "Joint Pain", "Sleep Disturbance", "Headache",
   "Anxiety", "Muscle Aches"
-];
-
-const initialEntries: SymptomEntry[] = [
-  { id: '1', date: new Date(2024, 6, 15), symptoms: ['Itching', 'Fatigue'], notes: 'Skin felt particularly sensitive after shower.', photoDataUri: 'https://placehold.co/300x200.png', photoAiHint: 'skin rash' },
-  { id: '2', date: new Date(2024, 6, 16), symptoms: ['Crawling Sensation', 'Brain Fog', 'Itching'], notes: 'Difficult to concentrate at work.' },
 ];
 
 const staticChartConfig = {
@@ -51,22 +49,40 @@ const staticChartConfig = {
 
 
 export default function SymptomJournalPage() {
-  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [currentSymptoms, setCurrentSymptoms] = useState<string[]>([]);
   const [customSymptom, setCustomSymptom] = useState('');
   const [notes, setNotes] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [entries, setEntries] = useState<SymptomEntry[]>(initialEntries);
+  const [entries, setEntries] = useState<SymptomEntry[]>([]);
   const [processedChartData, setProcessedChartData] = useState<ProcessedChartData[]>([]);
   const [dynamicChartConfig, setDynamicChartConfig] = useState<ChartConfig>(staticChartConfig);
 
 
   useEffect(() => {
+    const storedEntriesRaw = localStorage.getItem(SYMPTOM_JOURNAL_ENTRIES_KEY);
+    if (storedEntriesRaw) {
+      try {
+        const parsedEntries = JSON.parse(storedEntriesRaw) as SymptomEntry[];
+        // Dates are already strings, no need to parse to Date objects for internal state
+        setEntries(parsedEntries);
+      } catch (error) {
+        console.error("Error parsing symptom journal entries from localStorage:", error);
+        setEntries([]);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (entries.length > 0 || localStorage.getItem(SYMPTOM_JOURNAL_ENTRIES_KEY)) { // Save even if entries becomes empty to clear storage
+        localStorage.setItem(SYMPTOM_JOURNAL_ENTRIES_KEY, JSON.stringify(entries));
+    }
+
     const symptomCounts: { [key: string]: number } = entries.reduce((acc, entry) => {
       entry.symptoms.forEach(symptom => {
         const s = symptom.trim().toLowerCase();
-        if (s) { 
+        if (s) {
           acc[s] = (acc[s] || 0) + 1;
         }
       });
@@ -75,16 +91,16 @@ export default function SymptomJournalPage() {
 
     const newChartData = Object.entries(symptomCounts)
       .map(([name, count]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), count }))
-      .sort((a,b) => b.count - a.count); 
+      .sort((a, b) => b.count - a.count);
 
     setProcessedChartData(newChartData);
 
     const newDynamicConfig: ChartConfig = { ...staticChartConfig };
-     newChartData.forEach((item, index) => {
-        newDynamicConfig[item.name] = {
-            label: item.name,
-            color: `hsl(var(--chart-${(index % 5) + 1}))`
-        };
+    newChartData.forEach((item, index) => {
+      newDynamicConfig[item.name] = {
+        label: item.name,
+        color: `hsl(var(--chart-${(index % 5) + 1}))`
+      };
     });
     setDynamicChartConfig(newDynamicConfig);
 
@@ -106,7 +122,7 @@ export default function SymptomJournalPage() {
   };
 
   const handleCommonSymptomChange = (symptom: string, checked: boolean) => {
-    setCurrentSymptoms(prev => 
+    setCurrentSymptoms(prev =>
       checked ? [...prev, symptom] : prev.filter(s => s !== symptom)
     );
   };
@@ -122,23 +138,27 @@ export default function SymptomJournalPage() {
     setCurrentSymptoms(prev => prev.filter(s => s !== symptomToRemove));
   };
 
+  const handleDeleteEntry = (id: string) => {
+    setEntries(prevEntries => prevEntries.filter(entry => entry.id !== id));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!date || currentSymptoms.length === 0) {
+    if (!selectedDate || currentSymptoms.length === 0) {
       alert("Date and at least one symptom are required.");
       return;
     }
     const newEntry: SymptomEntry = {
       id: String(Date.now()),
-      date,
+      date: format(selectedDate, "yyyy-MM-dd"), // Store as YYYY-MM-DD string
       symptoms: currentSymptoms,
       notes,
       photoDataUri: photoPreview || undefined,
       photoAiHint: photo ? 'medical symptom' : undefined,
     };
-    setEntries(prevEntries => [newEntry, ...prevEntries].sort((a,b) => b.date.getTime() - a.date.getTime()));
-    
-    setDate(new Date());
+    setEntries(prevEntries => [newEntry, ...prevEntries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+
+    setSelectedDate(new Date());
     setCurrentSymptoms([]);
     setCustomSymptom('');
     setNotes('');
@@ -166,20 +186,20 @@ export default function SymptomJournalPage() {
                       className="w-full justify-start text-left font-normal"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {date ? format(date, "PPP") : <span>Pick a date</span>}
+                      {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
                     <Calendar
                       mode="single"
-                      selected={date}
-                      onSelect={setDate}
+                      selected={selectedDate}
+                      onSelect={setSelectedDate}
                       initialFocus
                     />
                   </PopoverContent>
                 </Popover>
               </div>
-              
+
               <div>
                 <Label>Common Symptoms</Label>
                 <div className="grid grid-cols-2 gap-2 mt-1">
@@ -201,11 +221,11 @@ export default function SymptomJournalPage() {
               <div>
                 <Label htmlFor="custom-symptom">Custom Symptom</Label>
                 <div className="flex items-center gap-2">
-                  <Input 
-                    id="custom-symptom" 
-                    value={customSymptom} 
-                    onChange={(e) => setCustomSymptom(e.target.value)} 
-                    placeholder="e.g., Tingling in hands" 
+                  <Input
+                    id="custom-symptom"
+                    value={customSymptom}
+                    onChange={(e) => setCustomSymptom(e.target.value)}
+                    placeholder="e.g., Tingling in hands"
                   />
                   <Button type="button" variant="outline" size="icon" onClick={handleAddCustomSymptom} aria-label="Add custom symptom">
                     <PlusCircle className="h-4 w-4" />
@@ -257,7 +277,7 @@ export default function SymptomJournalPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline flex items-center gap-2"><BarChartHorizontalBig className="h-6 w-6 text-primary"/>Symptom Trends</CardTitle>
+            <CardTitle className="font-headline flex items-center gap-2"><BarChartHorizontalBig className="h-6 w-6 text-primary" />Symptom Trends</CardTitle>
             <CardDescription>Visualize your symptom patterns over time. Shows frequency of logged symptoms.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -272,8 +292,8 @@ export default function SymptomJournalPage() {
                     tickMargin={5}
                     axisLine={false}
                     className="text-xs"
-                    width={100} 
-                    interval={0} 
+                    width={100}
+                    interval={0}
                   />
                   <XAxis dataKey="count" type="number" hide />
                   <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" nameKey="name" />} />
@@ -296,29 +316,34 @@ export default function SymptomJournalPage() {
           <CardTitle className="font-headline">My Journal Entries</CardTitle>
           <CardDescription>Review your past symptom logs.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 flex-grow overflow-y-auto">
-          {entries.length === 0 && <p className="text-muted-foreground">No entries yet. Add your first one!</p>}
-          {entries.sort((a,b) => b.date.getTime() - a.date.getTime()).map(entry => ( 
-            <Card key={entry.id} className="bg-card/50">
-              <CardHeader className="pb-2 pt-4">
-                <CardTitle className="text-md">{format(entry.date, "PPP")}</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm space-y-1 pb-4">
-                <div>
-                  <strong>Symptoms:</strong>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {entry.symptoms.map(symptom => <Badge key={symptom} variant="secondary">{symptom}</Badge>)}
+        <CardContent className="space-y-4 flex-grow">
+          <ScrollArea className="h-[calc(100vh-16rem)] pr-3"> {/* Adjust height as needed */}
+            {entries.length === 0 && <p className="text-muted-foreground">No entries yet. Add your first one!</p>}
+            {entries.map(entry => (
+              <Card key={entry.id} className="bg-card/50 mb-4">
+                <CardHeader className="pb-2 pt-4 flex flex-row justify-between items-start">
+                  <CardTitle className="text-md">{format(parseISO(entry.date), "PPP")}</CardTitle>
+                  <Button variant="ghost" size="icon" onClick={() => handleDeleteEntry(entry.id)} aria-label="Delete entry" className="h-7 w-7">
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </CardHeader>
+                <CardContent className="text-sm space-y-1 pb-4">
+                  <div>
+                    <strong>Symptoms:</strong>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {entry.symptoms.map(symptom => <Badge key={symptom} variant="secondary">{symptom}</Badge>)}
+                    </div>
                   </div>
-                </div>
-                {entry.notes && <p className="mt-1"><strong>Notes:</strong> {entry.notes}</p>}
-                {entry.photoDataUri && (
-                  <div className="mt-2">
-                     <Image src={entry.photoDataUri} alt="Symptom" width={100} height={100} className="rounded-md border object-cover" data-ai-hint={entry.photoDataUri.startsWith('https://placehold.co/') ? entry.photoAiHint : 'medical condition'} />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                  {entry.notes && <p className="mt-1"><strong>Notes:</strong> {entry.notes}</p>}
+                  {entry.photoDataUri && (
+                    <div className="mt-2">
+                      <Image src={entry.photoDataUri} alt="Symptom" width={100} height={100} className="rounded-md border object-cover" data-ai-hint={entry.photoDataUri.startsWith('https://placehold.co/') ? entry.photoAiHint : 'medical condition'} />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </ScrollArea>
         </CardContent>
       </Card>
     </div>
