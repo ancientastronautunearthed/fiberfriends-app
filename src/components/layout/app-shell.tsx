@@ -28,7 +28,7 @@ import {
   LayoutDashboard, Pill, Wind, Lightbulb, ShieldCheck as AffirmationIcon,
   Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown,
   HandHeart, LogInIcon, UserPlus as UserPlusIcon, AlertTriangle, ShoppingCart,
-  Package, GlassWater, Droplets, ToyBrick, BookOpen, UtensilsCrossed
+  Package, GlassWater, Droplets, ToyBrick, BookOpen, UtensilsCrossed, BriefcaseMedical
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -44,104 +44,106 @@ interface NavItem {
   isParent?: boolean;
   authRequired?: boolean; 
   noAuthOnly?: boolean; 
-  isSubItem?: boolean; // For visual distinction if needed, not used in current accordion
+  isSubItem?: boolean; 
+  devOnly?: boolean; // For dev-only links
 }
 
 const navItemsConfig: NavItem[] = [
   { href: '/landing', label: 'About Fiber Friends', icon: LayoutDashboard, pageTitle: 'Welcome to Fiber Friends' },
   {
-    label: 'My Journey',
+    label: 'Your Battle Log',
     icon: Activity,
-    pageTitle: 'My Journey',
+    pageTitle: 'Your Battle Log',
     isParent: true,
     authRequired: true,
     children: [
-      { href: '/symptom-journal', label: 'Symptom Journal', icon: BookText, pageTitle: 'Symptom Journal' },
-      { href: '/pattern-recognition', label: 'Pattern Recognition', icon: BrainCircuit, pageTitle: 'Pattern Recognition' },
-      { href: '/food-log', label: 'Food Log', icon: Apple, pageTitle: 'Daily Food Log' },
-      { href: '/nutrition-tracker', label: 'Nutrition Tracker', icon: UtensilsCrossed, pageTitle: 'Nutrition Tracker & Coach' },
-      { href: '/exercise-log', label: 'Exercise Log', icon: Dumbbell, pageTitle: 'Exercise Log Tracker' },
-      { href: '/product-tracker', label: 'Product Tracker', icon: ListChecks, pageTitle: 'Product Tracker' },
-      { href: '/prescription-tracker', label: 'Prescription Tracker', icon: Pill, pageTitle: 'Prescription Tracker' },
+      { href: '/symptom-journal', label: 'Battle Condition Log', icon: BookText, pageTitle: 'Battle Condition Log' },
+      { href: '/pattern-recognition', label: 'Enemy Intel Reports', icon: BrainCircuit, pageTitle: 'Enemy Intelligence Reports' },
+      { href: '/food-log', label: 'Monster-Killing Meals', icon: Apple, pageTitle: 'Monster-Killing Meals Log' },
+      { href: '/nutrition-tracker', label: 'Nutrition Strategy', icon: UtensilsCrossed, pageTitle: 'Nutrition Strategy & Coach' },
+      { href: '/exercise-log', label: 'Combat Training', icon: Dumbbell, pageTitle: 'Combat Training Log' },
+      { href: '/product-tracker', label: 'Gear & Artifacts', icon: ListChecks, pageTitle: 'Gear & Artifacts Tracker' },
+      { href: '/prescription-tracker', label: 'Battle Potions', icon: Pill, pageTitle: 'Battle Potions & Elixirs' },
     ]
   },
   {
-    label: 'Mind & Wellness',
+    label: 'Battle Challenges',
     icon: HeartPulseIcon,
-    pageTitle: 'Mind & Wellness',
+    pageTitle: 'Battle Challenges',
     isParent: true,
     authRequired: true,
     children: [
-      { href: '/knowledge-nugget-quiz', label: 'Knowledge Quiz', icon: Lightbulb, pageTitle: 'Knowledge Nugget Quiz' },
-      { href: '/affirmation-amplifier', label: 'Affirmation Amplifier', icon: AffirmationIcon, pageTitle: 'Affirmation Amplifier' },
-      { href: '/mindful-moment', label: 'Mindful Moment', icon: Wind, pageTitle: 'Mindful Moment' },
-      { href: '/kindness-challenge', label: 'Kindness Connection', icon: HandHeart, pageTitle: 'Kindness Connection Challenge' },
+      { href: '/knowledge-nugget-quiz', label: 'Test Your Wits', icon: Lightbulb, pageTitle: 'Test Your Wits Quiz' },
+      { href: '/affirmation-amplifier', label: 'Empowering Mantras', icon: AffirmationIcon, pageTitle: 'Empowering Mantras' },
+      { href: '/mindful-moment', label: 'Mindful Combat Training', icon: Wind, pageTitle: 'Mindful Combat Training' },
+      { href: '/kindness-challenge', label: 'Warrior\'s Code Quests', icon: HandHeart, pageTitle: 'Warrior\'s Code Quests' },
     ]
   },
   {
-    label: 'Community Hub',
+    label: 'Warrior Stronghold',
     icon: Users,
-    pageTitle: 'Community Hub',
+    pageTitle: 'Warrior Stronghold',
     isParent: true,
     children: [
-      { href: '/', label: 'Belief Circle', icon: HeartHandshake, pageTitle: 'Belief Circle' },
-      { href: '/doctor-forum', label: 'Doctor Forum', icon: MessageSquareQuote, pageTitle: 'Doctor Forum' },
-      // { href: '/humor-hub', label: 'Humor Hub', icon: Smile, pageTitle: 'Humor Hub' }, // Removed
+      { href: '/', label: 'Comrades\' Campfire', icon: HeartHandshake, pageTitle: 'Comrades\' Campfire' },
+      { href: '/doctor-forum', label: 'Intel on Obstructions', icon: MessageSquareQuote, pageTitle: 'Intel on Obstructions Forum' },
     ]
   },
   {
-    label: 'Curated Wellness Aids', 
+    label: 'Armory & Supplies', 
     icon: ShoppingCart,
-    pageTitle: 'Curated Wellness Aids',
+    pageTitle: 'Armory & Supplies',
     isParent: true,
     authRequired: false,
     children: [
-      { href: '/curated-wellness-aids#ai-product-suggester', label: 'AI Product Suggester', icon: BrainCircuit, pageTitle: 'AI Product Suggester' },
-      { href: '/curated-wellness-aids#supplements', label: 'Supplements', icon: Package, pageTitle: 'Supplements Category' },
-      { href: '/curated-wellness-aids#food-items', label: 'Food Items', icon: Apple, pageTitle: 'Food Items Category' },
-      { href: '/curated-wellness-aids#beverages', label: 'Beverages', icon: GlassWater, pageTitle: 'Beverages Category' },
-      { href: '/curated-wellness-aids#topicals', label: 'Topicals', icon: Droplets, pageTitle: 'Topicals Category' },
-      { href: '/curated-wellness-aids#wellness-tools', label: 'Wellness Tools', icon: ToyBrick, pageTitle: 'Wellness Tools Category' },
-      { href: '/curated-wellness-aids#books', label: 'Books', icon: BookOpen, pageTitle: 'Books Category' },
+      { href: '/curated-wellness-aids#ai-product-suggester', label: 'AI Battle Aid Suggester', icon: BrainCircuit, pageTitle: 'AI Battle Aid Suggester' },
+      { href: '/curated-wellness-aids#supplements', label: 'Reinforcements (Supplements)', icon: Package, pageTitle: 'Supplements Category' },
+      { href: '/curated-wellness-aids#food-items', label: 'Rations (Food Items)', icon: Apple, pageTitle: 'Food Items Category' },
+      { href: '/curated-wellness-aids#beverages', label: 'Potions (Beverages)', icon: GlassWater, pageTitle: 'Beverages Category' },
+      { href: '/curated-wellness-aids#topicals', label: 'Salves (Topicals)', icon: Droplets, pageTitle: 'Topicals Category' },
+      { href: '/curated-wellness-aids#wellness-tools', label: 'Training Gear (Wellness Tools)', icon: ToyBrick, pageTitle: 'Wellness Tools Category' },
+      { href: '/curated-wellness-aids#books', label: 'Battle Tomes (Books)', icon: BookOpen, pageTitle: 'Books Category' },
     ]
   },
   {
-    label: 'Resources',
-    icon: BookText, 
-    pageTitle: 'Resources',
+    label: 'Allied Healers',
+    icon: Stethoscope, // Changed from BookText
+    pageTitle: 'Allied Healers',
     isParent: true,
-    authRequired: false,
+    authRequired: false, // Assuming directory is public
     children: [
       { href: '/provider-directory', label: 'Provider Directory', icon: Stethoscope, pageTitle: 'Provider Directory', authRequired: false },
     ]
   },
   {
-    label: 'Connections',
+    label: 'Warrior Network',
     icon: Share2,
-    pageTitle: 'Connections',
+    pageTitle: 'Warrior Network',
     isParent: true,
     authRequired: true,
     children: [
-      { href: '/matching', label: 'Find Friends', icon: Users, pageTitle: 'Find Friends' },
-      { href: '/fiber-singles', label: 'Fiber Singles', icon: Heart, pageTitle: 'Fiber Singles Connect' },
-      { href: '/leaderboard', label: 'Leaderboard', icon: Trophy, pageTitle: 'Community Champions' },
+      { href: '/matching', label: 'Find Fellow Warriors', icon: Users, pageTitle: 'Find Fellow Warriors' },
+      { href: '/fiber-singles', label: 'Warrior Connections Portal', icon: Heart, pageTitle: 'Warrior Connections Portal' },
+      { href: '/leaderboard', label: 'Hall of Slayers', icon: Trophy, pageTitle: 'Hall of Slayers' },
     ]
   },
   {
-    label: 'My Monster',
+    label: 'Your Nemesis',
     icon: ShieldQuestion,
-    pageTitle: 'My Monster',
+    pageTitle: 'Your Nemesis',
     isParent: true,
     authRequired: true,
     children: [
-      { href: '/my-profile', label: 'Profile & Stats', icon: UserCircle, pageTitle: 'My Profile' },
-      { href: '/create-monster', label: 'New/Re-Conjure', icon: Wand2, pageTitle: 'Create Your Monster' },
-      { href: '/monster-tomb', label: 'Monster Tomb', icon: Skull, pageTitle: 'Tomb of Monsters' },
+      { href: '/my-profile', label: 'Profile & Stats', icon: UserCircle, pageTitle: 'My Warrior Profile' },
+      { href: '/create-monster', label: 'New/Re-Conjure Foe', icon: Wand2, pageTitle: 'Conjure Your Nemesis' },
+      { href: '/monster-tomb', label: 'Tomb of Vanquished Foes', icon: Skull, pageTitle: 'Tomb of Vanquished Foes' },
     ]
   },
-  { href: '/login', label: 'Login', icon: LogInIcon, pageTitle: 'Login', noAuthOnly: true },
-  { href: '/register', label: 'Register', icon: UserPlusIcon, pageTitle: 'Register', noAuthOnly: true },
-  { href: '/support-us', label: 'Support Us', icon: PiggyBank, pageTitle: 'Support Us' },
+  { href: '/login', label: 'Warrior Login', icon: LogInIcon, pageTitle: 'Login', noAuthOnly: true },
+  { href: '/register', label: 'Join the Ranks', icon: UserPlusIcon, pageTitle: 'Register', noAuthOnly: true },
+  { href: '/support-us', label: 'Reinforce the Ranks', icon: PiggyBank, pageTitle: 'Support Us' },
+  // Developer/Admin Link (Temporary)
+  { href: '/doctor/login', label: 'Doctor Portal (Dev)', icon: BriefcaseMedical, pageTitle: 'Doctor Portal Login', devOnly: true },
 ];
 
 
@@ -188,26 +190,21 @@ function InfoBar() {
 
 const findCurrentPage = (items: NavItem[], currentPath: string): NavItem | undefined => {
   for (const item of items) {
-    // Check current item
     if (item.href) {
       const baseItemPath = item.href.split('#')[0];
-      if (baseItemPath === '/' && currentPath === '/') return item;
-      if (baseItemPath === '/landing' && currentPath === '/landing') return item;
-      // For other paths, check if the current path starts with the baseItemPath.
-      // This handles sub-routes like /fiber-singles/chat/[id] matching /fiber-singles.
-      // And it also handles hash links matching the base path.
+       // Exact match for root paths or specific non-nested paths
+      if (baseItemPath === currentPath && (baseItemPath === '/' || baseItemPath === '/landing' || baseItemPath === '/login' || baseItemPath === '/register' || baseItemPath === '/support-us' || baseItemPath.startsWith('/doctor/'))) {
+        return item;
+      }
+      // StartsWith logic for other paths, ensuring it's not just a partial prefix of a different path
       if (baseItemPath !== '/' && baseItemPath !== '/landing' && currentPath.startsWith(baseItemPath)) {
-        // Ensure it's a full match or a sub-route, not just a partial prefix.
-        // e.g. /foo should match /foo and /foo/bar, but not /foobar
-        // Also consider if item.href itself contains a hash, the title should still come from the base.
         if (currentPath.length === baseItemPath.length || currentPath[baseItemPath.length] === '/' || currentPath[baseItemPath.length] === '#') {
-          // If item.href has a hash, use the main item's pageTitle.
+           // If item.href has a hash, use the main item's pageTitle unless the child page has a more specific one.
           const mainNavItem = navItemsConfig.flatMap(nav => nav.children || [nav]).find(nav => nav.href && nav.href.split('#')[0] === baseItemPath);
           return mainNavItem || item;
         }
       }
     }
-    // Check children recursively
     if (item.children) {
       const childPage = findCurrentPage(item.children, currentPath);
       if (childPage) return childPage;
@@ -220,24 +217,18 @@ const findCurrentPage = (items: NavItem[], currentPath: string): NavItem | undef
             if (child.href) {
                 const childBase = child.href.split('#')[0];
                 if (currentPath.startsWith(childBase)) {
-                    // If the child's href contains a hash, it's an anchor link.
-                    // The page title should come from the parent menu item or the specific child if it's meant to be a distinct page.
-                    // In this case, the parent 'Curated Wellness Aids' itself is a page.
-                    if (child.href.includes('#')) {
-                        // If we are on /curated-wellness-aids#something, the title is "Curated Wellness Aids"
-                        if (currentPath.startsWith('/curated-wellness-aids')) {
-                            return navItemsConfig.find(nav => nav.label === 'Curated Wellness Aids' && nav.isParent);
-                        }
+                     // Check if it's an anchor link under a parent that should have its own title (e.g. Curated Wellness Aids)
+                    if (child.href.includes('#') && item.href && currentPath.startsWith(item.href.split('#')[0])) {
+                        return item;
                     }
-                    // If child.href is a base path, and it *is* the parent's main page, return parent.
-                    if (childBase === item.href?.split('#')[0]) return item; // Or child if child defines its own page title.
-                    // If child has its own distinct pageTitle for a base path
+                    if (childBase === item.href?.split('#')[0]) return item;
                     if (currentPath.startsWith(childBase) && child.pageTitle !== item.pageTitle) return child;
                 }
             }
           }
       }
   }
+  if (currentPath === '/') return items.find(item => item.href === '/');
   return undefined;
 };
 
@@ -277,7 +268,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
   
   const filteredNavItems = React.useMemo(() => {
+    const isDevelopment = process.env.NODE_ENV === 'development';
     return navItemsConfig.filter(item => {
+      if (item.devOnly && !isDevelopment) return false; // Hide devOnly links in production
       if (item.authRequired && !user) return false;
       if (item.noAuthOnly && user) return false;
       return true;
@@ -286,6 +279,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         return {
           ...item,
           children: item.children.filter(child => {
+            if (child.devOnly && !isDevelopment) return false;
             if (child.authRequired && !user) return false;
             if (child.noAuthOnly && user) return false;
             return true;
@@ -374,7 +368,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             <SidebarMenuItem key={child.href} className="p-0">
                               <Link href={child.href} legacyBehavior passHref>
                                 <SidebarMenuButton
-                                  isActive={(pathname === child.href || (child.href !== '/' && child.href !== '/landing' && pathname.startsWith(child.href)))}
+                                  isActive={(pathname === child.href || (child.href !== '/' && child.href !== '/landing' && pathname.startsWith(child.href.split('#')[0])))}
                                   tooltip={{ children: child.label, side: 'right' }}
                                   className="w-full justify-start text-xs h-[1.875rem] pl-1.5 py-1" 
                                   variant="ghost"
@@ -434,3 +428,4 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </>
   );
 }
+
