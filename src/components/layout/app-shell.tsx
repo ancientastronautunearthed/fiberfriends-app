@@ -28,7 +28,7 @@ import {
   LayoutDashboard, Pill, Wind, Lightbulb, ShieldCheck as AffirmationIcon,
   Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown,
   HandHeart, LogInIcon, UserPlus as UserPlusIcon, AlertTriangle, ShoppingCart,
-  Package, GlassWater, Droplets, ToyBrick, BookOpen, UtensilsCrossed, BriefcaseMedical
+  Package, GlassWater, Droplets, ToyBrick, BookOpen, UtensilsCrossed
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -107,10 +107,10 @@ const navItemsConfig: NavItem[] = [
   },
   {
     label: 'Allied Healers',
-    icon: Stethoscope, // Changed from BookText
+    icon: Stethoscope, 
     pageTitle: 'Allied Healers',
     isParent: true,
-    authRequired: false, // Assuming directory is public
+    authRequired: false, 
     children: [
       { href: '/provider-directory', label: 'Provider Directory', icon: Stethoscope, pageTitle: 'Provider Directory', authRequired: false },
     ]
@@ -142,8 +142,6 @@ const navItemsConfig: NavItem[] = [
   { href: '/login', label: 'Warrior Login', icon: LogInIcon, pageTitle: 'Login', noAuthOnly: true },
   { href: '/register', label: 'Join the Ranks', icon: UserPlusIcon, pageTitle: 'Register', noAuthOnly: true },
   { href: '/support-us', label: 'Reinforce the Ranks', icon: PiggyBank, pageTitle: 'Support Us' },
-  // Developer/Admin Link (Temporary)
-  { href: '/doctor/login', label: 'Doctor Portal (Dev)', icon: BriefcaseMedical, pageTitle: 'Doctor Portal Login', devOnly: true },
 ];
 
 
@@ -270,7 +268,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const filteredNavItems = React.useMemo(() => {
     const isDevelopment = process.env.NODE_ENV === 'development';
     return navItemsConfig.filter(item => {
-      if (item.devOnly && !isDevelopment) return false; // Hide devOnly links in production
+      if (item.devOnly && !isDevelopment) return false; 
       if (item.authRequired && !user) return false;
       if (item.noAuthOnly && user) return false;
       return true;
@@ -428,4 +426,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </>
   );
 }
-
