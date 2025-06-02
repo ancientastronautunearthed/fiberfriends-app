@@ -26,9 +26,9 @@ import {
   HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, LogOut, 
   ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart, Dumbbell, Trophy, 
   LayoutDashboard, Pill, Wind, Lightbulb, ShieldCheck as AffirmationIcon,
-  Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown, Smile,
+  Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown,
   HandHeart, LogInIcon, UserPlus as UserPlusIcon, AlertTriangle, ShoppingCart,
-  Package, GlassWater, Droplets, ToyBrick, BookOpen, UtensilsCrossed // Corrected Icon Name
+  Package, GlassWater, Droplets, ToyBrick, BookOpen, UtensilsCrossed
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -59,7 +59,7 @@ const navItemsConfig: NavItem[] = [
       { href: '/symptom-journal', label: 'Symptom Journal', icon: BookText, pageTitle: 'Symptom Journal' },
       { href: '/pattern-recognition', label: 'Pattern Recognition', icon: BrainCircuit, pageTitle: 'Pattern Recognition' },
       { href: '/food-log', label: 'Food Log', icon: Apple, pageTitle: 'Daily Food Log' },
-      { href: '/nutrition-tracker', label: 'Nutrition Tracker', icon: UtensilsCrossed, pageTitle: 'Nutrition Tracker & Coach' }, // Corrected Icon Usage
+      { href: '/nutrition-tracker', label: 'Nutrition Tracker', icon: UtensilsCrossed, pageTitle: 'Nutrition Tracker & Coach' },
       { href: '/exercise-log', label: 'Exercise Log', icon: Dumbbell, pageTitle: 'Exercise Log Tracker' },
       { href: '/product-tracker', label: 'Product Tracker', icon: ListChecks, pageTitle: 'Product Tracker' },
       { href: '/prescription-tracker', label: 'Prescription Tracker', icon: Pill, pageTitle: 'Prescription Tracker' },
@@ -86,7 +86,7 @@ const navItemsConfig: NavItem[] = [
     children: [
       { href: '/', label: 'Belief Circle', icon: HeartHandshake, pageTitle: 'Belief Circle' },
       { href: '/doctor-forum', label: 'Doctor Forum', icon: MessageSquareQuote, pageTitle: 'Doctor Forum' },
-      { href: '/humor-hub', label: 'Humor Hub', icon: Smile, pageTitle: 'Humor Hub' },
+      // { href: '/humor-hub', label: 'Humor Hub', icon: Smile, pageTitle: 'Humor Hub' }, // Removed
     ]
   },
   {
