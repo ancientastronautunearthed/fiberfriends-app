@@ -8,13 +8,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ThumbsUp, MessageSquareText, Award, PlusCircle } from "lucide-react";
+import { ThumbsUp, MessageSquareText, Award, PlusCircle, ShieldCheck } from "lucide-react"; // Added ShieldCheck
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import { useToast } from '@/hooks/use-toast';
 
 const MONSTER_NAME_KEY = 'morgellonMonsterName';
 const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
+const TRUSTED_DOCTOR_NAME = "Dr. Anya Sharma, MD"; // Define trusted doctor name
 
 interface ForumPost {
   id: string;
@@ -27,9 +28,23 @@ interface ForumPost {
   tags: string[];
   upvotes: number;
   comments: number;
+  isTrustedDoctorPost?: boolean; // Optional flag
 }
 
 const initialForumPosts: ForumPost[] = [
+  {
+    id: "doc-post-1",
+    author: TRUSTED_DOCTOR_NAME,
+    avatar: "https://placehold.co/40x40.png", // Use a specific avatar if desired
+    avatarAiHint: "professional doctor",
+    time: "2 days ago",
+    title: "Understanding Symptom Fluctuation in Morgellons",
+    content: "Hello Fiber Friends community. I wanted to share some thoughts on why symptoms in Morgellons can vary so much from day to day or week to week. Many factors, including environmental triggers, stress levels, and individual immune responses, can play a role. Consistent journaling can be very helpful in identifying personal patterns. Remember, your experience is valid, and we are working towards better understanding. - Dr. Sharma",
+    tags: ["Medical Insight", "Symptom Management", "Research"],
+    upvotes: 210,
+    comments: 45,
+    isTrustedDoctorPost: true,
+  },
   {
     id: "1",
     author: "Patient Advocate",
@@ -54,6 +69,7 @@ const initialForumPosts: ForumPost[] = [
     upvotes: 98,
     comments: 15,
   },
+  // ... (keep other existing posts)
   {
     id: "3",
     author: "TruthSeeker22",
@@ -90,42 +106,6 @@ const initialForumPosts: ForumPost[] = [
     upvotes: 180,
     comments: 50,
   },
-  {
-    id: "6",
-    author: "ResearchWarrior",
-    avatar: "https://placehold.co/40x40.png?text=RW",
-    avatarAiHint: "scientist lab",
-    time: "2 weeks ago",
-    title: "Brought research papers, doc glanced and dismissed.",
-    content: "I spent hours compiling research that supported my symptoms. The doctor barely looked at it and said, 'The internet is full of misinformation.' So frustrating!",
-    tags: ["Research", "Dismissal", "MedicalArrogance"],
-    upvotes: 112,
-    comments: 28,
-  },
-  {
-    id: "7",
-    author: "TiredButFighting",
-    avatar: "https://placehold.co/40x40.png?text=TF",
-    avatarAiHint: "person determined",
-    time: "3 weeks ago",
-    title: "Referred to a psychiatrist for 'somatic symptom disorder'",
-    content: "It feels like a default diagnosis when they don't know what else to say. Has anyone successfully challenged this diagnosis?",
-    tags: ["PsychLabel", "SomaticSymptomDisorder", "SeekingAdvice"],
-    upvotes: 95,
-    comments: 19,
-  },
-  {
-    id: "8",
-    author: "MysticFibers",
-    avatar: "https://placehold.co/40x40.png?text=MF",
-    avatarAiHint: "abstract colorful fibers",
-    time: "1 month ago",
-    title: "Doctor suggested it was 'just dry skin'.",
-    content: "I have visible fibers coming out of my skin and lesions, and they said 'moisturize more'. It's insulting the level of some dismissals.",
-    tags: ["DrySkin", "Insulting", "Dermatologist"],
-    upvotes: 205,
-    comments: 41,
-  }
 ];
 
 const weeklyHighlight = {
@@ -234,7 +214,7 @@ export default function DoctorForumPage() {
         <div className="space-y-4">
           <h2 className="text-2xl font-headline font-semibold text-foreground">Recent Forum Posts</h2>
           {forumPosts.map((post) => (
-            <Card key={post.id}>
+            <Card key={post.id} className={post.isTrustedDoctorPost ? 'border-2 border-primary bg-primary/5' : ''}>
               <CardHeader>
                 <div className="flex items-center space-x-3 mb-2">
                   <Avatar>
@@ -242,7 +222,14 @@ export default function DoctorForumPage() {
                     <AvatarFallback>{post.author.substring(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="text-sm font-semibold">{post.author}</p>
+                    <p className="text-sm font-semibold flex items-center">
+                      {post.author}
+                      {post.isTrustedDoctorPost && (
+                        <Badge variant="default" className="ml-2 text-xs">
+                          <ShieldCheck className="mr-1 h-3 w-3" /> Trusted Advisor
+                        </Badge>
+                      )}
+                    </p>
                     <p className="text-xs text-muted-foreground">{post.time}</p>
                   </div>
                 </div>

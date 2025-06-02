@@ -6,12 +6,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Heart, MessageCircle } from "lucide-react";
+import { Heart, MessageCircle, ShieldCheck } from "lucide-react"; // Added ShieldCheck
+import { Badge } from "@/components/ui/badge"; // Import Badge
 import Image from "next/image";
 import { useToast } from '@/hooks/use-toast';
 
 const MONSTER_NAME_KEY = 'morgellonMonsterName';
 const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
+const TRUSTED_DOCTOR_NAME = "Dr. Anya Sharma, MD"; // Consistent name
 
 interface Story {
   id: string;
@@ -24,9 +26,23 @@ interface Story {
   imageAiHint?: string;
   likes: number;
   comments: number;
+  isTrustedDoctorPost?: boolean;
 }
 
 const initialStories: Story[] = [
+   {
+    id: "doc-story-1",
+    author: TRUSTED_DOCTOR_NAME,
+    avatar: "https://placehold.co/40x40.png", // Use a specific avatar if desired
+    avatarAiHint: "professional doctor",
+    time: "3 hours ago",
+    content: "Hello everyone, Dr. Sharma here. I want to emphasize the importance of self-compassion on this journey. It's okay to have difficult days. Acknowledge your feelings without judgment. Small acts of self-care can make a difference. We're here to support each other.",
+    imageUrl: "https://placehold.co/600x400.png?text=Compassion",
+    imageAiHint: "calm peaceful scene",
+    likes: 180,
+    comments: 25,
+    isTrustedDoctorPost: true,
+  },
   {
     id: "1",
     author: "Elara Vance",
@@ -49,6 +65,7 @@ const initialStories: Story[] = [
     likes: 221,
     comments: 83,
   },
+  // ... (keep other existing stories)
   {
     id: "3",
     author: "Aisha Khan",
@@ -61,82 +78,6 @@ const initialStories: Story[] = [
     likes: 98,
     comments: 12,
   },
-  {
-    id: "4",
-    author: "David Miller",
-    avatar: "https://placehold.co/40x40.png?text=DM",
-    avatarAiHint: "man outdoors",
-    time: "2 days ago",
-    content: "The brain fog has been intense this week. Sometimes I feel like I'm wading through mud. Any tips for managing it when you have to be productive?",
-    likes: 75,
-    comments: 25,
-  },
-  {
-    id: "5",
-    author: "Sophia Chen",
-    avatar: "https://placehold.co/40x40.png?text=SC",
-    avatarAiHint: "woman writing",
-    time: "3 days ago",
-    content: "Documenting everything in my symptom journal has been surprisingly helpful. It helps me see patterns I wouldn't have noticed otherwise. Highly recommend if you're not already doing it.",
-    imageUrl: "https://placehold.co/600x400.png?text=Journal",
-    imageAiHint: "open notebook",
-    likes: 110,
-    comments: 18,
-  },
-  {
-    id: "6",
-    author: "Leo Maxwell",
-    avatar: "https://placehold.co/40x40.png?text=LM",
-    avatarAiHint: "person nature",
-    time: "4 days ago",
-    content: "Just want to remind everyone: your pain is valid, your experiences are real. Don't let anyone make you doubt yourself. We are in this together.",
-    likes: 305,
-    comments: 45,
-  },
-  {
-    id: "7",
-    author: "Isabelle Moreau",
-    avatar: "https://placehold.co/40x40.png?text=IM",
-    avatarAiHint: "artist painting",
-    time: "5 days ago",
-    content: "Spent some time today doing art, which always helps me process difficult emotions. What are your non-medical ways of coping?",
-    imageUrl: "https://placehold.co/600x400.png?text=Art",
-    imageAiHint: "colorful abstract art",
-    likes: 82,
-    comments: 11,
-  },
-   {
-    id: "8",
-    author: "Ken Adams",
-    avatar: "https://placehold.co/40x40.png?text=KA",
-    avatarAiHint: "person smiling",
-    time: "6 days ago",
-    content: "Remembering to celebrate the small wins. Today, I managed a short walk without feeling completely drained. It's not much, but it's something.",
-    likes: 190,
-    comments: 22,
-  },
-  {
-    id: "9",
-    author: "Olivia Baker",
-    avatar: "https://placehold.co/40x40.png?text=OB",
-    avatarAiHint: "woman meditating",
-    time: "1 week ago",
-    content: "Dealing with another skin flare-up. It's so frustrating when you think you're making progress and then it comes back. Trying to stay positive.",
-    imageUrl: "https://placehold.co/600x400.png?text=Resilience",
-    imageAiHint: "stormy sky clearing",
-    likes: 103,
-    comments: 17,
-  },
-  {
-    id: "10",
-    author: "Chris Walker",
-    avatar: "https://placehold.co/40x40.png?text=CW",
-    avatarAiHint: "man reading",
-    time: "1 week ago",
-    content: "The lack of understanding from some medical professionals is disheartening. But finding communities like this one gives me hope. Thank you all for being here.",
-    likes: 250,
-    comments: 30,
-  }
 ];
 
 export default function BeliefCirclePage() {
@@ -169,7 +110,6 @@ export default function BeliefCirclePage() {
       avatarAiHint: userMonsterImageUrl ? "user monster" : "community member",
       time: "Just now",
       content: newStoryContent.trim(),
-      // imageUrl and imageAiHint could be added if we allow image uploads for posts
       likes: 0,
       comments: 0,
     };
@@ -178,7 +118,7 @@ export default function BeliefCirclePage() {
     setNewStoryContent('');
     toast({
       title: "Story Shared!",
-      description: "Your thoughts have been added to the Belief Circle (locally for this session).",
+      description: "Your thoughts have been added to the Comrades' Campfire (locally for this session).",
     });
   };
 
@@ -199,7 +139,7 @@ export default function BeliefCirclePage() {
             />
           </CardContent>
           <CardFooter className="flex justify-end">
-            <Button type="submit">Post to Belief Circle</Button>
+            <Button type="submit">Post to Comrades' Campfire</Button>
           </CardFooter>
         </form>
       </Card>
@@ -207,7 +147,7 @@ export default function BeliefCirclePage() {
       <div className="space-y-4">
         <h2 className="text-2xl font-headline font-semibold text-foreground">Community Stories</h2>
         {stories.map((story) => (
-          <Card key={story.id}>
+          <Card key={story.id} className={story.isTrustedDoctorPost ? 'border-2 border-primary bg-primary/5' : ''}>
             <CardHeader>
               <div className="flex items-center space-x-3">
                 <Avatar>
@@ -215,7 +155,14 @@ export default function BeliefCirclePage() {
                   <AvatarFallback>{story.author.substring(0, 2).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div>
-                  <CardTitle className="text-base font-semibold">{story.author}</CardTitle>
+                  <CardTitle className="text-base font-semibold flex items-center">
+                    {story.author}
+                    {story.isTrustedDoctorPost && (
+                      <Badge variant="default" className="ml-2 text-xs">
+                        <ShieldCheck className="mr-1 h-3 w-3" /> Trusted Advisor
+                      </Badge>
+                    )}
+                  </CardTitle>
                   <CardDescription className="text-xs">{story.time}</CardDescription>
                 </div>
               </div>
