@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Lightbulb, Sparkles, Skull, CheckCircle, XCircle, HelpCircle, Info, Trophy } from "lucide-react";
+import { Loader2, Lightbulb, Sparkles, Skull, CheckCircle, XCircle, HelpCircle, Info, Trophy, Gem, AlertCircle as AlertCircleIcon } from "lucide-react";
 import Image from "next/image";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -29,6 +29,7 @@ const KNOWLEDGE_NUGGET_QUIZ_LEVEL_KEY = 'knowledgeNuggetQuizLevel';
 const KNOWLEDGE_NUGGET_LAST_ATTEMPT_DATE_KEY = 'knowledgeNuggetQuizLastAttemptDate';
 
 const MAX_QUIZ_LEVEL = 10;
+const MAX_BASIC_QUIZ_LEVEL = 5; // New constant for basic tier limit
 const MONSTER_DEATH_THRESHOLD = -50;
 const MAX_MONSTER_HEALTH = 200;
 const INITIAL_HEALTH_MIN = 80;
@@ -65,6 +66,7 @@ export default function KnowledgeNuggetQuizPage() {
   const [currentQuizLevel, setCurrentQuizLevel] = useState<number>(1);
   const [lastQuizAttemptDate, setLastQuizAttemptDate] = useState<string | null>(null);
   const [hasAttemptedQuizToday, setHasAttemptedQuizToday] = useState<boolean>(false);
+  const [showPremiumUpgradePrompt, setShowPremiumUpgradePrompt] = useState<boolean>(false);
 
   const [quizData, setQuizData] = useState<QuizQuestionOutput | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
@@ -103,8 +105,8 @@ export default function KnowledgeNuggetQuizPage() {
     }
   }, [toast]);
 
-  const fetchQuizQuestion = useCallback(() => {
-    if (hasAttemptedQuizToday) return;
+  const fetchQuizQuestion = useCallback((levelToFetch: number) => {
+    if (hasAttemptedQuizToday || showPremiumUpgradePrompt) return;
 
     setError(null);
     setQuizData(null);
@@ -113,7 +115,7 @@ export default function KnowledgeNuggetQuizPage() {
     setShuffledOptions([]);
     startLoadingQuizTransition(async () => {
       try {
-        const result = await generateQuizQuestionAction({ difficultyLevel: currentQuizLevel });
+        const result = await generateQuizQuestionAction({ difficultyLevel: levelToFetch });
         setQuizData(result);
         setShuffledOptions([...result.options].sort(() => Math.random() - 0.5));
       } catch (e) {
@@ -121,20 +123,35 @@ export default function KnowledgeNuggetQuizPage() {
         toast({ title: "Quiz Error", description: e instanceof Error ? e.message : "Unknown error fetching quiz.", variant: "destructive" });
       }
     });
-  }, [toast, currentQuizLevel, hasAttemptedQuizToday]);
+  }, [toast, hasAttemptedQuizToday, showPremiumUpgradePrompt]);
 
   useEffect(() => {
     const isMonsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
     if (isMonsterGenerated) {
+        let loadedLevel = 1;
         const storedLevel = localStorage.getItem(KNOWLEDGE_NUGGET_QUIZ_LEVEL_KEY);
-        if (storedLevel) setCurrentQuizLevel(parseInt(storedLevel, 10));
+        if (storedLevel) loadedLevel = parseInt(storedLevel, 10);
+        setCurrentQuizLevel(loadedLevel);
 
         const storedLastAttemptDate = localStorage.getItem(KNOWLEDGE_NUGGET_LAST_ATTEMPT_DATE_KEY);
         setLastQuizAttemptDate(storedLastAttemptDate);
         const today = getCurrentDateString();
+        
+        let attemptToday = false;
         if (storedLastAttemptDate === today) {
+          attemptToday = true;
           setHasAttemptedQuizToday(true);
         }
+
+        if (loadedLevel > MAX_BASIC_QUIZ_LEVEL) {
+            setShowPremiumUpgradePrompt(true);
+            // If they've attempted today OR are already past basic limit, no need to fetch.
+            // Otherwise, fetch for current level (which might be > MAX_BASIC_QUIZ_LEVEL if they were premium then downgraded in simulation)
+            if (!attemptToday) fetchQuizQuestion(loadedLevel);
+        } else if (!attemptToday) {
+            fetchQuizQuestion(loadedLevel);
+        }
+
 
         setMonsterImageUrl(localStorage.getItem(MONSTER_IMAGE_KEY));
         setMonsterName(localStorage.getItem(MONSTER_NAME_KEY));
@@ -145,11 +162,8 @@ export default function KnowledgeNuggetQuizPage() {
             setMonsterHealth(initialHealth); localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
         }
         performNightlyRecovery();
-        if (storedLastAttemptDate !== today) {
-            fetchQuizQuestion();
-        }
     }
-  }, [performNightlyRecovery, fetchQuizQuestion]); // currentQuizLevel removed from deps as it's managed by fetchQuizQuestion itself
+  }, [performNightlyRecovery, fetchQuizQuestion]);
 
   useEffect(() => {
     localStorage.setItem(KNOWLEDGE_NUGGET_QUIZ_LEVEL_KEY, String(currentQuizLevel));
@@ -188,7 +202,7 @@ export default function KnowledgeNuggetQuizPage() {
   };
 
   const handleAnswerSelect = (answer: string) => {
-    if (isAnswered || !quizData || !monsterName || monsterHealth === null || hasAttemptedQuizToday) return;
+    if (isAnswered || !quizData || !monsterName || monsterHealth === null || hasAttemptedQuizToday || showPremiumUpgradePrompt) return;
     
     setSelectedAnswer(answer);
     setIsAnswered(true);
@@ -206,12 +220,26 @@ export default function KnowledgeNuggetQuizPage() {
 
       toastDescription = `${monsterName} winces! Your Lvl ${currentQuizLevel} knowledge dealt ${monsterDamage} damage. Health: ${newHealth.toFixed(1)}%. You earned ${POINTS_FOR_CORRECT_QUIZ_ANSWER} points.`;
 
+      const nextLevel = currentQuizLevel + 1;
       if (currentQuizLevel === MAX_QUIZ_LEVEL) {
         totalPointsAwarded += PERFECT_LEVEL_10_BONUS_POINTS;
         toastDescription += ` Max Level ${MAX_QUIZ_LEVEL} Mastered! +${PERFECT_LEVEL_10_BONUS_POINTS} Bonus Points!`;
-      } else {
-        setCurrentQuizLevel(prev => Math.min(prev + 1, MAX_QUIZ_LEVEL));
-        toastDescription += ` Leveled up to Quiz Level ${currentQuizLevel + 1}!`;
+        // Stays at max level
+      } else if (nextLevel > MAX_BASIC_QUIZ_LEVEL && nextLevel <= MAX_QUIZ_LEVEL) {
+        // User is basic and just completed MAX_BASIC_QUIZ_LEVEL
+        // Or user is premium and advancing through premium levels
+        // For simulation, if we *assume* they are basic for now and hit this:
+        if (currentQuizLevel === MAX_BASIC_QUIZ_LEVEL) {
+           setShowPremiumUpgradePrompt(true); // Show prompt after this correct answer
+           toastDescription += ` You've mastered Level ${currentQuizLevel}! Advanced levels require Premium.`;
+           setCurrentQuizLevel(nextLevel); // Technically set level, but prompt will block next question
+        } else {
+            setCurrentQuizLevel(nextLevel);
+            toastDescription += ` Leveled up to Quiz Level ${nextLevel}!`;
+        }
+      } else { // Advancing within basic levels or already premium and below max
+        setCurrentQuizLevel(nextLevel);
+        toastDescription += ` Leveled up to Quiz Level ${nextLevel}!`;
       }
       addPoints(totalPointsAwarded);
       if (!checkMonsterDeath(newHealth, `a correct Lvl ${currentQuizLevel} answer`)) {
@@ -219,7 +247,6 @@ export default function KnowledgeNuggetQuizPage() {
       }
     } else {
       toastDescription = `${monsterName} scoffs: "Your ignorance at Level ${currentQuizLevel} is amusing." The correct answer was: ${quizData.correctAnswer}.`;
-      // Level does not decrease on incorrect answer for now
       toast({ title: "Incorrect!", description: toastDescription, variant: "destructive", duration: 7000 });
     }
 
@@ -233,6 +260,14 @@ export default function KnowledgeNuggetQuizPage() {
       const currentValInRange = monsterHealth - MONSTER_DEATH_THRESHOLD;
       return Math.max(0, Math.min((currentValInRange / range) * 100, 100));
   };
+
+  const handleGetNextQuestion = () => {
+    if (currentQuizLevel > MAX_BASIC_QUIZ_LEVEL) {
+      setShowPremiumUpgradePrompt(true);
+      return;
+    }
+    fetchQuizQuestion(currentQuizLevel);
+  }
 
   if (monsterGeneratedState === null) {
     return <LoadingPlaceholder />;
@@ -264,7 +299,7 @@ export default function KnowledgeNuggetQuizPage() {
             <CardContent className="text-center">
               <Label htmlFor="monster-health-quiz" className="text-sm font-medium block mb-1">Monster Health: {monsterHealth.toFixed(1)}%</Label>
               <Progress id="monster-health-quiz" value={getHealthBarValue()} className="w-full h-2.5" />
-              <p className="text-xs text-muted-foreground mt-1">Damage: {MONSTER_HP_REDUCTION_BASE + currentQuizLevel} HP</p>
+              <p className="text-xs text-muted-foreground mt-1">Base Damage: {MONSTER_HP_REDUCTION_BASE + currentQuizLevel} HP</p>
             </CardContent>
           </Card>
         )}
@@ -276,10 +311,11 @@ export default function KnowledgeNuggetQuizPage() {
             <CardTitle className="font-headline flex items-center gap-2"><Lightbulb className="h-6 w-6 text-primary"/>Knowledge Nugget Quiz</CardTitle>
             <CardDescription>
               Test your knowledge. Level {currentQuizLevel}/{MAX_QUIZ_LEVEL}. Correct answers empower you and weaken your monster! One attempt per day.
+              Levels {MAX_BASIC_QUIZ_LEVEL + 1}-{MAX_QUIZ_LEVEL} are a Premium feature.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {hasAttemptedQuizToday && !isLoadingQuiz && (
+            {hasAttemptedQuizToday && !showPremiumUpgradePrompt && (
               <Alert variant="default" className="bg-accent/20 border-accent">
                 <Trophy className="h-4 w-4 text-accent-foreground" />
                 <AlertTitle>Daily Quiz Attempted</AlertTitle>
@@ -288,19 +324,30 @@ export default function KnowledgeNuggetQuizPage() {
                 </AlertDescription>
               </Alert>
             )}
-            {isLoadingQuiz && !hasAttemptedQuizToday && (
+             {showPremiumUpgradePrompt && (
+                <Alert variant="default" className="bg-amber-50 border-amber-300 dark:bg-amber-900/20 dark:border-amber-700">
+                    <Gem className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    <AlertTitle className="text-amber-700 dark:text-amber-300 font-semibold">Advanced Quiz Levels Locked!</AlertTitle>
+                    <AlertDescription className="text-amber-600 dark:text-amber-400 text-sm">
+                        Congratulations on mastering Level {MAX_BASIC_QUIZ_LEVEL}!
+                        Quiz Levels {MAX_BASIC_QUIZ_LEVEL + 1} through {MAX_QUIZ_LEVEL} offer deeper insights and are part of our Premium subscription.
+                        <Link href="/landing#pricing" className="block text-xs text-amber-700 dark:text-amber-300 hover:underline mt-1 font-semibold">Upgrade to Premium to continue leveling up!</Link>
+                    </AlertDescription>
+                </Alert>
+            )}
+            {isLoadingQuiz && !hasAttemptedQuizToday && !showPremiumUpgradePrompt && (
               <div className="flex items-center justify-center p-10">
                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
                 <p className="ml-3 text-muted-foreground">{monsterName || "The AI"} is preparing a Level {currentQuizLevel} question...</p>
               </div>
             )}
-            {error && !isLoadingQuiz && !hasAttemptedQuizToday && (
+            {error && !isLoadingQuiz && !hasAttemptedQuizToday && !showPremiumUpgradePrompt && (
               <Alert variant="destructive">
                 <AlertTitle>Quiz Error</AlertTitle>
                 <AlertDescription>{error} Please try fetching a new one later.</AlertDescription>
               </Alert>
             )}
-            {quizData && !isLoadingQuiz && !hasAttemptedQuizToday && (
+            {quizData && !isLoadingQuiz && !hasAttemptedQuizToday && !showPremiumUpgradePrompt && (
               <div className="space-y-4">
                 <p className="text-lg font-semibold text-foreground p-4 bg-muted/30 rounded-md">{quizData.question}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -341,9 +388,18 @@ export default function KnowledgeNuggetQuizPage() {
             )}
           </CardContent>
           <CardFooter>
-            <Button onClick={fetchQuizQuestion} disabled={isLoadingQuiz || hasAttemptedQuizToday || (isAnswered && selectedAnswer === quizData?.correctAnswer)} className="w-full sm:w-auto">
+            <Button onClick={handleGetNextQuestion} 
+                disabled={isLoadingQuiz || hasAttemptedQuizToday || showPremiumUpgradePrompt || (isAnswered && selectedAnswer === quizData?.correctAnswer && currentQuizLevel >= MAX_QUIZ_LEVEL) } 
+                className="w-full sm:w-auto"
+            >
               {isLoadingQuiz ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4"/>}
-              {hasAttemptedQuizToday ? "Quiz Done For Today" : (isLoadingQuiz ? "Conjuring..." : (quizData ? "Next Question (If Incorrect)" : "Get Question"))}
+              {hasAttemptedQuizToday ? "Quiz Done For Today" : 
+                (isLoadingQuiz ? "Conjuring..." : 
+                    (quizData && isAnswered && selectedAnswer !== quizData.correctAnswer) ? "Try Next Question (Same Level)" :
+                    (quizData && currentQuizLevel >= MAX_QUIZ_LEVEL && selectedAnswer === quizData.correctAnswer) ? "Max Level Reached!" :
+                    (quizData ? "Next Question" : "Get Question")
+                )
+              }
             </Button>
           </CardFooter>
         </Card>

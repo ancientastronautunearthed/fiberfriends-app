@@ -6,10 +6,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, UserSearch, ShieldQuestion, Heart, Wand2, Sparkles, Loader2 as IconLoader } from "lucide-react"; 
+import { MessageSquare, UserSearch, ShieldQuestion, Heart, Wand2, Sparkles, Loader2 as IconLoader, Gem, AlertCircle } from "lucide-react"; 
 import Image from "next/image";
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 const ROMANTIC_MONSTER_IMAGE_KEY = 'romanticMonsterImageUrl';
 const ROMANTIC_MONSTER_NAME_KEY = 'romanticMonsterName';
@@ -108,8 +109,8 @@ export default function FiberSinglesPage() {
 
   const handleSendMessage = (userName: string) => {
     toast({
-      title: "Simulated Message",
-      description: `Sending a message to ${userName} would cost 50 points or be free with Premium. (This is a simulated feature for the prototype.)`,
+      title: "Premium Feature: Direct Messaging",
+      description: `Sending a message to ${userName} would cost 50 points or be unlimited with Premium. This is a simulated feature.`,
       variant: "default",
       duration: 7000,
     });
@@ -199,14 +200,25 @@ export default function FiberSinglesPage() {
 
       <Card className="shadow-lg">
         <CardHeader className="text-center pb-4">
-          <UserSearch className="h-10 w-10 mx-auto text-primary mb-1" />
-          <CardTitle className="font-headline text-3xl">Fiber Singles Connect</CardTitle>
+          <div className="flex items-center justify-center gap-2">
+            <UserSearch className="h-10 w-10 text-primary mb-1" />
+            <CardTitle className="font-headline text-3xl flex items-center gap-1">Fiber Singles Connect <Gem className="h-6 w-6 text-amber-500" /></CardTitle>
+          </div>
           <CardDescription className="max-w-xl mx-auto">
             Connect with others in the Fiber Friends community. Your romantic monster persona is how you'll appear here.
           </CardDescription>
         </CardHeader>
         
         <CardContent>
+            <Alert variant="default" className="mb-6 bg-amber-50 border-amber-300 dark:bg-amber-900/20 dark:border-amber-700">
+              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <AlertTitle className="text-amber-700 dark:text-amber-300 font-semibold">Premium Feature Access</AlertTitle>
+              <AlertDescription className="text-amber-600 dark:text-amber-400 text-sm">
+                You can browse profiles with any plan. Full access to Fiber Singles, including unlimited messaging, advanced matching, seeing who likes you, and participating in chat games, is available with the <span className="font-semibold">Monster Master</span> plan or the <span className="font-semibold">Fiber Connection Add-on</span>.
+                <Link href="/landing#pricing" className="block text-xs text-amber-700 dark:text-amber-300 hover:underline mt-1">View Subscription Plans</Link>
+              </AlertDescription>
+            </Alert>
+
             <Card className="mb-6 p-4 bg-gradient-to-r from-pink-100 via-purple-100 to-indigo-100 dark:from-pink-900/30 dark:via-purple-900/30 dark:to-indigo-900/30 border-pink-300 dark:border-pink-700">
                 <CardHeader className="p-0 pb-2 flex flex-row items-center gap-3">
                      {userRomanticMonsterImageUrl && userRomanticMonsterName && (
