@@ -33,6 +33,7 @@ const MONSTER_TOMB_KEY = 'morgellonMonsterTomb';
 const MONSTER_HAS_SPOKEN_KEY = 'monsterHasSpokenFirstTime';
 const USER_POINTS_KEY = 'userPoints'; 
 const MONSTER_LAST_RECOVERY_DATE_KEY = 'monsterLastRecoveryDate';
+const ALL_NUTRITIONAL_FOOD_ENTRIES_KEY = 'allNutritionalFoodEntries';
 
 
 const MONSTER_DEATH_THRESHOLD = -50;
@@ -55,6 +56,19 @@ interface TombEntry {
   name: string;
   imageUrl: string;
   diedAt: string;
+}
+
+interface NutritionalFoodLogEntry {
+  id: string;
+  loggedAt: string; // ISO string
+  foodName: string;
+  calories?: number;
+  proteinGrams?: number;
+  carbGrams?: number;
+  fatGrams?: number;
+  sugarGrams?: number;
+  sodiumMilligrams?: number;
+  servingDescription?: string;
 }
 
 export default function FoodLogPage() {
@@ -183,6 +197,31 @@ export default function FoodLogPage() {
       return false; 
   };
 
+  const saveNutritionalEntry = (foodName: string, gradingResult: FoodGradingOutput) => {
+    if (gradingResult.calories !== undefined && (!gradingResult.clarifyingQuestions || gradingResult.clarifyingQuestions.length === 0)) {
+      const newNutritionalEntry: NutritionalFoodLogEntry = {
+        id: Date.now().toString() + '_nutr',
+        loggedAt: new Date().toISOString(),
+        foodName: foodName, // Use the potentially modified foodName
+        calories: gradingResult.calories,
+        proteinGrams: gradingResult.proteinGrams,
+        carbGrams: gradingResult.carbGrams,
+        fatGrams: gradingResult.fatGrams,
+        sugarGrams: gradingResult.sugarGrams,
+        sodiumMilligrams: gradingResult.sodiumMilligrams,
+        servingDescription: gradingResult.servingDescription,
+      };
+
+      const existingNutritionalEntriesRaw = localStorage.getItem(ALL_NUTRITIONAL_FOOD_ENTRIES_KEY);
+      let existingNutritionalEntries: NutritionalFoodLogEntry[] = [];
+      if (existingNutritionalEntriesRaw) {
+        existingNutritionalEntries = JSON.parse(existingNutritionalEntriesRaw);
+      }
+      existingNutritionalEntries.push(newNutritionalEntry);
+      localStorage.setItem(ALL_NUTRITIONAL_FOOD_ENTRIES_KEY, JSON.stringify(existingNutritionalEntries));
+    }
+  };
+
 
   const handleFoodSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -222,6 +261,8 @@ export default function FoodLogPage() {
           healthAfter: newHealth,
         };
         setFoodLogEntries(prev => [newLogEntry, ...prev].slice(0, 20)); 
+        saveNutritionalEntry(result.foodName, result);
+
 
         let toastTitle = "";
         let monsterQuote = result.reasoning;
@@ -405,6 +446,8 @@ export default function FoodLogPage() {
           healthAfter: newHealth,
         };
         setFoodLogEntries(prev => [newLogEntry, ...prev].slice(0, 20)); 
+        saveNutritionalEntry(foodItemDescription, result);
+
 
         let toastTitle = result.grade === "good" ? `${monsterName} wails!` : result.grade === "bad" ? `${monsterName} rejoices!` : `${monsterName} is indifferent.`;
         let monsterQuote = result.reasoning;
@@ -570,6 +613,25 @@ export default function FoodLogPage() {
                 </Alert>
             </CardContent>
           )}
+           {suggestedMeal && !generatedRecipe && (
+            <Card className="m-4 p-4 bg-accent/10">
+              <CardTitle className="text-lg mb-1">{suggestedMeal.suggestedMealName}</CardTitle>
+              <CardDescription className="mb-2">{suggestedMeal.shortDescription}</CardDescription>
+              <p className="italic text-sm text-muted-foreground mb-3">"{suggestedMeal.monsterImpactStatement}"</p>
+              <div className="flex gap-2">
+                <Button onClick={() => handleGenerateRecipe(suggestedMeal.suggestedMealName)} disabled={isGeneratingRecipe}>
+                  {isGeneratingRecipe ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ChefHat className="mr-2 h-4 w-4"/>}
+                  Get Recipe
+                </Button>
+                <Button variant="outline" onClick={() => { setSuggestedMeal(null); setGeneratedRecipe(null); setError(null); }}>Clear Suggestion</Button>
+              </div>
+            </Card>
+          )}
+          {isGeneratingRecipe && (
+            <CardContent className="flex items-center justify-center p-4">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin"/> {monsterName}'s minions are scribbling a recipe...
+            </CardContent>
+          )}
         </Card>
 
         {generatedRecipe && (
@@ -586,7 +648,14 @@ export default function FoodLogPage() {
                     <li key={idx}>
                       {ing.quantity} {ing.unit} {ing.name}
                       {ing.notes && <span className="text-xs text-muted-foreground"> ({ing.notes})</span>}
-                      {ing.isLinkable && <ShoppingCart className="inline-block ml-1 h-3 w-3 text-primary/70" title="Potentially linkable item"/>}
+                      {ing.isLinkable && 
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <ShoppingCart className="inline-block ml-1 h-3 w-3 text-primary/70 cursor-help"/>
+                          </TooltipTrigger>
+                          <TooltipContent><p className="text-xs">This item might be available on Amazon Fresh/Whole Foods.</p></TooltipContent>
+                        </Tooltip>
+                      }
                     </li>
                   ))}
                 </ul>
@@ -608,16 +677,16 @@ export default function FoodLogPage() {
                 </>
               )}
             </CardContent>
-            <CardFooter>
-                 <Button variant="outline" onClick={() => { setSuggestedMeal(null); setGeneratedRecipe(null); setError(null); setRecipePreparationNotes(''); }}>
+             <CardFooter className="flex gap-2">
+                <Button variant="outline" onClick={() => { setSuggestedMeal(null); setGeneratedRecipe(null); setError(null); setRecipePreparationNotes(''); }}>
                     Clear Recipe & Suggestion
                 </Button>
             </CardFooter>
           </Card>
         )}
 
-        {generatedRecipe && ( /* New Card for logging the prepared recipe */
-          <Card className="mt-6 border-primary/50">
+        {generatedRecipe && ( 
+          <Card className="border-primary/50">
             <CardHeader>
               <CardTitle className="font-headline text-xl flex items-center gap-2"><Edit3 className="h-5 w-5 text-primary"/>Log Your Prepared Recipe</CardTitle>
               <CardDescription>
