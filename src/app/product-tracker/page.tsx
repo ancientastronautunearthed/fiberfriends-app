@@ -75,8 +75,20 @@ interface StreakData {
   count: number;
 }
 
+function LoadingPlaceholder() {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <p className="ml-3 text-muted-foreground">Loading Gear & Artifacts Tracker...</p>
+    </div>
+  );
+}
+
 
 export default function ProductTrackerPage() {
+  const [isClientReady, setIsClientReady] = useState(false);
+  const [isMonsterActuallyGenerated, setIsMonsterActuallyGenerated] = useState(false);
+
   const [workingProducts, setWorkingProducts] = useState<ProductEntryClient[]>([]);
   const [notWorkingProducts, setNotWorkingProducts] = useState<ProductEntryClient[]>([]);
 
@@ -100,7 +112,8 @@ export default function ProductTrackerPage() {
   const [positiveProductUsageStreak, setPositiveProductUsageStreak] = useState<StreakData>({ date: '', count: 0});
 
 
-  const updateStreak = (streakKey: string, setStreakState: React.Dispatch<React.SetStateAction<StreakData>>): number => {
+  const updateStreak = useCallback((streakKey: string, setStreakState: React.Dispatch<React.SetStateAction<StreakData>>): number => {
+    if (typeof window === 'undefined') return 0;
     const today = new Date().toISOString().split('T')[0];
     const storedStreak = localStorage.getItem(streakKey);
     let currentStreak: StreakData = { date: today, count: 0 };
@@ -127,12 +140,13 @@ export default function ProductTrackerPage() {
     localStorage.setItem(streakKey, JSON.stringify(currentStreak));
     setStreakState(currentStreak);
     return currentStreak.count;
-  };
+  }, []);
 
 
   const performNightlyRecovery = useCallback(() => {
-    const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
-    if (monsterGenerated !== 'true') return;
+    if (typeof window === 'undefined') return;
+    const monsterGeneratedCheck = localStorage.getItem(MONSTER_GENERATED_KEY);
+    if (monsterGeneratedCheck !== 'true') return;
 
     const storedName = localStorage.getItem(MONSTER_NAME_KEY);
     const storedHealthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
@@ -162,11 +176,13 @@ export default function ProductTrackerPage() {
   }, [toast]);
 
   useEffect(() => {
-    const storedMonsterImage = localStorage.getItem(MONSTER_IMAGE_KEY);
-    const storedMonsterName = localStorage.getItem(MONSTER_NAME_KEY);
-    const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
+    setIsClientReady(true);
+    const isGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+    setIsMonsterActuallyGenerated(isGenerated);
 
-    if (monsterGenerated === 'true' && storedMonsterImage && storedMonsterName) {
+    if (isGenerated) {
+      const storedMonsterImage = localStorage.getItem(MONSTER_IMAGE_KEY);
+      const storedMonsterName = localStorage.getItem(MONSTER_NAME_KEY);
       setMonsterImageUrl(storedMonsterImage);
       setMonsterName(storedMonsterName);
       const storedHealth = localStorage.getItem(MONSTER_HEALTH_KEY);
@@ -192,20 +208,44 @@ export default function ProductTrackerPage() {
     const savedProductUsageStreak = localStorage.getItem(POSITIVE_PRODUCT_USAGE_STREAK_KEY);
     if (savedProductUsageStreak) setPositiveProductUsageStreak(JSON.parse(savedProductUsageStreak));
 
-
   }, [performNightlyRecovery]);
 
+  const checkMonsterDeath = useCallback((currentHealth: number, cause: string) => {
+    if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterName && monsterImageUrl) {
+       if (typeof window === 'undefined') return true; // Avoid further localStorage ops during SSR/build
+       const tomb: TombEntry[] = JSON.parse(localStorage.getItem(MONSTER_TOMB_KEY) || '[]');
+       tomb.unshift({ name: monsterName, imageUrl: monsterImageUrl, diedAt: new Date().toISOString() });
+       localStorage.setItem(MONSTER_TOMB_KEY, JSON.stringify(tomb.slice(0, 50)));
+       localStorage.removeItem(MONSTER_IMAGE_KEY);
+       localStorage.removeItem(MONSTER_NAME_KEY);
+       localStorage.removeItem(MONSTER_HEALTH_KEY);
+       localStorage.removeItem(MONSTER_GENERATED_KEY);
+       setMonsterImageUrl(null); setMonsterName(null); setMonsterHealth(null);
+       setIsMonsterActuallyGenerated(false);
+       toast({
+         title: `${monsterName} Has Perished!`,
+         description: `Its reign of internal terror ends, falling to ${currentHealth.toFixed(1)}% health due to ${cause}. A new shadow will soon take its place... Create it now!`,
+         variant: "destructive", duration: Number.MAX_SAFE_INTEGER
+       });
+       router.push('/create-monster');
+       return true;
+     }
+     return false;
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [monsterName, monsterImageUrl, router, toast]);
+
+
   useEffect(() => {
-    if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true' && monsterName) {
+    if (typeof window !== 'undefined' && monsterHealth !== null && isMonsterActuallyGenerated && monsterName) {
       localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
       checkMonsterDeath(monsterHealth, "its own frail constitution");
     }
-  }, [monsterHealth, monsterName]);
+  }, [monsterHealth, monsterName, isMonsterActuallyGenerated, checkMonsterDeath]);
 
-  useEffect(() => { localStorage.setItem(WORKING_PRODUCTS_KEY, JSON.stringify(workingProducts)); }, [workingProducts]);
-  useEffect(() => { localStorage.setItem(NOT_WORKING_PRODUCTS_KEY, JSON.stringify(notWorkingProducts)); }, [notWorkingProducts]);
-  useEffect(() => { localStorage.setItem(USER_POINTS_KEY, String(userPoints)); }, [userPoints]);
-  useEffect(() => { localStorage.setItem(POSITIVE_PRODUCT_USAGE_STREAK_KEY, JSON.stringify(positiveProductUsageStreak)); }, [positiveProductUsageStreak]);
+  useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem(WORKING_PRODUCTS_KEY, JSON.stringify(workingProducts)); }, [workingProducts]);
+  useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem(NOT_WORKING_PRODUCTS_KEY, JSON.stringify(notWorkingProducts)); }, [notWorkingProducts]);
+  useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem(USER_POINTS_KEY, String(userPoints)); }, [userPoints]);
+  useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem(POSITIVE_PRODUCT_USAGE_STREAK_KEY, JSON.stringify(positiveProductUsageStreak)); }, [positiveProductUsageStreak]);
 
 
   useEffect(() => {
@@ -239,7 +279,7 @@ export default function ProductTrackerPage() {
 
     const totalProductsLogged = workingProducts.length + notWorkingProducts.length;
     if (totalProductsLogged > 0 && totalProductsLogged % PRODUCT_LOG_MILESTONE_INTERVAL === 0) {
-        showSocialProofToast(`${totalProductsLogged} product insights shared`, POINTS_PER_PRODUCT, true);
+        if (typeof window !== 'undefined') showSocialProofToast(`${totalProductsLogged} product insights shared`, POINTS_PER_PRODUCT, true);
     }
 };
 
@@ -327,7 +367,7 @@ export default function ProductTrackerPage() {
 
     const totalProductsLogged = workingProducts.length + notWorkingProducts.length + 1;
     if (totalProductsLogged > 0 && totalProductsLogged % PRODUCT_LOG_MILESTONE_INTERVAL === 0) {
-        showSocialProofToast(`${totalProductsLogged} product insights shared`, POINTS_PER_PRODUCT, true);
+        if (typeof window !== 'undefined') showSocialProofToast(`${totalProductsLogged} product insights shared`, POINTS_PER_PRODUCT, true);
     }
 
     setPastProductName('');
@@ -338,29 +378,8 @@ export default function ProductTrackerPage() {
     setNotWorkingProducts(prev => prev.filter(p => p.id !== id));
   };
 
-  const checkMonsterDeath = (currentHealth: number, cause: string) => {
-    if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterName && monsterImageUrl) {
-       const tomb: TombEntry[] = JSON.parse(localStorage.getItem(MONSTER_TOMB_KEY) || '[]');
-       tomb.unshift({ name: monsterName, imageUrl: monsterImageUrl, diedAt: new Date().toISOString() });
-       localStorage.setItem(MONSTER_TOMB_KEY, JSON.stringify(tomb.slice(0, 50)));
-       localStorage.removeItem(MONSTER_IMAGE_KEY);
-       localStorage.removeItem(MONSTER_NAME_KEY);
-       localStorage.removeItem(MONSTER_HEALTH_KEY);
-       localStorage.removeItem(MONSTER_GENERATED_KEY);
-       setMonsterImageUrl(null); setMonsterName(null); setMonsterHealth(null);
-       toast({
-         title: `${monsterName} Has Perished!`,
-         description: `Its reign of internal terror ends, falling to ${currentHealth.toFixed(1)}% health due to ${cause}. A new shadow will soon take its place... Create it now!`,
-         variant: "destructive", duration: Number.MAX_SAFE_INTEGER
-       });
-       router.push('/create-monster');
-       return true;
-     }
-     return false;
-   };
-
   const handleUseProduct = (product: ProductEntryClient) => {
-    if (!monsterGenerated || monsterHealth === null || !product.isGraded || !monsterName) return;
+    if (!isMonsterActuallyGenerated || monsterHealth === null || !product.isGraded || !monsterName) return;
 
     const STREAK_BONUS_PER_DAY = 0.02;
     const MAX_STREAK_MODIFIER = 0.50;
@@ -394,12 +413,10 @@ export default function ProductTrackerPage() {
         duration: Number.MAX_SAFE_INTEGER,
       });
       if (currentStreakCount >= 5 && currentStreakCount % 5 === 0) { 
-          showSocialProofToast(`${currentStreakCount}-day streak using helpful products like ${product.productName}`, undefined, true);
+          if (typeof window !== 'undefined') showSocialProofToast(`${currentStreakCount}-day streak using helpful products like ${product.productName}`, undefined, true);
       }
     }
   };
-
-  const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
 
   const nextTierPoints = () => {
     if (currentTier.points < TIERS.BRONZE.points) return TIERS.BRONZE.points;
@@ -422,6 +439,21 @@ export default function ProductTrackerPage() {
       const range = MAX_MONSTER_HEALTH - MONSTER_DEATH_THRESHOLD;
       const currentValInRange = monsterHealth - MONSTER_DEATH_THRESHOLD;
       return Math.max(0, Math.min((currentValInRange / range) * 100, 100));
+  }
+
+  if (!isClientReady) {
+    return <LoadingPlaceholder />;
+  }
+
+  if (!isMonsterActuallyGenerated) {
+    return (
+      <Card className="max-w-lg mx-auto">
+        <CardHeader><CardTitle className="font-headline flex items-center gap-2"><Info />Nemesis Required</CardTitle></CardHeader>
+        <CardContent><p className="text-center text-muted-foreground mb-4">Create your Nemesis to use Gear & Artifacts and see their impact.</p>
+          <Button asChild className="w-full"><Link href="/create-monster"><Sparkles className="mr-2 h-4 w-4"/>Summon Nemesis</Link></Button>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -468,7 +500,7 @@ export default function ProductTrackerPage() {
         </CardContent>
       </Card>
 
-      {monsterGenerated && monsterName && monsterImageUrl && monsterHealth !== null && (
+      {isMonsterActuallyGenerated && monsterName && monsterImageUrl && monsterHealth !== null && (
         <Card className={cn("lg:col-span-1", showDamageEffect && 'animate-damage-flash')}>
           <CardHeader className="items-center text-center">
             <Link href="/my-profile">
@@ -483,20 +515,20 @@ export default function ProductTrackerPage() {
           </CardHeader>
           <CardContent className="text-center">
             <Label htmlFor="monster-health-progress" className="text-sm font-medium block mb-1">
-              Monster Health: {monsterHealth.toFixed(1)}%
+              Nemesis Health: {monsterHealth.toFixed(1)}%
             </Label>
             <Progress id="monster-health-progress" value={getHealthBarValue()} className="w-full h-2.5" />
             <p className="text-xs text-muted-foreground mt-1">Dies at {MONSTER_DEATH_THRESHOLD}%, Max: {MAX_MONSTER_HEALTH}%</p>
           </CardContent>
         </Card>
       )}
-      {!monsterGenerated && (
+      {!isMonsterActuallyGenerated && isClientReady && (
          <Card className="p-4 bg-muted/50 text-center">
             <Info className="mx-auto h-8 w-8 text-primary mb-2" />
-            <CardTitle className="text-md mb-1">No Active Monster</CardTitle>
-            <p className="text-sm text-muted-foreground mb-3">Create a monster to use products and see their health impact.</p>
+            <CardTitle className="text-md mb-1">No Active Nemesis</CardTitle>
+            <p className="text-sm text-muted-foreground mb-3">Create your Nemesis to use Gear & Artifacts and see their impact.</p>
             <Button asChild size="sm">
-                <Link href="/create-monster"><Sparkles className="mr-2 h-4 w-4"/>Create Monster</Link>
+                <Link href="/create-monster"><Sparkles className="mr-2 h-4 w-4"/>Summon Nemesis</Link>
             </Button>
         </Card>
       )}
@@ -505,39 +537,39 @@ export default function ProductTrackerPage() {
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline">Currently Using & Working</CardTitle>
-            <CardDescription>List products that help. AI will grade their benefit (1-5 score, cached for 24hrs). Using a product reduces monster health by its score, amplified by consistency streaks.</CardDescription>
+            <CardTitle className="font-headline">Equip Battle Aid (Currently Using)</CardTitle>
+            <CardDescription>List items that help. AI grades their benefit (1-5 score, cached for 24hrs). "Activate Aid" to apply effect to {monsterName || 'Nemesis'}.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <div>
-                <Label htmlFor="current-product-name">Product Name</Label>
+                <Label htmlFor="current-product-name">Aid Name</Label>
                 <Input
                   id="current-product-name"
                   value={currentProductName}
                   onChange={(e) => setCurrentProductName(e.target.value)}
                   placeholder="e.g., Specific Vitamin C Serum"
-                  disabled={isGradingProduct}
+                  disabled={isGradingProduct || !isMonsterActuallyGenerated}
                 />
               </div>
               <div>
-                <Label htmlFor="current-product-notes">Notes (Brand, Dosage, etc.)</Label>
+                <Label htmlFor="current-product-notes">Notes (Brand, Usage, etc.)</Label>
                 <Textarea
                   id="current-product-notes"
                   value={currentProductNotes}
                   onChange={(e) => setCurrentProductNotes(e.target.value)}
-                  placeholder="e.g., Brand X, 500mg daily"
+                  placeholder="e.g., Brand X, Apply nightly"
                   className="min-h-[60px]"
-                  disabled={isGradingProduct}
+                  disabled={isGradingProduct || !isMonsterActuallyGenerated}
                 />
               </div>
             </div>
-            <Button onClick={handleAddWorkingProduct} className="w-full sm:w-auto" disabled={isGradingProduct || !currentProductName.trim() || !monsterGenerated}>
+            <Button onClick={handleAddWorkingProduct} className="w-full sm:w-auto" disabled={isGradingProduct || !currentProductName.trim() || !isMonsterActuallyGenerated}>
               {isGradingProduct ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-              {isGradingProduct ? `Asking ${monsterName || 'the AI'} about ${currentProductName}...` : 'Add & Grade Working Product'}
+              {isGradingProduct ? `Consulting Oracle for ${currentProductName}...` : 'Equip & Assess Aid'}
             </Button>
             <div className="space-y-3 pt-4 max-h-96 overflow-y-auto">
-              {workingProducts.length === 0 && <p className="text-sm text-muted-foreground">No working products logged yet.</p>}
+              {workingProducts.length === 0 && <p className="text-sm text-muted-foreground">No battle aids equipped yet.</p>}
               {workingProducts.map(product => (
                 <Card key={product.id} className="p-3 bg-card/60">
                   <div className="flex justify-between items-start gap-2">
@@ -553,13 +585,13 @@ export default function ProductTrackerPage() {
                                         <Button variant="ghost" size="icon" className="h-5 w-5"><HelpCircle className="h-3.5 w-3.5 text-muted-foreground"/></Button>
                                     </TooltipTrigger>
                                     <TooltipContent side="top" className="max-w-xs">
-                                        <p className="text-xs font-medium">{monsterName || 'AI'} Reasoning:</p>
+                                        <p className="text-xs font-medium">{monsterName || 'Oracle'} Reasoning:</p>
                                         <p className="text-xs">{product.reasoning}</p>
                                     </TooltipContent>
                                 </Tooltip>
                             </div>
                         ) : (
-                            <Badge variant="outline" className="animate-pulse">Grading by AI...</Badge>
+                            <Badge variant="outline" className="animate-pulse">Oracle Assessing...</Badge>
                         )}
                       </div>
                     </div>
@@ -567,9 +599,9 @@ export default function ProductTrackerPage() {
                         <Button variant="ghost" size="icon" onClick={() => handleRemoveWorkingProduct(product.id)} aria-label="Remove product" className="h-7 w-7">
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
-                        {monsterGenerated && product.isGraded && (
+                        {isMonsterActuallyGenerated && product.isGraded && (
                             <Button size="sm" variant="outline" onClick={() => handleUseProduct(product)} className="text-xs h-7 px-2" disabled={monsterHealth === null || monsterHealth <= MONSTER_DEATH_THRESHOLD}>
-                                <HeartPulse className="mr-1 h-3 w-3"/> Use
+                                <HeartPulse className="mr-1 h-3 w-3"/> Activate Aid
                             </Button>
                         )}
                     </div>
@@ -582,18 +614,19 @@ export default function ProductTrackerPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline">Tried & Did Not Work</CardTitle>
-            <CardDescription>List products that didn't help or had adverse effects.</CardDescription>
+            <CardTitle className="font-headline">Discarded Aids (Tried & Failed)</CardTitle>
+            <CardDescription>List aids that didn't help or had adverse effects. For your records.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <div>
-                <Label htmlFor="past-product-name">Product Name</Label>
+                <Label htmlFor="past-product-name">Aid Name</Label>
                 <Input
                   id="past-product-name"
                   value={pastProductName}
                   onChange={(e) => setPastProductName(e.target.value)}
                   placeholder="e.g., Common Pain Reliever"
+                  disabled={!isMonsterActuallyGenerated}
                 />
               </div>
               <div>
@@ -604,14 +637,15 @@ export default function ProductTrackerPage() {
                   onChange={(e) => setPastProductNotes(e.target.value)}
                   placeholder="e.g., Caused mild nausea"
                   className="min-h-[60px]"
+                  disabled={!isMonsterActuallyGenerated}
                 />
               </div>
             </div>
-            <Button onClick={handleAddNotWorkingProduct} className="w-full sm:w-auto" disabled={!pastProductName.trim()}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Past Product
+            <Button onClick={handleAddNotWorkingProduct} className="w-full sm:w-auto" disabled={!pastProductName.trim() || !isMonsterActuallyGenerated}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add to Discard Pile
             </Button>
             <div className="space-y-3 pt-4 max-h-96 overflow-y-auto">
-              {notWorkingProducts.length === 0 && <p className="text-sm text-muted-foreground">No past products logged yet.</p>}
+              {notWorkingProducts.length === 0 && <p className="text-sm text-muted-foreground">No discarded aids logged yet.</p>}
               {notWorkingProducts.map(product => (
                 <Card key={product.id} className="p-3 bg-card/60">
                   <div className="flex justify-between items-start">
