@@ -77,7 +77,19 @@ interface StreakData {
   count: number;
 }
 
+function LoadingPlaceholder() {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <p className="ml-3 text-muted-foreground">Loading Your Battle Potions...</p>
+    </div>
+  );
+}
+
 export default function PrescriptionTrackerPage() {
+  const [isClientReady, setIsClientReady] = useState(false);
+  const [isMonsterActuallyGenerated, setIsMonsterActuallyGenerated] = useState(false);
+
   const [monsterImageUrl, setMonsterImageUrl] = useState<string | null>(null);
   const [monsterName, setMonsterName] = useState<string | null>(null);
   const [monsterHealth, setMonsterHealth] = useState<number | null>(null);
@@ -96,7 +108,8 @@ export default function PrescriptionTrackerPage() {
   const router = useRouter();
   const [prescriptionUsageStreak, setPrescriptionUsageStreak] = useState<StreakData>({ date: '', count: 0});
 
-  const updateStreak = (streakKey: string, setStreakState: React.Dispatch<React.SetStateAction<StreakData>>): number => {
+  const updateStreak = useCallback((streakKey: string, setStreakState: React.Dispatch<React.SetStateAction<StreakData>>): number => {
+    if (typeof window === 'undefined') return 0;
     const today = new Date().toISOString().split('T')[0];
     const storedStreak = localStorage.getItem(streakKey);
     let currentStreakData: StreakData = { date: today, count: 0 };
@@ -122,12 +135,13 @@ export default function PrescriptionTrackerPage() {
     localStorage.setItem(streakKey, JSON.stringify(currentStreakData));
     setStreakState(currentStreakData);
     return currentStreakData.count;
-  };
+  }, []);
 
 
   const performNightlyRecovery = useCallback(() => {
-    const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
-    if (monsterGenerated !== 'true') return;
+    if (typeof window === 'undefined') return;
+    const monsterGeneratedCheck = localStorage.getItem(MONSTER_GENERATED_KEY);
+    if (monsterGeneratedCheck !== 'true') return;
 
     const storedName = localStorage.getItem(MONSTER_NAME_KEY);
     const storedHealthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
@@ -157,16 +171,20 @@ export default function PrescriptionTrackerPage() {
   }, [toast]);
 
   useEffect(() => {
-    const storedImage = localStorage.getItem(MONSTER_IMAGE_KEY);
-    const storedName = localStorage.getItem(MONSTER_NAME_KEY);
-    const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
+    setIsClientReady(true);
+    const isGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+    setIsMonsterActuallyGenerated(isGenerated);
 
-    if (monsterGenerated === 'true' && storedImage && storedName) {
+    if (isGenerated) {
+      const storedImage = localStorage.getItem(MONSTER_IMAGE_KEY);
+      const storedName = localStorage.getItem(MONSTER_NAME_KEY);
       setMonsterImageUrl(storedImage);
       setMonsterName(storedName);
+      
       const storedHealth = localStorage.getItem(MONSTER_HEALTH_KEY);
-      if (storedHealth) setMonsterHealth(parseFloat(storedHealth));
-      else {
+      if (storedHealth) {
+        setMonsterHealth(parseFloat(storedHealth));
+      } else {
         const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
         setMonsterHealth(initialHealth);
         localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
@@ -185,15 +203,16 @@ export default function PrescriptionTrackerPage() {
   }, [performNightlyRecovery]);
 
   useEffect(() => {
-    if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true' && monsterName) {
+    if (typeof window !== 'undefined' && monsterHealth !== null && isMonsterActuallyGenerated && monsterName) {
       localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
       checkMonsterDeath(monsterHealth, "its own complicated chemistry"); 
     }
-  }, [monsterHealth, monsterName]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monsterHealth, monsterName, isMonsterActuallyGenerated]);
 
-  useEffect(() => { localStorage.setItem(BENEFICIAL_PRESCRIPTIONS_KEY, JSON.stringify(beneficialPrescriptions)); }, [beneficialPrescriptions]);
-  useEffect(() => { localStorage.setItem(OTHER_PRESCRIPTIONS_KEY, JSON.stringify(otherPrescriptions)); }, [otherPrescriptions]);
-  useEffect(() => { localStorage.setItem(PRESCRIPTION_USAGE_STREAK_KEY, JSON.stringify(prescriptionUsageStreak)); }, [prescriptionUsageStreak]);
+  useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem(BENEFICIAL_PRESCRIPTIONS_KEY, JSON.stringify(beneficialPrescriptions)); }, [beneficialPrescriptions]);
+  useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem(OTHER_PRESCRIPTIONS_KEY, JSON.stringify(otherPrescriptions)); }, [otherPrescriptions]);
+  useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem(PRESCRIPTION_USAGE_STREAK_KEY, JSON.stringify(prescriptionUsageStreak)); }, [prescriptionUsageStreak]);
 
   const checkMonsterDeath = (currentHealth: number, cause: string) => {
      if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterName && monsterImageUrl) {
@@ -203,6 +222,7 @@ export default function PrescriptionTrackerPage() {
         localStorage.removeItem(MONSTER_IMAGE_KEY); localStorage.removeItem(MONSTER_NAME_KEY);
         localStorage.removeItem(MONSTER_HEALTH_KEY); localStorage.removeItem(MONSTER_GENERATED_KEY);
         setMonsterImageUrl(null); setMonsterName(null); setMonsterHealth(null);
+        setIsMonsterActuallyGenerated(false); // Update state to reflect monster is gone
         toast({
           title: `${monsterName} Has Perished!`,
           description: `Its dark reign ends due to ${cause}, at ${currentHealth.toFixed(1)}% health. A new shadow awaits... Create it now!`,
@@ -213,6 +233,7 @@ export default function PrescriptionTrackerPage() {
   };
 
   const addPoints = (points: number) => {
+    if (typeof window === 'undefined') return;
     const currentPoints = parseInt(localStorage.getItem(USER_POINTS_KEY) || '0', 10);
     localStorage.setItem(USER_POINTS_KEY, String(currentPoints + points));
   };
@@ -307,7 +328,7 @@ export default function PrescriptionTrackerPage() {
   };
 
   const handleTakeDose = (prescription: PrescriptionLogEntryClient) => {
-    if (!monsterGenerated || monsterHealth === null || !prescription.isGraded || !monsterName) return;
+    if (!isMonsterActuallyGenerated || monsterHealth === null || !prescription.isGraded || !monsterName) return;
     if (prescription.benefitScore <= 0) {
       toast({ title: "No Monster Impact", description: `${prescription.prescriptionName} has no graded benefit to affect ${monsterName}.`, variant: "default" });
       return;
@@ -347,14 +368,16 @@ export default function PrescriptionTrackerPage() {
       return Math.max(0, Math.min((currentValInRange / range) * 100, 100));
   };
   
-  const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+  if (!isClientReady) {
+    return <LoadingPlaceholder />;
+  }
 
-  if (!monsterGenerated) {
+  if (!isMonsterActuallyGenerated) {
     return (
       <Card className="max-w-lg mx-auto">
-        <CardHeader><CardTitle className="font-headline flex items-center gap-2"><Info />Monster Required</CardTitle></CardHeader>
-        <CardContent><p className="text-center text-muted-foreground mb-4">Create your Morgellon Monster to track prescriptions and their effects.</p>
-          <Button asChild className="w-full"><Link href="/create-monster"><Sparkles className="mr-2 h-4 w-4"/>Create Monster</Link></Button>
+        <CardHeader><CardTitle className="font-headline flex items-center gap-2"><Info />Nemesis Required</CardTitle></CardHeader>
+        <CardContent><p className="text-center text-muted-foreground mb-4">Create your Nemesis to track prescriptions and their effects on its power.</p>
+          <Button asChild className="w-full"><Link href="/create-monster"><Sparkles className="mr-2 h-4 w-4"/>Summon Nemesis</Link></Button>
         </CardContent>
       </Card>
     );
@@ -378,7 +401,7 @@ export default function PrescriptionTrackerPage() {
               )}
             </CardHeader>
             <CardContent className="text-center">
-              <Label htmlFor="monster-health-rx" className="text-sm font-medium block mb-1">Monster Health: {monsterHealth.toFixed(1)}%</Label>
+              <Label htmlFor="monster-health-rx" className="text-sm font-medium block mb-1">Nemesis Health: {monsterHealth.toFixed(1)}%</Label>
               <Progress id="monster-health-rx" value={getHealthBarValue()} className="w-full h-2.5" />
               <p className="text-xs text-muted-foreground mt-1">Dies at {MONSTER_DEATH_THRESHOLD}%, Max: {MAX_MONSTER_HEALTH}%</p>
             </CardContent>
@@ -389,24 +412,24 @@ export default function PrescriptionTrackerPage() {
       <div className="lg:col-span-2 space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline flex items-center gap-2"><Pill className="h-6 w-6 text-primary"/>Log Prescription</CardTitle>
+            <CardTitle className="font-headline flex items-center gap-2"><Pill className="h-6 w-6 text-primary"/>Log Battle Potion or Elixir</CardTitle>
             <CardDescription>Log prescriptions you're taking or have tried. Beneficial ones (AI-graded, cached for 24hrs) can impact {monsterName}'s health when "taken".</CardDescription>
           </CardHeader>
           <form onSubmit={handleLogPrescription}>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="prescription-name">Prescription Name</Label>
+                <Label htmlFor="prescription-name">Potion/Elixir Name</Label>
                 <Input id="prescription-name" value={prescriptionNameInput} onChange={(e) => setPrescriptionNameInput(e.target.value)} placeholder="e.g., Amoxicillin, Sertraline" disabled={isProcessing}/>
               </div>
               <div>
-                <Label htmlFor="prescription-comments">Your Comments/Experience</Label>
+                <Label htmlFor="prescription-comments">Your Notes/Experience</Label>
                 <Textarea id="prescription-comments" value={commentsInput} onChange={(e) => setCommentsInput(e.target.value)} placeholder="e.g., Helped with X symptom, caused Y side effect..." className="min-h-[80px]" disabled={isProcessing}/>
               </div>
               <div>
-                <Label>My Experience with this Prescription</Label>
+                <Label>My Experience with this Potion/Elixir</Label>
                 <RadioGroup value={experienceTypeInput} onValueChange={(v) => setExperienceTypeInput(v as any)} className="flex gap-4 pt-1">
-                  <div className="flex items-center space-x-2"><RadioGroupItem value="beneficial" id="exp-beneficial" /><Label htmlFor="exp-beneficial" className="font-normal flex items-center gap-1"><ThumbsUp className="h-4 w-4 text-green-500"/>Helped Me</Label></div>
-                  <div className="flex items-center space-x-2"><RadioGroupItem value="not-beneficial" id="exp-not-beneficial" /><Label htmlFor="exp-not-beneficial" className="font-normal flex items-center gap-1"><ThumbsDown className="h-4 w-4 text-red-500"/>Didn't Help / Adverse</Label></div>
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="beneficial" id="exp-beneficial" /><Label htmlFor="exp-beneficial" className="font-normal flex items-center gap-1"><ThumbsUp className="h-4 w-4 text-green-500"/>Effective Potion</Label></div>
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="not-beneficial" id="exp-not-beneficial" /><Label htmlFor="exp-not-beneficial" className="font-normal flex items-center gap-1"><ThumbsDown className="h-4 w-4 text-red-500"/>Ineffective/Harmful</Label></div>
                   <div className="flex items-center space-x-2"><RadioGroupItem value="neutral" id="exp-neutral" /><Label htmlFor="exp-neutral" className="font-normal flex items-center gap-1"><CircleOff className="h-4 w-4 text-muted-foreground"/>Neutral / Unsure</Label></div>
                 </RadioGroup>
               </div>
@@ -415,7 +438,7 @@ export default function PrescriptionTrackerPage() {
             <CardFooter>
               <Button type="submit" disabled={isProcessing || !prescriptionNameInput.trim()} className="w-full sm:w-auto">
                 {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ListChecks className="mr-2 h-4 w-4"/>}
-                {isProcessing ? 'Processing...' : 'Log Prescription'}
+                {isProcessing ? 'Processing...' : 'Log Potion/Elixir'}
               </Button>
             </CardFooter>
           </form>
@@ -424,11 +447,11 @@ export default function PrescriptionTrackerPage() {
         <div className="grid md:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle className="font-headline text-lg flex items-center gap-1.5"><ThumbsUp className="text-green-500"/>Beneficial Prescriptions</CardTitle>
-              <CardDescription className="text-xs">AI-graded. "Take Dose" to apply effect to {monsterName}.</CardDescription>
+              <CardTitle className="font-headline text-lg flex items-center gap-1.5"><ThumbsUp className="text-green-500"/>Effective Potions</CardTitle>
+              <CardDescription className="text-xs">AI-graded. "Consume Potion" to apply effect to {monsterName}.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 max-h-80 overflow-y-auto">
-              {beneficialPrescriptions.length === 0 && <p className="text-sm text-muted-foreground">No beneficial prescriptions logged yet.</p>}
+              {beneficialPrescriptions.length === 0 && <p className="text-sm text-muted-foreground">No effective potions logged yet.</p>}
               {beneficialPrescriptions.map(rx => (
                 <Card key={rx.id} className="p-3 bg-card/70">
                   <div className="flex justify-between items-start gap-2">
@@ -438,7 +461,7 @@ export default function PrescriptionTrackerPage() {
                       <div className="text-xs mt-1">
                         {rx.isGraded ? (
                            <div className="flex items-center gap-1">
-                            <Badge variant="default">Monster Dmg: {rx.benefitScore}/15</Badge>
+                            <Badge variant="default">Nemesis Dmg: {rx.benefitScore}/15</Badge>
                             <Tooltip>
                                 <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-5 w-5"><Info className="h-3.5 w-3.5"/></Button></TooltipTrigger>
                                 <TooltipContent side="top" className="max-w-xs"><p className="text-xs font-medium">AI Reasoning:</p><p className="text-xs">{rx.reasoning}</p></TooltipContent>
@@ -449,7 +472,7 @@ export default function PrescriptionTrackerPage() {
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
                       <Button variant="ghost" size="icon" onClick={() => setBeneficialPrescriptions(prev => prev.filter(p => p.id !== rx.id))} aria-label="Remove" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                      {rx.isGraded && rx.benefitScore > 0 && <Button size="sm" variant="outline" onClick={() => handleTakeDose(rx)} className="text-xs h-7 px-2" disabled={monsterHealth === null || monsterHealth <= MONSTER_DEATH_THRESHOLD}><HeartPulse className="mr-1 h-3 w-3"/>Take Dose</Button>}
+                      {rx.isGraded && rx.benefitScore > 0 && <Button size="sm" variant="outline" onClick={() => handleTakeDose(rx)} className="text-xs h-7 px-2" disabled={monsterHealth === null || monsterHealth <= MONSTER_DEATH_THRESHOLD}><HeartPulse className="mr-1 h-3 w-3"/>Consume</Button>}
                     </div>
                   </div>
                 </Card>
@@ -459,18 +482,18 @@ export default function PrescriptionTrackerPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="font-headline text-lg flex items-center gap-1.5"><MessageSquare/>Other Logged Prescriptions</CardTitle>
-              <CardDescription className="text-xs">For your records (not AI-graded for monster impact).</CardDescription>
+              <CardTitle className="font-headline text-lg flex items-center gap-1.5"><MessageSquare/>Other Logged Potions</CardTitle>
+              <CardDescription className="text-xs">For your records (not AI-graded for Nemesis impact).</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 max-h-80 overflow-y-auto">
-              {otherPrescriptions.length === 0 && <p className="text-sm text-muted-foreground">No other prescriptions logged yet.</p>}
+              {otherPrescriptions.length === 0 && <p className="text-sm text-muted-foreground">No other potions logged yet.</p>}
               {otherPrescriptions.map(rx => (
                 <Card key={rx.id} className="p-3 bg-card/70">
                   <div className="flex justify-between items-start gap-2">
                     <div className="flex-grow">
                       <h4 className="font-semibold text-foreground">{rx.prescriptionName}</h4>
                       <p className="text-xs text-muted-foreground italic">"{rx.userComments.substring(0,100)}{rx.userComments.length > 100 ? '...' : ''}"</p>
-                      <Badge variant="secondary" className="mt-1">{rx.experienceType === 'not-beneficial' ? "Didn't Help / Adverse" : "Neutral / Unsure"}</Badge>
+                      <Badge variant="secondary" className="mt-1">{rx.experienceType === 'not-beneficial' ? "Ineffective/Harmful" : "Neutral / Unsure"}</Badge>
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => setOtherPrescriptions(prev => prev.filter(p => p.id !== rx.id))} aria-label="Remove" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive"/></Button>
                   </div>
