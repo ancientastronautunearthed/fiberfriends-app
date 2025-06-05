@@ -53,7 +53,7 @@ const defaultDemonicRate = () => parseFloat((Math.random() * (0.8 - 0.5) + 0.5).
 
 function LoadingPlaceholder() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[300px]">
+    <div className="flex flex-col items-center justify-center min-h-[300px] w-full">
       <Loader2 className="h-12 w-12 animate-spin text-primary" />
       <p className="mt-4 text-muted-foreground">Loading Affirmation Amplifier...</p>
     </div>
@@ -61,10 +61,12 @@ function LoadingPlaceholder() {
 }
 
 export default function AffirmationAmplifierPage() {
+  const [isClientReady, setIsClientReady] = useState(false);
+  const [isMonsterActuallyGenerated, setIsMonsterActuallyGenerated] = useState(false);
+
   const [monsterImageUrl, setMonsterImageUrl] = useState<string | null>(null);
   const [monsterName, setMonsterName] = useState<string | null>(null);
   const [monsterHealth, setMonsterHealth] = useState<number | null>(null);
-  const [monsterGeneratedState, setMonsterGeneratedState] = useState<boolean | null>(null);
   
   const [affirmationData, setAffirmationData] = useState<AffirmationOutput | null>(null);
   const [isAmplifying, setIsAmplifying] = useState(false);
@@ -83,35 +85,9 @@ export default function AffirmationAmplifierPage() {
 
   const getCurrentDateString = () => new Date().toISOString().split('T')[0];
 
-  useEffect(() => {
-    setMonsterGeneratedState(localStorage.getItem(MONSTER_GENERATED_KEY) === 'true');
-  }, []);
-
-  useEffect(() => {
-    const isMonsterActuallyGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
-    if (isMonsterActuallyGenerated) {
-        const storedConfig = localStorage.getItem(MONSTER_VOICE_CONFIG_KEY);
-        if (storedConfig) {
-          try {
-            setUserMonsterVoiceConfig(JSON.parse(storedConfig));
-          } catch (e) { 
-            setUserMonsterVoiceConfig({ voiceURI: null, pitch: defaultDemonicPitch(), rate: defaultDemonicRate() });
-          }
-        } else {
-           setUserMonsterVoiceConfig({ voiceURI: null, pitch: defaultDemonicPitch(), rate: defaultDemonicRate() });
-        }
-
-        const lastCompletedDate = localStorage.getItem(AFFIRMATION_AMPLIFIER_LAST_COMPLETED_DATE_KEY);
-        if (lastCompletedDate === getCurrentDateString()) {
-          setHasAmplifiedToday(true);
-        }
-    }
-  }, []);
-
-
   const performNightlyRecovery = useCallback(() => {
-    const isMonsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
-    if (!isMonsterGenerated) return;
+    if (typeof window === 'undefined' || !isMonsterActuallyGenerated) return;
+
     const storedName = localStorage.getItem(MONSTER_NAME_KEY);
     const storedHealthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
     if (!storedHealthStr || !storedName) return;
@@ -127,7 +103,7 @@ export default function AffirmationAmplifierPage() {
       localStorage.setItem(MONSTER_LAST_RECOVERY_DATE_KEY, todayDateStr);
       toast({ title: `${storedName} Regenerates`, description: `It seems my power grew by ${recoveryAmount}HP overnight. Health: ${newHealth.toFixed(1)}%.`, duration: 7000 });
     }
-  }, [toast]);
+  }, [toast, isMonsterActuallyGenerated]);
 
   const fetchAffirmation = useCallback(() => {
     setError(null);
@@ -144,8 +120,27 @@ export default function AffirmationAmplifierPage() {
   }, [toast]);
 
   useEffect(() => {
-    const isMonsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
-    if (isMonsterGenerated) {
+    setIsClientReady(true);
+    const generated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+    setIsMonsterActuallyGenerated(generated);
+
+    if (generated) {
+        const storedConfig = localStorage.getItem(MONSTER_VOICE_CONFIG_KEY);
+        if (storedConfig) {
+          try {
+            setUserMonsterVoiceConfig(JSON.parse(storedConfig));
+          } catch (e) { 
+            setUserMonsterVoiceConfig({ voiceURI: null, pitch: defaultDemonicPitch(), rate: defaultDemonicRate() });
+          }
+        } else {
+           setUserMonsterVoiceConfig({ voiceURI: null, pitch: defaultDemonicPitch(), rate: defaultDemonicRate() });
+        }
+
+        const lastCompletedDate = localStorage.getItem(AFFIRMATION_AMPLIFIER_LAST_COMPLETED_DATE_KEY);
+        if (lastCompletedDate === getCurrentDateString()) {
+          setHasAmplifiedToday(true);
+        }
+
       const storedImage = localStorage.getItem(MONSTER_IMAGE_KEY);
       const storedName = localStorage.getItem(MONSTER_NAME_KEY);
       if (storedImage && storedName) {
@@ -163,26 +158,30 @@ export default function AffirmationAmplifierPage() {
   }, [performNightlyRecovery, fetchAffirmation]);
 
   useEffect(() => {
-    if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true' && monsterName) {
+    if (typeof window !== 'undefined' && monsterHealth !== null && isMonsterActuallyGenerated && monsterName) {
       localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
       checkMonsterDeath(monsterHealth, "the force of positivity"); 
     }
-  }, [monsterHealth, monsterName]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monsterHealth, monsterName, isMonsterActuallyGenerated]);
 
   const checkMonsterDeath = (currentHealth: number, cause: string) => {
      if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterName && monsterImageUrl) {
+        if (typeof window === 'undefined') return true;
         const tomb: TombEntry[] = JSON.parse(localStorage.getItem(MONSTER_TOMB_KEY) || '[]');
         tomb.unshift({ name: monsterName, imageUrl: monsterImageUrl, diedAt: new Date().toISOString() });
         localStorage.setItem(MONSTER_TOMB_KEY, JSON.stringify(tomb.slice(0, 50)));
         localStorage.removeItem(MONSTER_IMAGE_KEY); localStorage.removeItem(MONSTER_NAME_KEY);
         localStorage.removeItem(MONSTER_HEALTH_KEY); localStorage.removeItem(MONSTER_GENERATED_KEY);
         setMonsterImageUrl(null); setMonsterName(null); setMonsterHealth(null);
+        setIsMonsterActuallyGenerated(false);
         toast({ title: `${monsterName} Dissolves!`, description: `Its negativity couldn't withstand ${cause}. Current health: ${currentHealth.toFixed(1)}%.`, variant: "destructive", duration: Number.MAX_SAFE_INTEGER });
         router.push('/create-monster'); return true;
       } return false;
   };
 
   const addPoints = (points: number) => {
+    if (typeof window === 'undefined') return;
     const currentPoints = parseInt(localStorage.getItem(USER_POINTS_KEY) || '0', 10);
     localStorage.setItem(USER_POINTS_KEY, String(currentPoints + points));
   };
@@ -222,7 +221,6 @@ export default function AffirmationAmplifierPage() {
     if (!checkMonsterDeath(newHealth, "an internalized affirmation")) {
       toast({ title: "Affirmation Amplified!", description: `${monsterName} recoils! Your inner strength grows. Monster Health: ${newHealth.toFixed(1)}% (-${MONSTER_HP_REDUCTION_FOR_AFFIRMATION}). You earned ${POINTS_FOR_AFFIRMATION} points!`, duration: 7000 });
     }
-    // Fetch a new affirmation after completion, even if they can't amplify again today
     fetchAffirmation();
   };
   
@@ -234,7 +232,7 @@ export default function AffirmationAmplifierPage() {
   };
 
   const speakMonsterRetort = (text: string) => {
-    if (!userMonsterVoiceConfig || isSpeaking) return;
+    if (!userMonsterVoiceConfig || isSpeaking || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     if (userMonsterVoiceConfig.voiceURI) {
@@ -250,11 +248,11 @@ export default function AffirmationAmplifierPage() {
     speechSynthesis.speak(utterance);
   };
 
-  if (monsterGeneratedState === null) {
+  if (!isClientReady) {
     return <LoadingPlaceholder />;
   }
 
-  if (!monsterGeneratedState) {
+  if (!isMonsterActuallyGenerated) {
     return (
       <Card className="max-w-lg mx-auto">
         <CardHeader><CardTitle className="font-headline flex items-center gap-2"><HelpCircle />Monster Required</CardTitle></CardHeader>
@@ -363,4 +361,3 @@ export default function AffirmationAmplifierPage() {
     </div>
   );
 }
-

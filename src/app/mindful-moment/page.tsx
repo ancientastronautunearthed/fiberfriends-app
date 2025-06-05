@@ -36,7 +36,7 @@ const MIN_RECOVERY = 10;
 const MAX_RECOVERY = 20;
 const MAX_MINDFUL_MINUTES_PER_DAY = 3;
 
-const BREATHING_CYCLE = { inhale: 4, hold: 4, exhale: 6 }; // seconds
+const BREATHING_CYCLE = { inhale: 4, hold: 4, exhale: 6 }; 
 const TOTAL_CYCLE_DURATION = BREATHING_CYCLE.inhale + BREATHING_CYCLE.hold + BREATHING_CYCLE.exhale;
 
 const DURATION_OPTIONS = [
@@ -63,7 +63,7 @@ interface DailyUsageData {
 
 function LoadingPlaceholder() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[300px]">
+    <div className="flex flex-col items-center justify-center min-h-[300px] w-full">
       <Loader2 className="h-12 w-12 animate-spin text-primary" />
       <p className="mt-4 text-muted-foreground">Loading Mindful Moment...</p>
     </div>
@@ -71,10 +71,12 @@ function LoadingPlaceholder() {
 }
 
 export default function MindfulMomentPage() {
+  const [isClientReady, setIsClientReady] = useState(false);
+  const [isMonsterActuallyGenerated, setIsMonsterActuallyGenerated] = useState(false);
+
   const [monsterImageUrl, setMonsterImageUrl] = useState<string | null>(null);
   const [monsterName, setMonsterName] = useState<string | null>(null);
   const [monsterHealth, setMonsterHealth] = useState<number | null>(null);
-  const [monsterGeneratedState, setMonsterGeneratedState] = useState<boolean | null>(null);
   
   const [selectedDuration, setSelectedDuration] = useState(DURATION_OPTIONS[0].value);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -93,50 +95,53 @@ export default function MindfulMomentPage() {
   const [streakBonusDamage, setStreakBonusDamage] = useState(0);
   const [dailyUsage, setDailyUsage] = useState<DailyUsageData>({ date: '', minutesCompletedToday: 0 });
 
-  useEffect(() => {
-    setMonsterGeneratedState(localStorage.getItem(MONSTER_GENERATED_KEY) === 'true');
-  }, []);
-
   const updateStreak = useCallback(() => {
+    if (typeof window === 'undefined') return 0;
     const today = new Date().toISOString().split('T')[0];
-    let currentStreak = { ...mindfulStreak };
+    const storedStreak = localStorage.getItem(MINDFUL_MOMENT_STREAK_KEY);
+    let currentStreakData: StreakData = { date: today, count: 0 };
     let currentBonus = streakBonusDamage;
 
-    if (currentStreak.date === today) { 
-      // No change to streak count if already done today
-    } else {
-      const lastDate = currentStreak.date ? new Date(currentStreak.date) : null;
-      const currentDate = new Date(today);
-      let diffDays = 99;
-      if (lastDate) {
+
+    if (storedStreak) { 
+      currentStreakData = JSON.parse(storedStreak);
+      if (currentStreakData.date === today) { 
+      } else {
+        const lastDate = new Date(currentStreakData.date);
+        const currentDate = new Date(today);
         const diffTime = Math.abs(currentDate.getTime() - lastDate.getTime());
-        diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      }
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      if (diffDays === 1) {
-        currentStreak.count += 1;
-      } else { 
-        currentStreak.count = 1;
-        currentBonus = 0; 
-      }
-      currentStreak.date = today;
+        if (diffDays === 1) {
+          currentStreakData.count += 1;
+        } else { 
+          currentStreakData.count = 1;
+          currentBonus = 0; 
+        }
+        currentStreakData.date = today;
 
-      if (currentStreak.count > 0 && currentStreak.count % 3 === 0) {
-        currentBonus = Math.min(5, currentBonus + 1); 
+        if (currentStreakData.count > 0 && currentStreakData.count % 3 === 0) {
+          currentBonus = Math.min(5, currentBonus + 1); 
+        }
+      }
+    } else {
+      currentStreakData.count = 1; 
+      currentBonus = 0; 
+      if (currentStreakData.count > 0 && currentStreakData.count % 3 === 0) { // Check for initial bonus
+        currentBonus = Math.min(5, currentBonus + 1);
       }
     }
     
-    setMindfulStreak(currentStreak);
-    localStorage.setItem(MINDFUL_MOMENT_STREAK_KEY, JSON.stringify(currentStreak));
+    setMindfulStreak(currentStreakData);
+    localStorage.setItem(MINDFUL_MOMENT_STREAK_KEY, JSON.stringify(currentStreakData));
     setStreakBonusDamage(currentBonus);
     localStorage.setItem(MINDFUL_STREAK_BONUS_KEY, String(currentBonus));
-    return currentStreak.count;
-  }, [mindfulStreak, streakBonusDamage]);
+    return currentStreakData.count;
+  }, [streakBonusDamage]);
 
 
   const performNightlyRecovery = useCallback(() => {
-    const isMonsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
-    if (!isMonsterGenerated) return;
+    if (typeof window === 'undefined' || !isMonsterActuallyGenerated) return;
 
     const storedName = localStorage.getItem(MONSTER_NAME_KEY);
     const storedHealthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
@@ -162,11 +167,14 @@ export default function MindfulMomentPage() {
         variant: "default", duration: 7000,
       });
     }
-  }, [toast]);
+  }, [toast, isMonsterActuallyGenerated]);
 
   useEffect(() => {
-    const isMonsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
-    if (isMonsterGenerated) {
+    setIsClientReady(true);
+    const generated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+    setIsMonsterActuallyGenerated(generated);
+
+    if (generated) {
       setMonsterImageUrl(localStorage.getItem(MONSTER_IMAGE_KEY));
       setMonsterName(localStorage.getItem(MONSTER_NAME_KEY));
       const storedHealth = localStorage.getItem(MONSTER_HEALTH_KEY);
@@ -201,21 +209,23 @@ export default function MindfulMomentPage() {
   }, [performNightlyRecovery]);
 
   useEffect(() => {
-    if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true' && monsterName) {
+    if (typeof window !== 'undefined' && monsterHealth !== null && isMonsterActuallyGenerated && monsterName) {
       localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
       checkMonsterDeath(monsterHealth, "the burden of tranquility"); 
     }
-  }, [monsterHealth, monsterName]);
-
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monsterHealth, monsterName, isMonsterActuallyGenerated]);
 
   const checkMonsterDeath = (currentHealth: number, cause: string) => {
      if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterName && monsterImageUrl) {
+        if (typeof window === 'undefined') return true;
         const tomb: TombEntry[] = JSON.parse(localStorage.getItem(MONSTER_TOMB_KEY) || '[]');
         tomb.unshift({ name: monsterName, imageUrl: monsterImageUrl, diedAt: new Date().toISOString() });
         localStorage.setItem(MONSTER_TOMB_KEY, JSON.stringify(tomb.slice(0, 50)));
         localStorage.removeItem(MONSTER_IMAGE_KEY); localStorage.removeItem(MONSTER_NAME_KEY);
         localStorage.removeItem(MONSTER_HEALTH_KEY); localStorage.removeItem(MONSTER_GENERATED_KEY);
         setMonsterImageUrl(null); setMonsterName(null); setMonsterHealth(null);
+        setIsMonsterActuallyGenerated(false);
         toast({
           title: `${monsterName} Has Vanished!`,
           description: `Its form dissipates, succumbing to ${cause} at ${currentHealth.toFixed(1)}% health. The quiet is... unsettling. A new presence may emerge.`,
@@ -226,6 +236,7 @@ export default function MindfulMomentPage() {
   };
 
   const addPoints = (points: number) => {
+    if (typeof window === 'undefined') return;
     const currentPoints = parseInt(localStorage.getItem(USER_POINTS_KEY) || '0', 10);
     localStorage.setItem(USER_POINTS_KEY, String(currentPoints + points));
   };
@@ -237,9 +248,11 @@ export default function MindfulMomentPage() {
       phaseTimerRef.current = setTimeout(() => {
         setBreathingPhase('exhale');
         phaseTimerRef.current = setTimeout(() => {
-          // Check isSessionActive before calling runBreathingCycle again
-          if (isSessionActive && timeLeft > 0) runBreathingCycle(); 
-          else setBreathingPhase('idle');
+          if (timerRef.current && timeLeft > 0) { // check if session is still intended to be active
+             runBreathingCycle(); 
+          } else {
+             setBreathingPhase('idle');
+          }
         }, BREATHING_CYCLE.exhale * 1000);
       }, BREATHING_CYCLE.hold * 1000);
     }, BREATHING_CYCLE.inhale * 1000);
@@ -259,7 +272,7 @@ export default function MindfulMomentPage() {
 
 
   useEffect(() => {
-    if (isSessionActive) {
+    if (isSessionActive && timeLeft > 0) { // Only start if session is active and time is left
         runBreathingCycle();
     } else {
         if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
@@ -269,7 +282,7 @@ export default function MindfulMomentPage() {
         if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSessionActive]);
+  }, [isSessionActive, timeLeft > 0]); // Added timeLeft > 0
 
 
   const handleStartSession = () => {
@@ -289,7 +302,10 @@ export default function MindfulMomentPage() {
     setIsSessionActive(false);
     setBreathingPhase('idle');
     if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
-    if (timerRef.current) clearTimeout(timerRef.current);
+    if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null; // Ensure timer is cleared and reset
+    }
 
     startProcessingCompletionTransition(async () => {
       if (monsterHealth === null || !monsterName) return;
@@ -300,7 +316,7 @@ export default function MindfulMomentPage() {
       const newMinutesCompletedToday = dailyUsage.minutesCompletedToday + durationOption.value;
       const newDailyUsage: DailyUsageData = { date: new Date().toISOString().split('T')[0], minutesCompletedToday: newMinutesCompletedToday };
       setDailyUsage(newDailyUsage);
-      localStorage.setItem(MINDFUL_MOMENT_DAILY_USAGE_KEY, JSON.stringify(newDailyUsage));
+      if (typeof window !== 'undefined') localStorage.setItem(MINDFUL_MOMENT_DAILY_USAGE_KEY, JSON.stringify(newDailyUsage));
 
       const currentStreakCount = updateStreak();
       const totalDamage = durationOption.baseDamage + streakBonusDamage;
@@ -339,11 +355,11 @@ export default function MindfulMomentPage() {
       return Math.max(0, Math.min((currentValInRange / range) * 100, 100));
   };
 
-  if (monsterGeneratedState === null) {
+  if (!isClientReady) {
     return <LoadingPlaceholder />;
   }
 
-  if (!monsterGeneratedState) {
+  if (!isMonsterActuallyGenerated) {
     return (
       <Card className="max-w-lg mx-auto">
         <CardHeader><CardTitle className="font-headline flex items-center gap-2"><Info />Monster Required</CardTitle></CardHeader>
@@ -466,4 +482,3 @@ export default function MindfulMomentPage() {
     </div>
   );
 }
-

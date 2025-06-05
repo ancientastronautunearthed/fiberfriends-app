@@ -49,9 +49,7 @@ const taskDefinitions: TaskDefinition[] = [
   { id: 'kind_act_small1', text: "Perform a very small act of kindness (e.g., smile at a stranger, let someone go ahead of you).", level: 1, points: 15, monsterBaseHPDamage: 2 },
   { id: 'positive_memory1', text: "Briefly recall a positive memory, even a simple one. How did it make you feel?", level: 2, points: 15, monsterBaseHPDamage: 2 },
   { id: 'community_support1', text: "Read a post in the Belief Circle and send positive thoughts to the author.", level: 2, points: 15, monsterBaseHPDamage: 2 },
-  // Add more tasks for levels 1-3 as desired
 ];
-
 
 interface StoredTask {
     date: string; // YYYY-MM-DD
@@ -72,7 +70,7 @@ interface TombEntry {
 
 function LoadingPlaceholder() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[300px]">
+    <div className="flex flex-col items-center justify-center min-h-[300px] w-full">
       <Loader2 className="h-12 w-12 animate-spin text-primary" />
       <p className="mt-4 text-muted-foreground">Loading Kindness Challenge...</p>
     </div>
@@ -80,10 +78,12 @@ function LoadingPlaceholder() {
 }
 
 export default function KindnessChallengePage() {
+  const [isClientReady, setIsClientReady] = useState(false);
+  const [isMonsterActuallyGenerated, setIsMonsterActuallyGenerated] = useState(false);
+
   const [monsterImageUrl, setMonsterImageUrl] = useState<string | null>(null);
   const [monsterName, setMonsterName] = useState<string | null>(null);
   const [monsterHealth, setMonsterHealth] = useState<number | null>(null);
-  const [monsterGeneratedState, setMonsterGeneratedState] = useState<boolean | null>(null);
   
   const [currentTask, setCurrentTask] = useState<TaskDefinition | null>(null);
   const [hasCompletedTaskToday, setHasCompletedTaskToday] = useState(false);
@@ -99,13 +99,8 @@ export default function KindnessChallengePage() {
 
   const getCurrentDateString = () => new Date().toISOString().split('T')[0];
 
-  useEffect(() => {
-    setMonsterGeneratedState(localStorage.getItem(MONSTER_GENERATED_KEY) === 'true');
-  }, []);
-
   const performNightlyRecovery = useCallback(() => {
-    const isMonsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
-    if (!isMonsterGenerated) return;
+    if (typeof window === 'undefined' || !isMonsterActuallyGenerated) return;
 
     const storedName = localStorage.getItem(MONSTER_NAME_KEY);
     const storedHealthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
@@ -131,16 +126,17 @@ export default function KindnessChallengePage() {
         variant: "default", duration: 7000,
       });
     }
-  }, [toast]);
+  }, [toast, isMonsterActuallyGenerated]);
   
   const updateKindnessStreak = useCallback(() => {
+    if (typeof window === 'undefined') return 0;
     const today = getCurrentDateString();
     const storedStreak = localStorage.getItem(KINDNESS_CHALLENGE_STREAK_KEY);
     let currentStreakData: StreakData = { date: today, count: 0 };
 
     if (storedStreak) {
         currentStreakData = JSON.parse(storedStreak);
-        if (currentStreakData.date !== today) { // Check if it's a new day
+        if (currentStreakData.date !== today) { 
             const lastDate = new Date(currentStreakData.date);
             const currentDate = new Date(today);
             const diffTime = Math.abs(currentDate.getTime() - lastDate.getTime());
@@ -149,20 +145,17 @@ export default function KindnessChallengePage() {
             if (diffDays === 1) {
                 currentStreakData.count += 1;
             } else {
-                currentStreakData.count = 1; // Streak broken
+                currentStreakData.count = 1; 
             }
             currentStreakData.date = today;
         }
-        // If currentStreakData.date is already today, count doesn't change here, it's just maintained.
     } else {
-        currentStreakData.count = 1; // First time
+        currentStreakData.count = 1; 
     }
     
     localStorage.setItem(KINDNESS_CHALLENGE_STREAK_KEY, JSON.stringify(currentStreakData));
     setKindnessStreak(currentStreakData);
 
-    // Calculate and store bonus damage
-    // Example: +1 bonus damage for every 3 streak days, max +3
     const newBonusDamage = Math.min(3, Math.floor(currentStreakData.count / 3));
     localStorage.setItem(KINDNESS_CHALLENGE_BONUS_DAMAGE_KEY, String(newBonusDamage));
     setStreakBonusDamage(newBonusDamage);
@@ -172,8 +165,11 @@ export default function KindnessChallengePage() {
 
 
   useEffect(() => {
-    const isMonsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
-    if (isMonsterGenerated) {
+    setIsClientReady(true);
+    const generated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+    setIsMonsterActuallyGenerated(generated);
+
+    if (generated) {
       setMonsterImageUrl(localStorage.getItem(MONSTER_IMAGE_KEY));
       setMonsterName(localStorage.getItem(MONSTER_NAME_KEY));
       const storedHealth = localStorage.getItem(MONSTER_HEALTH_KEY);
@@ -185,13 +181,11 @@ export default function KindnessChallengePage() {
       performNightlyRecovery();
     }
 
-    // Load streak and bonus damage
     const storedStreak = localStorage.getItem(KINDNESS_CHALLENGE_STREAK_KEY);
     if (storedStreak) setKindnessStreak(JSON.parse(storedStreak));
     const storedBonus = localStorage.getItem(KINDNESS_CHALLENGE_BONUS_DAMAGE_KEY);
     if (storedBonus) setStreakBonusDamage(parseInt(storedBonus, 10));
 
-    // Daily task logic
     const todayStr = getCurrentDateString();
     const storedTaskData = localStorage.getItem(KINDNESS_CHALLENGE_CURRENT_TASK_KEY);
     let taskForToday: StoredTask | null = null;
@@ -204,39 +198,41 @@ export default function KindnessChallengePage() {
             if (foundTask) resolvedCurrentTask = foundTask;
             setHasCompletedTaskToday(taskForToday.isCompleted);
         } else {
-            taskForToday = null; // Stored task is for a previous day
+            taskForToday = null; 
         }
     }
 
-    if (!taskForToday || !resolvedCurrentTask) { // If no task for today or currentTask not set
-        // Select a new task (initially from level 1)
-        const availableTasks = taskDefinitions.filter(t => t.level <= 3); // For now, up to level 3
+    if (!taskForToday || !resolvedCurrentTask) { 
+        const availableTasks = taskDefinitions.filter(t => t.level <= 3); 
         const newTask = availableTasks[Math.floor(Math.random() * availableTasks.length)];
         resolvedCurrentTask = newTask;
         setHasCompletedTaskToday(false);
         localStorage.setItem(KINDNESS_CHALLENGE_CURRENT_TASK_KEY, JSON.stringify({ date: todayStr, taskId: newTask.id, isCompleted: false }));
     }
-    setCurrentTask(resolvedCurrentTask); // Set the state for currentTask
-    updateKindnessStreak(); // Update streak status on load
+    setCurrentTask(resolvedCurrentTask);
+    updateKindnessStreak();
   }, [performNightlyRecovery, updateKindnessStreak]);
 
 
   useEffect(() => {
-    if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true' && monsterName) {
+    if (typeof window !== 'undefined' && monsterHealth !== null && isMonsterActuallyGenerated && monsterName) {
       localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
       checkMonsterDeath(monsterHealth, "an overwhelming act of kindness"); 
     }
-  }, [monsterHealth, monsterName]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monsterHealth, monsterName, isMonsterActuallyGenerated]);
 
 
   const checkMonsterDeath = (currentHealth: number, cause: string) => {
      if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterName && monsterImageUrl) {
+        if (typeof window === 'undefined') return true;
         const tomb: TombEntry[] = JSON.parse(localStorage.getItem(MONSTER_TOMB_KEY) || '[]');
         tomb.unshift({ name: monsterName, imageUrl: monsterImageUrl, diedAt: new Date().toISOString() });
         localStorage.setItem(MONSTER_TOMB_KEY, JSON.stringify(tomb.slice(0, 50)));
         localStorage.removeItem(MONSTER_IMAGE_KEY); localStorage.removeItem(MONSTER_NAME_KEY);
         localStorage.removeItem(MONSTER_HEALTH_KEY); localStorage.removeItem(MONSTER_GENERATED_KEY);
         setMonsterImageUrl(null); setMonsterName(null); setMonsterHealth(null);
+        setIsMonsterActuallyGenerated(false);
         toast({
           title: `${monsterName} Dissolves!`,
           description: `Its negativity couldn't withstand ${cause}. Current health: ${currentHealth.toFixed(1)}%. A new presence begins to form...`,
@@ -247,6 +243,7 @@ export default function KindnessChallengePage() {
   };
 
   const addPoints = (points: number) => {
+    if (typeof window === 'undefined') return;
     const currentPoints = parseInt(localStorage.getItem(USER_POINTS_KEY) || '0', 10);
     localStorage.setItem(USER_POINTS_KEY, String(currentPoints + points));
   };
@@ -263,7 +260,7 @@ export default function KindnessChallengePage() {
       setShowDamageEffect(true);
       setTimeout(() => setShowDamageEffect(false), 700);
 
-      const currentStreak = updateKindnessStreak(); // This updates streak and bonus damage
+      const currentStreak = updateKindnessStreak(); 
 
       setHasCompletedTaskToday(true);
       const todayStr = getCurrentDateString();
@@ -295,11 +292,11 @@ export default function KindnessChallengePage() {
       return Math.max(0, Math.min((currentValInRange / range) * 100, 100));
   };
 
-  if (monsterGeneratedState === null) {
+  if (!isClientReady) {
     return <LoadingPlaceholder />;
   }
 
-  if (!monsterGeneratedState) {
+  if (!isMonsterActuallyGenerated) {
     return (
       <Card className="max-w-lg mx-auto">
         <CardHeader><CardTitle className="font-headline flex items-center gap-2"><Info />Monster Required</CardTitle></CardHeader>
@@ -400,4 +397,3 @@ export default function KindnessChallengePage() {
     </div>
   );
 }
-
