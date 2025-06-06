@@ -7,13 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BarChart3, UserCheck, Microscope, Search, Download, Brain, Bone, Leaf, CookingPot, Pill, Bot, User, Users2, Sparkles, Settings2, Loader2, Send, ShieldAlert } from "lucide-react";
+import { BarChart3, UserCheck, Microscope, Search, Download, Brain, Bone, Leaf, CookingPot, Pill, Bot, User, Users2, Sparkles, Settings2, Loader2, Send, ShieldAlert, Palette, Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { generateAssistantImageAction } from './actions';
+import { useToast } from '@/hooks/use-toast';
 
 // Mock data interfaces
 interface MockPatientData {
@@ -64,6 +67,9 @@ interface AiAssistantConfig {
   name: string;
   gender: 'male' | 'female' | 'neutral';
   traits: string[];
+  imageUrl?: string;
+  species?: string;
+  speciesDetails?: string;
 }
 
 interface ChatMessage {
@@ -81,6 +87,8 @@ const PERSONALITY_TRAITS_OPTIONS = [
   "Formal & Professional",
 ];
 
+const ASSISTANT_SPECIES_OPTIONS = ["Human", "Animal", "Sci-Fi", "Monster", "Abstract/Symbolic", "Other"];
+
 const ASSISTANT_CONFIG_KEY = 'drMiddelveenAiAssistantConfig';
 
 export default function DrMiddelveenPortalPage() {
@@ -93,10 +101,15 @@ export default function DrMiddelveenPortalPage() {
   const [assistantNameInput, setAssistantNameInput] = useState('');
   const [assistantGenderInput, setAssistantGenderInput] = useState<'male' | 'female' | 'neutral'>('neutral');
   const [selectedTraitsInput, setSelectedTraitsInput] = useState<string[]>([]);
+  const [assistantSpeciesInput, setAssistantSpeciesInput] = useState<string>('');
+  const [assistantSpeciesDetailsInput, setAssistantSpeciesDetailsInput] = useState('');
+  const [assistantImageUrl, setAssistantImageUrl] = useState<string | null>(null);
+  const [isGeneratingAssistantImage, startGeneratingImageTransition] = useTransition();
   const [isConfiguringAssistant, setIsConfiguringAssistant] = useState(true);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [currentQuery, setCurrentQuery] = useState('');
   const [isAssistantThinking, setIsAssistantThinking] = useState(false);
+  const { toast } = useToast();
 
 
   useEffect(() => {
@@ -105,16 +118,43 @@ export default function DrMiddelveenPortalPage() {
       try {
         const parsedConfig = JSON.parse(storedConfig) as AiAssistantConfig;
         setAssistantConfig(parsedConfig);
+        setAssistantNameInput(parsedConfig.name);
+        setAssistantGenderInput(parsedConfig.gender);
+        setSelectedTraitsInput(parsedConfig.traits);
+        setAssistantSpeciesInput(parsedConfig.species || '');
+        setAssistantSpeciesDetailsInput(parsedConfig.speciesDetails || '');
+        setAssistantImageUrl(parsedConfig.imageUrl || null);
         setIsConfiguringAssistant(false);
       } catch (e) {
         console.error("Error parsing assistant config from localStorage", e);
-        localStorage.removeItem(ASSISTANT_CONFIG_KEY); // Clear corrupted data
+        localStorage.removeItem(ASSISTANT_CONFIG_KEY); 
         setIsConfiguringAssistant(true);
       }
     } else {
       setIsConfiguringAssistant(true);
     }
   }, []);
+
+  const handleGenerateAssistantImage = async () => {
+    if (!assistantNameInput.trim() || !assistantSpeciesInput) {
+        toast({ title: "Missing Info", description: "Please provide an assistant name and select a species before generating an image.", variant: "destructive" });
+        return;
+    }
+    startGeneratingImageTransition(async () => {
+        try {
+            const result = await generateAssistantImageAction({
+                assistantName: assistantNameInput.trim(),
+                species: assistantSpeciesInput,
+                speciesDetails: assistantSpeciesDetailsInput.trim() || undefined,
+            });
+            setAssistantImageUrl(result.imageUrl);
+            toast({ title: "Assistant Image Generated!", description: "Your AI assistant has a new look." });
+        } catch (e) {
+            const errorMsg = e instanceof Error ? e.message : "Failed to generate image.";
+            toast({ title: "Image Generation Error", description: errorMsg, variant: "destructive" });
+        }
+    });
+  };
 
 
   const handleSearchPatient = (e: React.FormEvent) => {
@@ -130,29 +170,27 @@ export default function DrMiddelveenPortalPage() {
 
   const handleActivateAssistant = () => {
     if (!assistantNameInput.trim() || selectedTraitsInput.length === 0) {
-      alert("Please provide a name and select at least one personality trait for your assistant.");
+      toast({title: "Configuration Incomplete", description: "Please provide a name and select at least one personality trait for your assistant.", variant: "destructive"});
       return;
     }
     const newConfig: AiAssistantConfig = {
-      name: assistantNameInput,
+      name: assistantNameInput.trim(),
       gender: assistantGenderInput,
       traits: selectedTraitsInput,
+      species: assistantSpeciesInput || undefined,
+      speciesDetails: assistantSpeciesDetailsInput.trim() || undefined,
+      imageUrl: assistantImageUrl || undefined,
     };
     setAssistantConfig(newConfig);
     localStorage.setItem(ASSISTANT_CONFIG_KEY, JSON.stringify(newConfig));
     setIsConfiguringAssistant(false);
-    setChatHistory([]); // Reset chat history for new assistant
+    setChatHistory([]); 
+    toast({title: "AI Assistant Activated!", description: `${newConfig.name} is ready to assist.`});
   };
   
   const handleReconfigureAssistant = () => {
     setIsConfiguringAssistant(true);
-    setAssistantConfig(null);
-    localStorage.removeItem(ASSISTANT_CONFIG_KEY);
-    // Optionally reset input fields
-    setAssistantNameInput('');
-    setAssistantGenderInput('neutral');
-    setSelectedTraitsInput([]);
-    setChatHistory([]);
+    // Don't clear assistantConfig from state immediately, keep current values in form
   };
 
   const handleTraitToggle = (trait: string, checked: boolean) => {
@@ -206,7 +244,10 @@ export default function DrMiddelveenPortalPage() {
     }, 1500 + Math.random() * 1000);
   };
   
-  const getAssistantIcon = () => {
+  const getAssistantVisual = () => {
+    if (assistantConfig?.imageUrl) {
+        return <Image src={assistantConfig.imageUrl} alt={assistantConfig.name} width={60} height={60} className="rounded-lg border-2 border-primary object-cover shadow-md" data-ai-hint="ai assistant"/>;
+    }
     if (assistantConfig?.gender === 'male') return <User className="h-10 w-10 text-blue-500" />;
     if (assistantConfig?.gender === 'female') return <User className="h-10 w-10 text-pink-500" />;
     return <Bot className="h-10 w-10 text-gray-500" />;
@@ -238,7 +279,6 @@ export default function DrMiddelveenPortalPage() {
         </CardContent>
       </Card>
       
-      {/* AI Research Assistant Section */}
       <Card>
         <CardHeader className="flex flex-row justify-between items-start">
           <div>
@@ -253,20 +293,56 @@ export default function DrMiddelveenPortalPage() {
         </CardHeader>
         <CardContent>
           {isConfiguringAssistant ? (
-            <div className="space-y-4 p-2 border border-dashed rounded-md">
+            <div className="space-y-6 p-2 border border-dashed rounded-md">
               <h3 className="font-semibold text-lg text-center">Configure Your AI Assistant</h3>
-              <div>
-                <Label htmlFor="assistant-name">Assistant Name</Label>
-                <Input id="assistant-name" value={assistantNameInput} onChange={(e) => setAssistantNameInput(e.target.value)} placeholder="e.g., Analyzer, InsightBot" />
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <Label htmlFor="assistant-name">Assistant Name</Label>
+                    <Input id="assistant-name" value={assistantNameInput} onChange={(e) => setAssistantNameInput(e.target.value)} placeholder="e.g., Analyzer, InsightBot" />
+                </div>
+                <div>
+                  <Label>Assistant Gender Persona</Label>
+                  <RadioGroup value={assistantGenderInput} onValueChange={(v) => setAssistantGenderInput(v as any)} className="flex gap-4 pt-2">
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="male" id="gender-male" /><Label htmlFor="gender-male" className="font-normal">Male</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="female" id="gender-female" /><Label htmlFor="gender-female" className="font-normal">Female</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="neutral" id="gender-neutral" /><Label htmlFor="gender-neutral" className="font-normal">Neutral</Label></div>
+                  </RadioGroup>
+                </div>
               </div>
-              <div>
-                <Label>Assistant Gender Persona</Label>
-                <RadioGroup value={assistantGenderInput} onValueChange={(v) => setAssistantGenderInput(v as any)} className="flex gap-4 pt-1">
-                  <div className="flex items-center space-x-2"><RadioGroupItem value="male" id="gender-male" /><Label htmlFor="gender-male" className="font-normal">Male</Label></div>
-                  <div className="flex items-center space-x-2"><RadioGroupItem value="female" id="gender-female" /><Label htmlFor="gender-female" className="font-normal">Female</Label></div>
-                  <div className="flex items-center space-x-2"><RadioGroupItem value="neutral" id="gender-neutral" /><Label htmlFor="gender-neutral" className="font-normal">Neutral/Unspecified</Label></div>
-                </RadioGroup>
+
+              <div className="space-y-3 p-3 border rounded-md bg-background">
+                <h4 className="font-medium flex items-center gap-2"><Palette className="h-4 w-4"/>Visual Persona</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <Label htmlFor="assistant-species">Species Category</Label>
+                        <Select value={assistantSpeciesInput} onValueChange={setAssistantSpeciesInput}>
+                            <SelectTrigger id="assistant-species"><SelectValue placeholder="Select species..." /></SelectTrigger>
+                            <SelectContent>
+                                {ASSISTANT_SPECIES_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div>
+                        <Label htmlFor="assistant-species-details">Specifics / Style Details</Label>
+                        <Input id="assistant-species-details" value={assistantSpeciesDetailsInput} onChange={(e) => setAssistantSpeciesDetailsInput(e.target.value)} placeholder="e.g., Wise owl, friendly robot" />
+                    </div>
+                </div>
+                <Button onClick={handleGenerateAssistantImage} disabled={isGeneratingAssistantImage || !assistantNameInput.trim() || !assistantSpeciesInput} className="w-full sm:w-auto mt-2">
+                    {isGeneratingAssistantImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ImageIcon className="mr-2 h-4 w-4"/>}
+                    Generate Assistant Image
+                </Button>
+                {assistantImageUrl && (
+                    <div className="mt-3 text-center">
+                        <Label className="block mb-1 text-sm">Generated Preview:</Label>
+                        <Image src={assistantImageUrl} alt="Generated assistant preview" width={100} height={100} className="rounded-md border object-cover mx-auto shadow" data-ai-hint="ai generated assistant"/>
+                    </div>
+                )}
+                 {isGeneratingAssistantImage && (
+                    <div className="text-center text-sm text-muted-foreground p-2">Generating image... this may take a moment.</div>
+                )}
               </div>
+
               <div>
                 <Label>Personality Traits (Select up to 3)</Label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-1">
@@ -288,10 +364,11 @@ export default function DrMiddelveenPortalPage() {
           ) : assistantConfig ? (
             <div className="space-y-4">
               <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
-                {getAssistantIcon()}
+                {getAssistantVisual()}
                 <div>
                   <h3 className="text-lg font-semibold">{assistantConfig.name}</h3>
                   <p className="text-sm text-muted-foreground capitalize">{assistantConfig.gender} Persona</p>
+                  {assistantConfig.species && <p className="text-xs text-muted-foreground">Species: {assistantConfig.species}{assistantConfig.speciesDetails ? ` (${assistantConfig.speciesDetails})` : ''}</p>}
                   <div className="flex flex-wrap gap-1 mt-1">
                     {assistantConfig.traits.map(trait => <Badge key={trait} variant="secondary">{trait}</Badge>)}
                   </div>
@@ -333,7 +410,6 @@ export default function DrMiddelveenPortalPage() {
           ) : null}
         </CardContent>
       </Card>
-
 
       <Card>
         <CardHeader>
@@ -468,5 +544,3 @@ export default function DrMiddelveenPortalPage() {
     </div>
   );
 }
-
-    

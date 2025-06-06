@@ -21,4 +21,6 @@ import '@/ai/flows/knowledge-nugget-quiz-flow.ts';
 import '@/ai/flows/affirmation-generation-flow.ts';
 // import '@/ai/flows/ai-companion-chat-flow.ts'; // Removed
 import '@/ai/flows/product-suggestion-flow.ts'; 
-import '@/ai/flows/nutrition-advice-flow.ts'; // Added new nutrition advice flow
+import '@/ai/flows/nutrition-advice-flow.ts';
+import '@/ai/flows/monster-slaying-image-flow.ts';
+import '@/ai/flows/assistant-image-generation-flow.ts'; // Added new assistant image flow
