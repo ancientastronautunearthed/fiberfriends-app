@@ -29,7 +29,7 @@ import {
   Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown,
   HandHeart, LogInIcon, UserPlus as UserPlusIcon, AlertTriangle, ShoppingCart,
   Package, GlassWater, Droplets, ToyBrick, BookOpen as BookOpenIcon, UtensilsCrossed, HelpCircle as TutorialIcon,
-  FileText, BedDouble, Target // Added Target for Battle Plan
+  FileText, BedDouble, Target, Settings2 as Settings2Icon // Added Target for Battle Plan & Settings2Icon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -54,7 +54,7 @@ const navItemsConfig: NavItem[] = [
   { href: '/tutorial', label: 'Battle Manual', icon: TutorialIcon, pageTitle: 'Fiber Friends Tutorial' },
   {
     label: 'Daily Battle Plan',
-    icon: Target, // Using Target icon for Battle Plan
+    icon: Target, 
     pageTitle: 'Daily Battle Plan',
     isParent: true,
     authRequired: true,
@@ -69,6 +69,7 @@ const navItemsConfig: NavItem[] = [
       { href: '/product-tracker', label: 'Gear & Artifacts', icon: ListChecks, pageTitle: 'Gear & Artifacts Tracker' },
       { href: '/sleep-log', label: 'Sleep Log', icon: BedDouble, pageTitle: 'Sleep Log' },
       { href: '/symptom-journal', label: 'Battle Condition Log', icon: BookText, pageTitle: 'Battle Condition Log' },
+      { href: '/workout-plan-creator', label: 'Workout Plan Creator', icon: Settings2Icon, pageTitle: 'AI Workout Plan Creator', authRequired: true },
     ]
   },
   {
@@ -122,11 +123,11 @@ const navItemsConfig: NavItem[] = [
   },
   {
     label: 'Warrior Stronghold',
-    icon: Users, // Using Users icon for community
+    icon: Users, 
     pageTitle: 'Warrior Stronghold',
     isParent: true,
     children: [
-      { href: '/', label: 'Comrades\' Campfire', icon: HeartHandshake, pageTitle: 'Comrades\' Campfire' }, // Homepage
+      { href: '/', label: 'Comrades\' Campfire', icon: HeartHandshake, pageTitle: 'Comrades\' Campfire' }, 
       { href: '/doctor-forum', label: 'Intel on Obstructions', icon: MessageSquareQuote, pageTitle: 'Intel on Obstructions Forum' },
     ]
   },
@@ -202,14 +203,11 @@ const findCurrentPage = (items: NavItem[], currentPath: string): NavItem | undef
   for (const item of items) {
     if (item.href) {
       const baseItemPath = item.href.split('#')[0];
-       // Exact match for root paths or specific non-nested paths
       if (baseItemPath === currentPath && (baseItemPath === '/' || baseItemPath === '/landing' || baseItemPath === '/login' || baseItemPath === '/register' || baseItemPath === '/support-us' || baseItemPath.startsWith('/doctor/'))) {
         return item;
       }
-      // StartsWith logic for other paths, ensuring it's not just a partial prefix of a different path
       if (baseItemPath !== '/' && baseItemPath !== '/landing' && currentPath.startsWith(baseItemPath)) {
         if (currentPath.length === baseItemPath.length || currentPath[baseItemPath.length] === '/' || currentPath[baseItemPath.length] === '#') {
-           // If item.href has a hash, use the main item's pageTitle unless the child page has a more specific one.
           const mainNavItem = navItemsConfig.flatMap(nav => nav.children || [nav]).find(nav => nav.href && nav.href.split('#')[0] === baseItemPath);
           return mainNavItem || item;
         }
@@ -220,14 +218,12 @@ const findCurrentPage = (items: NavItem[], currentPath: string): NavItem | undef
       if (childPage) return childPage;
     }
   }
-  // Fallback for parent if only hash differs or if direct children define page titles differently
   for (const item of items) {
       if (item.isParent && item.children) {
           for (const child of item.children) {
             if (child.href) {
                 const childBase = child.href.split('#')[0];
                 if (currentPath.startsWith(childBase)) {
-                     // Check if it's an anchor link under a parent that should have its own title (e.g. Curated Wellness Aids)
                     if (child.href.includes('#') && item.href && currentPath.startsWith(item.href.split('#')[0])) {
                         return item;
                     }
@@ -242,6 +238,7 @@ const findCurrentPage = (items: NavItem[], currentPath: string): NavItem | undef
   if (currentPath === '/tutorial') return items.find(item => item.href === '/tutorial');
   if (currentPath.startsWith('/doctor-portal/dr-middelveen')) return items.find(item => item.href === '/doctor-portal/dr-middelveen');
   if (currentPath.startsWith('/sleep-log')) return navItemsConfig.flatMap(i => i.children || []).find(c => c.href === '/sleep-log');
+  if (currentPath.startsWith('/workout-plan-creator')) return navItemsConfig.flatMap(i => i.children || []).find(c => c.href === '/workout-plan-creator');
 
 
   return undefined;
@@ -298,7 +295,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             if (child.authRequired && !user) return false;
             if (child.noAuthOnly && user) return false;
             return true;
-          }).sort((a, b) => a.label.localeCompare(b.label)) // Sort children alphabetically
+          }).sort((a, b) => a.label.localeCompare(b.label)) 
         };
       }
       return item;
@@ -308,11 +305,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         const indexA = fixedOrder.indexOf(a.label);
         const indexB = fixedOrder.indexOf(b.label);
 
-        if (indexA !== -1 && indexB !== -1) return indexA - indexB; // Both are in fixed order
-        if (indexA !== -1) return -1; // A is fixed, B is not
-        if (indexB !== -1) return 1;  // B is fixed, A is not
+        if (indexA !== -1 && indexB !== -1) return indexA - indexB; 
+        if (indexA !== -1) return -1; 
+        if (indexB !== -1) return 1;  
 
-        // Neither are fixed, sort alphabetically
         return a.label.localeCompare(b.label);
     });
   }, [user]);

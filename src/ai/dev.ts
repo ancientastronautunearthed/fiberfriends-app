@@ -24,3 +24,4 @@ import '@/ai/flows/product-suggestion-flow.ts';
 import '@/ai/flows/nutrition-advice-flow.ts';
 import '@/ai/flows/monster-slaying-image-flow.ts';
 import '@/ai/flows/assistant-image-generation-flow.ts'; // Added new assistant image flow
+import '@/ai/flows/workout-plan-generation-flow.ts'; // Added new workout plan flow
