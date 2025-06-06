@@ -29,7 +29,7 @@ import {
   Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown,
   HandHeart, LogInIcon, UserPlus as UserPlusIcon, AlertTriangle, ShoppingCart,
   Package, GlassWater, Droplets, ToyBrick, BookOpen as BookOpenIcon, UtensilsCrossed, HelpCircle as TutorialIcon,
-  FileText, BedDouble, Target, Settings2 as Settings2Icon
+  FileText, BedDouble, Target, Settings2 as Settings2Icon, Sparkles as SparklesIcon // Added SparklesIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -51,6 +51,7 @@ interface NavItem {
 
 const navItemsConfig: NavItem[] = [
   { href: '/landing', label: 'About Fiber Friends', icon: LayoutDashboard, pageTitle: 'Welcome to Fiber Friends' },
+  { href: '/getting-started', label: 'Getting Started', icon: Wand2, pageTitle: 'Getting Started Guide' },
   { href: '/tutorial', label: 'User Guide', icon: TutorialIcon, pageTitle: 'Fiber Friends User Guide' },
   {
     label: 'Daily Wellness Log',
@@ -133,14 +134,15 @@ const navItemsConfig: NavItem[] = [
   },
   {
     label: 'My Wellness Profile',
-    icon: ShieldQuestion, // ShieldQuestion might be too "gamey", UserCircle might be better here or Activity
+    icon: ShieldQuestion, 
     pageTitle: 'My Wellness Profile',
     isParent: true,
     authRequired: true,
     children: [
-      { href: '/monster-tomb', label: 'Archived Goals', icon: Skull, pageTitle: 'Archived Goals & Milestones' }, // Renamed Tomb
+      { href: '/food-log', label: 'AI Chef Tools (Meal Log)', icon: SparklesIcon, pageTitle: 'Meal Log', authRequired: true },
+      { href: '/monster-tomb', label: 'Archived Goals', icon: Skull, pageTitle: 'Archived Goals & Milestones' }, 
       { href: '/my-profile', label: 'My Profile', icon: UserCircle, pageTitle: 'My Profile' },
-      { href: '/create-monster', label: 'Setup/Update Profile Avatar', icon: Wand2, pageTitle: 'Setup/Update Profile Avatar' }, // Renamed "Create Monster"
+      { href: '/create-monster', label: 'Setup/Update Profile Avatar', icon: Wand2, pageTitle: 'Setup/Update Profile Avatar' }, 
     ]
   },
   {
@@ -235,6 +237,7 @@ const findCurrentPage = (items: NavItem[], currentPath: string): NavItem | undef
       }
   }
   if (currentPath === '/') return items.find(item => item.href === '/');
+  if (currentPath === '/getting-started') return items.find(item => item.href === '/getting-started');
   if (currentPath === '/tutorial') return items.find(item => item.href === '/tutorial');
   if (currentPath.startsWith('/doctor-portal/dr-middelveen')) return items.find(item => item.href === '/doctor-portal/dr-middelveen');
   if (currentPath.startsWith('/sleep-log')) return navItemsConfig.flatMap(i => i.children || []).find(c => c.href === '/sleep-log');
@@ -301,7 +304,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       return item;
     }).filter(item => !(item.isParent && item.children && item.children.length === 0))
     .sort((a,b) => {
-        const fixedOrder = ["About Fiber Friends", "User Guide", "Daily Wellness Log"]; // Updated fixed order
+        const fixedOrder = ["About Fiber Friends", "Getting Started", "User Guide", "Daily Wellness Log"]; 
         const indexA = fixedOrder.indexOf(a.label);
         const indexB = fixedOrder.indexOf(b.label);
 
@@ -309,8 +312,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         if (indexA !== -1) return -1; 
         if (indexB !== -1) return 1;  
 
-        // Fallback for items not in fixedOrder: sort alphabetically
-        // But ensure "My Wellness Profile" comes before "Support Us" etc.
         const professionalOrder = [
           "Insights & Analysis", 
           "Healthcare Providers", 
@@ -318,7 +319,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           "Community Network", 
           "Community Hub", 
           "My Wellness Profile",
-          "Dr. Middelveen Portal" // Dev only but keep its relative order if shown
+          "Dr. Middelveen Portal" 
         ];
         const profIndexA = professionalOrder.indexOf(a.label);
         const profIndexB = professionalOrder.indexOf(b.label);
@@ -327,13 +328,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         if (profIndexA !== -1) return -1;
         if (profIndexB !== -1) return 1;
         
-        // Sort auth links and support us last
         const lastOrder = ["Login", "Register", "Support Us"];
         const lastIndexA = lastOrder.indexOf(a.label);
         const lastIndexB = lastOrder.indexOf(b.label);
 
         if (lastIndexA !== -1 && lastIndexB !== -1) return lastIndexA - lastIndexB;
-        if (lastIndexA !== -1) return 1; // Put these at the end
+        if (lastIndexA !== -1) return 1; 
         if (lastIndexB !== -1) return -1;
 
 
@@ -416,7 +416,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <SidebarMenu className="py-1 space-y-0.5 border-l-2 border-sidebar-border/30 ml-[calc(0.625rem+4px)] pl-3">
                         {item.children.map((child) => (
                           child.href && (
-                            <SidebarMenuItem key={child.href} className="p-0">
+                            <SidebarMenuItem key={child.href + child.label} className="p-0"> {/* Ensure unique key if hrefs can be same for different labels */}
                               <Link href={child.href} legacyBehavior passHref>
                                 <SidebarMenuButton
                                   isActive={(pathname === child.href.split('#')[0] || (child.href !== '/' && child.href !== '/landing' && pathname.startsWith(child.href.split('#')[0])))}
