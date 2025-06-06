@@ -5,11 +5,11 @@ import React, { useState } from 'react'; // Import useState
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Star, MapPin, Filter, PlusCircle, ShieldCheck, Send as SendIcon } from "lucide-react";
+import { Star, MapPin, Filter, PlusCircle, ShieldCheck, Send as SendIcon, Info } from "lucide-react";
 import Image from "next/image";
 import SendMessageModal from '@/components/features/send-message-modal'; // Import the modal
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface Provider {
   id: string;
@@ -78,11 +78,24 @@ const mockProviders: Provider[] = [
 export default function ProviderDirectoryPage() {
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
   const [messagingDoctorName, setMessagingDoctorName] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState(''); // State for the search term
 
   const handleSendMessageClick = (doctorName: string) => {
     setMessagingDoctorName(doctorName);
     setIsMessageModalOpen(true);
   };
+
+  // Mock filter logic (client-side for now)
+  const filteredProviders = mockProviders.filter(provider => {
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    return (
+      provider.name.toLowerCase().includes(lowerSearchTerm) ||
+      provider.specialty.toLowerCase().includes(lowerSearchTerm) ||
+      provider.location.toLowerCase().includes(lowerSearchTerm) ||
+      provider.morgellonsExperience.toLowerCase().includes(lowerSearchTerm)
+    );
+  });
+
 
   return (
     <>
@@ -90,35 +103,27 @@ export default function ProviderDirectoryPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline">Validated Provider Directory</CardTitle>
-            <CardDescription>Find medical professionals who treat Morgellons with care and credibility. Reviews are based on Morgellons-specific experiences. Look for our Trusted Advisor!</CardDescription>
+            <CardDescription>
+              Find trusted Medical Specialists with experience in Morgellons. Reviews are based on Morgellons-specific experiences. Look for our Lead Medical Advisor!
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
-              <Input placeholder="Search by name or keyword..." />
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by Region" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ca">California</SelectItem>
-                  <SelectItem value="or">Oregon</SelectItem>
-                  <SelectItem value="tx">Texas</SelectItem>
-                  <SelectItem value="all">All Regions</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by Specialty" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="integrative">Integrative Medicine</SelectItem>
-                  <SelectItem value="dermatology">Dermatology</SelectItem>
-                  <SelectItem value="naturopathic">Naturopathic</SelectItem>
-                  <SelectItem value="functional">Functional Medicine</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button className="w-full"><Filter className="mr-2 h-4 w-4" />Apply Filters</Button>
+            <div className="flex flex-col sm:flex-row gap-4 items-end">
+              <Input 
+                placeholder="Search by name, location (city/state), or keyword..." 
+                className="flex-grow"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)} 
+              />
+              <Button className="w-full sm:w-auto"><Filter className="mr-2 h-4 w-4" />Apply Filters</Button>
             </div>
+             <Alert variant="default" className="mt-4 bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300">
+                <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                <AlertTitle className="font-semibold">Expanding Our Network</AlertTitle>
+                <AlertDescription className="text-sm">
+                    If you don't see a provider in your state, please check back regularly. We are continuously working to expand our network and aim to have at least one validated specialist in every state and grow internationally.
+                </AlertDescription>
+            </Alert>
             <div className="flex justify-end mt-4">
               <Button variant="outline"><PlusCircle className="mr-2 h-4 w-4"/>Suggest a Provider</Button>
             </div>
@@ -126,7 +131,7 @@ export default function ProviderDirectoryPage() {
         </Card>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {mockProviders.map(provider => (
+          {filteredProviders.map(provider => (
             <Card key={provider.id} className={`hover:shadow-lg transition-shadow ${provider.isTrusted ? 'border-2 border-primary bg-primary/5' : ''}`}>
               <CardHeader className="flex flex-row items-start gap-4">
                 <Image src={provider.imageUrl} alt={provider.name} width={80} height={80} className="rounded-lg border object-cover" data-ai-hint={provider.imageAiHint} />
@@ -154,7 +159,7 @@ export default function ProviderDirectoryPage() {
                   </div>
                 )}
                 <p><strong>Treatment Philosophy:</strong> {provider.philosophy}</p>
-                <p><strong>Morgellons Experience:</strong> <Badge variant={provider.morgellonsExperience.includes("Positive") || provider.morgellonsExperience.includes("Knowledgeable") || provider.isTrusted ? "default" : "secondary"}>{provider.morgellonsExperience}</Badge></p>
+                <p><strong>Morgellons Experience:</strong> <Badge variant={provider.morgellonsExperience.includes("Positive") || provider.morgellonsExperience.includes("Knowledgeable") || provider.morgellonsExperience.includes("Lead Medical Advisor") ? "default" : "secondary"}>{provider.morgellonsExperience}</Badge></p>
               </CardContent>
               <CardFooter className="flex-col gap-2">
                 <Button variant="outline" className="w-full">View Profile & Reviews</Button>
@@ -166,6 +171,12 @@ export default function ProviderDirectoryPage() {
               </CardFooter>
             </Card>
           ))}
+           {filteredProviders.length === 0 && searchTerm && (
+            <Card className="md:col-span-2 lg:col-span-3 p-6 text-center text-muted-foreground">
+              <Info className="h-8 w-8 mx-auto mb-2" />
+              <p>No providers found matching "{searchTerm}". Try a broader search term or check back later as our network grows.</p>
+            </Card>
+          )}
         </div>
         <Card>
           <CardHeader>
