@@ -28,7 +28,8 @@ import {
   LayoutDashboard, Pill, Wind, Lightbulb, ShieldCheck as AffirmationIcon,
   Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown,
   HandHeart, LogInIcon, UserPlus as UserPlusIcon, AlertTriangle, ShoppingCart,
-  Package, GlassWater, Droplets, ToyBrick, BookOpen, UtensilsCrossed, HelpCircle as TutorialIcon
+  Package, GlassWater, Droplets, ToyBrick, BookOpen, UtensilsCrossed, HelpCircle as TutorialIcon,
+  ClipboardUser // Added for Doctor Portal
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -140,6 +141,15 @@ const navItemsConfig: NavItem[] = [
       { href: '/monster-tomb', label: 'Tomb of Vanquished Foes', icon: Skull, pageTitle: 'Tomb of Vanquished Foes' },
     ]
   },
+  // Doctor Portal Link - Added as a top-level item for now
+  { 
+    href: '/doctor-portal/dr-middelveen', 
+    label: 'Dr. Middelveen Portal', 
+    icon: ClipboardUser, // Or Microscope, Stethoscope
+    pageTitle: 'Dr. Middelveen Portal',
+    authRequired: true, // Assuming this portal requires login, even if a special one
+    devOnly: true // Let's mark as devOnly for now as it's a prototype with mock data
+  },
   { href: '/login', label: 'Warrior Login', icon: LogInIcon, pageTitle: 'Login', noAuthOnly: true },
   { href: '/register', label: 'Join the Ranks', icon: UserPlusIcon, pageTitle: 'Register', noAuthOnly: true },
   { href: '/support-us', label: 'Reinforce the Ranks', icon: PiggyBank, pageTitle: 'Support Us' },
@@ -229,6 +239,8 @@ const findCurrentPage = (items: NavItem[], currentPath: string): NavItem | undef
   }
   if (currentPath === '/') return items.find(item => item.href === '/');
   if (currentPath === '/tutorial') return items.find(item => item.href === '/tutorial'); // Ensure tutorial page title
+  if (currentPath.startsWith('/doctor-portal/dr-middelveen')) return items.find(item => item.href === '/doctor-portal/dr-middelveen');
+
   return undefined;
 };
 
