@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { generateMonsterSlayingImageAction } from './actions';
 import { Progress } from '@/components/ui/progress';
-import LoadingPlaceholder from '@/components/ui/loading-placeholder';
+import LoadingPlaceholder from '@/components/ui/loading-placeholder'; // New import
 import { cn } from '@/lib/utils';
 
 const MONSTER_NAME_KEY = 'morgellonMonsterName';
@@ -114,6 +114,7 @@ interface DailyTask {
 
 function DailyBattlePlanCard({ monsterName, monsterImageUrl, monsterHealth }: { monsterName: string; monsterImageUrl: string; monsterHealth: number | null }) {
   const [tasks, setTasks] = useState<DailyTask[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(true); // New state for tasks loading
   const [allTasksCompleted, setAllTasksCompleted] = useState(false);
   const [rewardClaimedToday, setRewardClaimedToday] = useState(false);
   const [generatedSlayingImage, setGeneratedSlayingImage] = useState<string | null>(null);
@@ -124,6 +125,7 @@ function DailyBattlePlanCard({ monsterName, monsterImageUrl, monsterHealth }: { 
 
   const checkTaskCompletion = useCallback(() => {
     if (typeof window === 'undefined') return;
+    setTasksLoading(true); // Set loading true before checking
     const todayStr = getCurrentDateString();
     const updatedTasks: DailyTask[] = [
       { id: 'food', label: "Log a Meal", href: "/food-log", isCompleted: false },
@@ -179,6 +181,7 @@ function DailyBattlePlanCard({ monsterName, monsterImageUrl, monsterHealth }: { 
     
     setTasks(updatedTasks);
     setAllTasksCompleted(updatedTasks.every(task => task.isCompleted));
+    setTasksLoading(false); // Set loading to false after tasks are processed
   }, []);
 
   useEffect(() => {
@@ -187,10 +190,9 @@ function DailyBattlePlanCard({ monsterName, monsterImageUrl, monsterHealth }: { 
     const claimed = localStorage.getItem(DAILY_REWARD_CLAIMED_PREFIX + getCurrentDateString()) === 'true';
     setRewardClaimedToday(claimed);
 
-    // Periodically check for task completion if not all done and reward not claimed
     let intervalId: NodeJS.Timeout | null = null;
     if (!allTasksCompleted && !claimed) {
-      intervalId = setInterval(checkTaskCompletion, 30000); // Check every 30 seconds
+      intervalId = setInterval(checkTaskCompletion, 30000); 
     }
     return () => {
       if (intervalId) clearInterval(intervalId);
@@ -203,29 +205,25 @@ function DailyBattlePlanCard({ monsterName, monsterImageUrl, monsterHealth }: { 
 
     startClaimRewardTransition(async () => {
       try {
-        // Award points
         if (typeof window !== 'undefined') {
             const currentPoints = parseInt(localStorage.getItem(USER_POINTS_KEY) || '0', 10);
             localStorage.setItem(USER_POINTS_KEY, String(currentPoints + DAILY_VICTORY_BONUS_POINTS));
         }
 
-        // Generate monster slaying image
         const imageResult = await generateMonsterSlayingImageAction({
           monsterName: monsterName,
-          monsterInitialImageUrl: monsterImageUrl, // Pass current image for context
+          monsterInitialImageUrl: monsterImageUrl,
           achievement: `Victory! ${monsterName} completed the Daily Battle Plan!`,
         });
         setGeneratedSlayingImage(imageResult.imageUrl);
 
-        // Save image to vault
         if (typeof window !== 'undefined') {
             const vaultRaw = localStorage.getItem(MONSTER_SLAYING_IMAGE_VAULT_KEY);
             const vault = vaultRaw ? JSON.parse(vaultRaw) : [];
             vault.unshift({ date: getCurrentDateString(), imageUrl: imageResult.imageUrl, monsterName: monsterName });
-            localStorage.setItem(MONSTER_SLAYING_IMAGE_VAULT_KEY, JSON.stringify(vault.slice(0, 10))); // Keep last 10
+            localStorage.setItem(MONSTER_SLAYING_IMAGE_VAULT_KEY, JSON.stringify(vault.slice(0, 10)));
         }
 
-        // Mark reward as claimed
         if (typeof window !== 'undefined') {
             localStorage.setItem(DAILY_REWARD_CLAIMED_PREFIX + getCurrentDateString(), 'true');
         }
@@ -263,34 +261,41 @@ function DailyBattlePlanCard({ monsterName, monsterImageUrl, monsterHealth }: { 
                 <span>Progress:</span>
                 <span>{completedCount} / {totalTasks} Tasks</span>
             </div>
-            <Progress value={(completedCount / totalTasks) * 100} className="h-2.5" />
+            <Progress value={tasksLoading ? 0 : (completedCount / totalTasks) * 100} className="h-2.5" />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {tasks.map(task => (
-            <Link href={task.href} key={task.id} legacyBehavior>
-              <a className={cn(
-                "flex items-center justify-between p-3 rounded-md border transition-all hover:shadow-md",
-                task.isCompleted ? "bg-green-100 dark:bg-green-900/30 border-green-500 dark:border-green-700" : "bg-card hover:bg-muted/50"
-              )}>
-                <span className={cn("text-sm", task.isCompleted ? "text-green-700 dark:text-green-300 font-medium" : "text-foreground")}>{task.label}</span>
-                {task.isCompleted ? (
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                ) : (
-                  <Eye className="h-5 w-5 text-muted-foreground" />
-                )}
-              </a>
-            </Link>
-          ))}
-        </div>
+        {tasksLoading ? (
+          <div className="flex items-center justify-center p-6">
+            <IconLoader className="h-6 w-6 animate-spin text-primary mr-2" />
+            <p className="text-muted-foreground">Loading daily tasks...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {tasks.map(task => (
+              <Link href={task.href} key={task.id} legacyBehavior>
+                <a className={cn(
+                  "flex items-center justify-between p-3 rounded-md border transition-all hover:shadow-md",
+                  task.isCompleted ? "bg-green-100 dark:bg-green-900/30 border-green-500 dark:border-green-700" : "bg-card hover:bg-muted/50"
+                )}>
+                  <span className={cn("text-sm", task.isCompleted ? "text-green-700 dark:text-green-300 font-medium" : "text-foreground")}>{task.label}</span>
+                  {task.isCompleted ? (
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </a>
+              </Link>
+            ))}
+          </div>
+        )}
 
-        {allTasksCompleted && !rewardClaimedToday && (
+        {allTasksCompleted && !rewardClaimedToday && !tasksLoading && (
           <Button onClick={handleClaimReward} disabled={isClaimingReward} className="w-full mt-4 bg-gradient-to-r from-primary to-accent text-primary-foreground">
             {isClaimingReward ? <IconLoader className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
             {isClaimingReward ? "Claiming Victory..." : "Claim Daily Victory Reward!"}
           </Button>
         )}
-        {rewardClaimedToday && (
+        {rewardClaimedToday && !tasksLoading && (
           <div className="mt-4 p-3 rounded-md bg-green-100 dark:bg-green-800/30 border border-green-500 dark:border-green-700 text-green-700 dark:text-green-300 flex items-center gap-2">
             <Trophy className="h-5 w-5" />
             <div>
@@ -327,6 +332,7 @@ export default function BeliefCirclePage() {
     setIsClient(true);
     const generated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
     setMonsterGenerated(generated);
+    setMonsterDetailsLoading(true); // Start loading
 
     if (generated) {
       const name = localStorage.getItem(MONSTER_NAME_KEY);
@@ -338,13 +344,12 @@ export default function BeliefCirclePage() {
       if (healthStr) {
         setUserMonsterHealth(parseFloat(healthStr));
       }
-      setMonsterDetailsLoading(false); 
     } else {
       setUserMonsterName(null);
       setUserMonsterImageUrl(null);
       setUserMonsterHealth(null);
-      setMonsterDetailsLoading(false); 
     }
+    setMonsterDetailsLoading(false); // Finish loading attempt
     
   }, []);
 
@@ -438,8 +443,8 @@ export default function BeliefCirclePage() {
   return (
     <div className="space-y-8">
       <DailyBattlePlanCard
-        monsterName={userMonsterName}
-        monsterImageUrl={userMonsterImageUrl}
+        monsterName={userMonsterName} 
+        monsterImageUrl={userMonsterImageUrl} 
         monsterHealth={userMonsterHealth}
       />
       
@@ -514,3 +519,5 @@ export default function BeliefCirclePage() {
     </div>
   );
 }
+
+    
