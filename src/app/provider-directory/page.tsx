@@ -5,19 +5,23 @@ import React, { useState } from 'react'; // Import useState
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Star, MapPin, Filter, PlusCircle, ShieldCheck, Send as SendIcon, Info } from "lucide-react";
 import Image from "next/image";
 import SendMessageModal from '@/components/features/send-message-modal'; // Import the modal
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { useToast } from '@/hooks/use-toast';
 
 interface Provider {
   id: string;
   name: string;
   specialty: string;
   location: string;
-  rating?: number; 
-  reviewsCount?: number; 
+  rating?: number;
+  reviewsCount?: number;
   philosophy: string;
   morgellonsExperience: string;
   imageUrl: string;
@@ -78,14 +82,53 @@ const mockProviders: Provider[] = [
 export default function ProviderDirectoryPage() {
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
   const [messagingDoctorName, setMessagingDoctorName] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState(''); // State for the search term
+  const [searchTerm, setSearchTerm] = useState('');
+  const { toast } = useToast();
+
+  // State for suggestion modal
+  const [isSuggestModalOpen, setIsSuggestModalOpen] = useState(false);
+  const [suggestedProviderName, setSuggestedProviderName] = useState('');
+  const [suggestedProviderSpecialty, setSuggestedProviderSpecialty] = useState('');
+  const [suggestedProviderLocation, setSuggestedProviderLocation] = useState('');
+  const [suggestedProviderReason, setSuggestedProviderReason] = useState('');
+  const [suggestedProviderContact, setSuggestedProviderContact] = useState('');
+
 
   const handleSendMessageClick = (doctorName: string) => {
     setMessagingDoctorName(doctorName);
     setIsMessageModalOpen(true);
   };
 
-  // Mock filter logic (client-side for now)
+  const handleSuggestionSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!suggestedProviderName.trim() || !suggestedProviderSpecialty.trim() || !suggestedProviderLocation.trim() || !suggestedProviderReason.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in at least Name, Specialty, Location, and Reason.",
+        variant: "destructive",
+      });
+      return;
+    }
+    console.log("Provider Suggestion Submitted:", {
+      name: suggestedProviderName,
+      specialty: suggestedProviderSpecialty,
+      location: suggestedProviderLocation,
+      reason: suggestedProviderReason,
+      contact: suggestedProviderContact,
+    });
+    toast({
+      title: "Suggestion Received!",
+      description: `Thank you for suggesting ${suggestedProviderName}. Our team will review it.`,
+    });
+    setIsSuggestModalOpen(false);
+    // Clear form
+    setSuggestedProviderName('');
+    setSuggestedProviderSpecialty('');
+    setSuggestedProviderLocation('');
+    setSuggestedProviderReason('');
+    setSuggestedProviderContact('');
+  };
+
   const filteredProviders = mockProviders.filter(provider => {
     const lowerSearchTerm = searchTerm.toLowerCase();
     return (
@@ -109,13 +152,14 @@ export default function ProviderDirectoryPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col sm:flex-row gap-4 items-end">
-              <Input 
-                placeholder="Search by name, location (city/state), or keyword..." 
+              <Input
+                placeholder="Search by name, location (city/state), or keyword..."
                 className="flex-grow"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)} 
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
-              <Button className="w-full sm:w-auto"><Filter className="mr-2 h-4 w-4" />Apply Filters</Button>
+              {/* The Apply Filters button can be kept for future enhanced filtering logic */}
+              {/* <Button className="w-full sm:w-auto"><Filter className="mr-2 h-4 w-4" />Apply Filters</Button> */}
             </div>
              <Alert variant="default" className="mt-4 bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300">
                 <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -125,7 +169,49 @@ export default function ProviderDirectoryPage() {
                 </AlertDescription>
             </Alert>
             <div className="flex justify-end mt-4">
-              <Button variant="outline"><PlusCircle className="mr-2 h-4 w-4"/>Suggest a Provider</Button>
+              <Dialog open={isSuggestModalOpen} onOpenChange={setIsSuggestModalOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline"><PlusCircle className="mr-2 h-4 w-4"/>Suggest a Provider</Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Suggest a Provider</DialogTitle>
+                    <DialogDescription>
+                      Help us grow our directory by suggesting a provider you trust or know has experience with Morgellons.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleSuggestionSubmit}>
+                    <div className="py-4 space-y-3">
+                      <div>
+                        <Label htmlFor="suggest-name">Provider's Name <span className="text-destructive">*</span></Label>
+                        <Input id="suggest-name" value={suggestedProviderName} onChange={(e) => setSuggestedProviderName(e.target.value)} placeholder="e.g., Dr. Jane Smith" required />
+                      </div>
+                      <div>
+                        <Label htmlFor="suggest-specialty">Specialty <span className="text-destructive">*</span></Label>
+                        <Input id="suggest-specialty" value={suggestedProviderSpecialty} onChange={(e) => setSuggestedProviderSpecialty(e.target.value)} placeholder="e.g., Dermatologist, Internist" required />
+                      </div>
+                      <div>
+                        <Label htmlFor="suggest-location">Location (City, State) <span className="text-destructive">*</span></Label>
+                        <Input id="suggest-location" value={suggestedProviderLocation} onChange={(e) => setSuggestedProviderLocation(e.target.value)} placeholder="e.g., Anytown, CA" required />
+                      </div>
+                      <div>
+                        <Label htmlFor="suggest-reason">Reason for Suggestion / Experience <span className="text-destructive">*</span></Label>
+                        <Textarea id="suggest-reason" value={suggestedProviderReason} onChange={(e) => setSuggestedProviderReason(e.target.value)} placeholder="Describe why you're suggesting this provider..." className="min-h-[100px]" required/>
+                      </div>
+                      <div>
+                        <Label htmlFor="suggest-contact">Provider Contact (Website/Phone - Optional)</Label>
+                        <Input id="suggest-contact" value={suggestedProviderContact} onChange={(e) => setSuggestedProviderContact(e.target.value)} placeholder="e.g., www.drsmith.com or 555-1234" />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <DialogClose asChild>
+                        <Button type="button" variant="outline">Cancel</Button>
+                      </DialogClose>
+                      <Button type="submit">Submit Suggestion</Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </div>
           </CardContent>
         </Card>
