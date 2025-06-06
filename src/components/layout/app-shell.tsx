@@ -7,8 +7,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { auth as firebaseAuthInstance } from '@/lib/firebase'; // Renamed to avoid conflict
 import { signOut } from 'firebase/auth';
 import { useAuth } from '@/context/auth-context';
-import Image from 'next/image'; 
-import { 
+import Image from 'next/image';
+import {
   Sidebar,
   SidebarHeader,
   SidebarTrigger,
@@ -18,18 +18,18 @@ import {
   SidebarMenuButton,
   SidebarInset,
   SidebarFooter,
-  useSidebar, 
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { 
-  HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, LogOut, 
-  ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart, Dumbbell, Trophy, 
+import {
+  HeartHandshake, BookText, BrainCircuit, Users, Stethoscope, MessageSquareQuote, LogOut,
+  ListChecks, PiggyBank, Info, Wand2, UserCircle, Apple, Skull, Heart, Dumbbell, Trophy,
   LayoutDashboard, Pill, Wind, Lightbulb, ShieldCheck as AffirmationIcon,
   Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown,
   HandHeart, LogInIcon, UserPlus as UserPlusIcon, AlertTriangle, ShoppingCart,
   Package, GlassWater, Droplets, ToyBrick, BookOpen as BookOpenIcon, UtensilsCrossed, HelpCircle as TutorialIcon,
-  FileText, BedDouble // Added BedDouble
+  FileText, BedDouble, Target // Added Target for Battle Plan
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -39,13 +39,13 @@ import { useToast } from '@/hooks/use-toast';
 interface NavItem {
   href?: string;
   label: string;
-  icon: React.ElementType; 
+  icon: React.ElementType;
   pageTitle: string;
   children?: NavItem[];
   isParent?: boolean;
-  authRequired?: boolean; 
-  noAuthOnly?: boolean; 
-  isSubItem?: boolean; 
+  authRequired?: boolean;
+  noAuthOnly?: boolean;
+  isSubItem?: boolean;
   devOnly?: boolean; // For dev-only links
 }
 
@@ -53,69 +53,59 @@ const navItemsConfig: NavItem[] = [
   { href: '/landing', label: 'About Fiber Friends', icon: LayoutDashboard, pageTitle: 'Welcome to Fiber Friends' },
   { href: '/tutorial', label: 'Battle Manual', icon: TutorialIcon, pageTitle: 'Fiber Friends Tutorial' },
   {
-    label: 'Your Battle Log',
-    icon: Activity,
-    pageTitle: 'Your Battle Log',
+    label: 'Daily Battle Plan',
+    icon: Target, // Using Target icon for Battle Plan
+    pageTitle: 'Daily Battle Plan',
     isParent: true,
     authRequired: true,
     children: [
-      { href: '/symptom-journal', label: 'Battle Condition Log', icon: BookText, pageTitle: 'Battle Condition Log' },
-      { href: '/pattern-recognition', label: 'Enemy Intel Reports', icon: BrainCircuit, pageTitle: 'Enemy Intelligence Reports' },
-      { href: '/food-log', label: 'Monster-Killing Meals', icon: Apple, pageTitle: 'Monster-Killing Meals Log' },
-      { href: '/nutrition-tracker', label: 'Nutrition Strategy', icon: UtensilsCrossed, pageTitle: 'Nutrition Strategy & Coach' },
-      { href: '/exercise-log', label: 'Combat Training', icon: Dumbbell, pageTitle: 'Combat Training Log' },
-      { href: '/sleep-log', label: 'Sleep Log', icon: BedDouble, pageTitle: 'Sleep Log' }, // New Sleep Log
-      { href: '/product-tracker', label: 'Gear & Artifacts', icon: ListChecks, pageTitle: 'Gear & Artifacts Tracker' },
-      { href: '/prescription-tracker', label: 'Battle Potions', icon: Pill, pageTitle: 'Battle Potions & Elixirs' },
-    ]
-  },
-  {
-    label: 'Battle Challenges',
-    icon: HeartPulseIcon,
-    pageTitle: 'Battle Challenges',
-    isParent: true,
-    authRequired: true,
-    children: [
-      { href: '/knowledge-nugget-quiz', label: 'Test Your Wits', icon: Lightbulb, pageTitle: 'Test Your Wits Quiz' },
       { href: '/affirmation-amplifier', label: 'Empowering Mantras', icon: AffirmationIcon, pageTitle: 'Empowering Mantras' },
-      { href: '/mindful-moment', label: 'Mindful Combat Training', icon: Wind, pageTitle: 'Mindful Combat Training' },
+      { href: '/exercise-log', label: 'Combat Training', icon: Dumbbell, pageTitle: 'Combat Training Log' },
+      { href: '/food-log', label: 'Monster-Killing Meals', icon: Apple, pageTitle: 'Monster-Killing Meals Log' },
       { href: '/kindness-challenge', label: 'Warrior\'s Code Quests', icon: HandHeart, pageTitle: 'Warrior\'s Code Quests' },
+      { href: '/knowledge-nugget-quiz', label: 'Test Your Wits', icon: Lightbulb, pageTitle: 'Test Your Wits Quiz' },
+      { href: '/mindful-moment', label: 'Mindful Combat Training', icon: Wind, pageTitle: 'Mindful Combat Training' },
+      { href: '/prescription-tracker', label: 'Battle Potions', icon: Pill, pageTitle: 'Battle Potions & Elixirs' },
+      { href: '/product-tracker', label: 'Gear & Artifacts', icon: ListChecks, pageTitle: 'Gear & Artifacts Tracker' },
+      { href: '/sleep-log', label: 'Sleep Log', icon: BedDouble, pageTitle: 'Sleep Log' },
+      { href: '/symptom-journal', label: 'Battle Condition Log', icon: BookText, pageTitle: 'Battle Condition Log' },
     ]
   },
   {
-    label: 'Warrior Stronghold',
-    icon: Users,
-    pageTitle: 'Warrior Stronghold',
+    label: 'Allied Healers',
+    icon: Stethoscope,
+    pageTitle: 'Allied Healers',
     isParent: true,
+    authRequired: false,
     children: [
-      { href: '/', label: 'Comrades\' Campfire', icon: HeartHandshake, pageTitle: 'Comrades\' Campfire' },
-      { href: '/doctor-forum', label: 'Intel on Obstructions', icon: MessageSquareQuote, pageTitle: 'Intel on Obstructions Forum' },
+      { href: '/provider-directory', label: 'Provider Directory', icon: Stethoscope, pageTitle: 'Provider Directory', authRequired: false },
     ]
   },
   {
-    label: 'Armory & Supplies', 
+    label: 'Armory & Supplies',
     icon: ShoppingCart,
     pageTitle: 'Armory & Supplies',
     isParent: true,
     authRequired: false,
     children: [
       { href: '/curated-wellness-aids#ai-product-suggester', label: 'AI Battle Aid Suggester', icon: BrainCircuit, pageTitle: 'AI Battle Aid Suggester' },
-      { href: '/curated-wellness-aids#supplements', label: 'Reinforcements (Supplements)', icon: Package, pageTitle: 'Supplements Category' },
-      { href: '/curated-wellness-aids#food-items', label: 'Rations (Food Items)', icon: Apple, pageTitle: 'Food Items Category' },
+      { href: '/curated-wellness-aids#books', label: 'Battle Tomes (Books)', icon: BookOpenIcon, pageTitle: 'Books Category' },
       { href: '/curated-wellness-aids#beverages', label: 'Potions (Beverages)', icon: GlassWater, pageTitle: 'Beverages Category' },
+      { href: '/curated-wellness-aids#food-items', label: 'Rations (Food Items)', icon: Apple, pageTitle: 'Food Items Category' },
+      { href: '/curated-wellness-aids#supplements', label: 'Reinforcements (Supplements)', icon: Package, pageTitle: 'Supplements Category' },
       { href: '/curated-wellness-aids#topicals', label: 'Salves (Topicals)', icon: Droplets, pageTitle: 'Topicals Category' },
       { href: '/curated-wellness-aids#wellness-tools', label: 'Training Gear (Wellness Tools)', icon: ToyBrick, pageTitle: 'Wellness Tools Category' },
-      { href: '/curated-wellness-aids#books', label: 'Battle Tomes (Books)', icon: BookOpenIcon, pageTitle: 'Books Category' },
     ]
   },
   {
-    label: 'Allied Healers',
-    icon: Stethoscope, 
-    pageTitle: 'Allied Healers',
+    label: 'Intelligence & Strategy',
+    icon: BrainCircuit,
+    pageTitle: 'Intelligence & Strategy',
     isParent: true,
-    authRequired: false, 
+    authRequired: true,
     children: [
-      { href: '/provider-directory', label: 'Provider Directory', icon: Stethoscope, pageTitle: 'Provider Directory', authRequired: false },
+      { href: '/pattern-recognition', label: 'Enemy Intel Reports', icon: BrainCircuit, pageTitle: 'Enemy Intelligence Reports' },
+      { href: '/nutrition-tracker', label: 'Nutrition Strategy & Coach', icon: UtensilsCrossed, pageTitle: 'Nutrition Strategy & Coach' },
     ]
   },
   {
@@ -126,8 +116,18 @@ const navItemsConfig: NavItem[] = [
     authRequired: true,
     children: [
       { href: '/matching', label: 'Find Fellow Warriors', icon: Users, pageTitle: 'Find Fellow Warriors' },
-      { href: '/fiber-singles', label: 'Warrior Connections Portal', icon: Heart, pageTitle: 'Warrior Connections Portal' },
       { href: '/leaderboard', label: 'Hall of Slayers', icon: Trophy, pageTitle: 'Hall of Slayers' },
+      { href: '/fiber-singles', label: 'Warrior Connections Portal', icon: Heart, pageTitle: 'Warrior Connections Portal' },
+    ]
+  },
+  {
+    label: 'Warrior Stronghold',
+    icon: Users, // Using Users icon for community
+    pageTitle: 'Warrior Stronghold',
+    isParent: true,
+    children: [
+      { href: '/', label: 'Comrades\' Campfire', icon: HeartHandshake, pageTitle: 'Comrades\' Campfire' }, // Homepage
+      { href: '/doctor-forum', label: 'Intel on Obstructions', icon: MessageSquareQuote, pageTitle: 'Intel on Obstructions Forum' },
     ]
   },
   {
@@ -137,18 +137,18 @@ const navItemsConfig: NavItem[] = [
     isParent: true,
     authRequired: true,
     children: [
-      { href: '/my-profile', label: 'Profile & Stats', icon: UserCircle, pageTitle: 'My Warrior Profile' },
       { href: '/create-monster', label: 'New/Re-Conjure Foe', icon: Wand2, pageTitle: 'Conjure Your Nemesis' },
+      { href: '/my-profile', label: 'Profile & Stats', icon: UserCircle, pageTitle: 'My Warrior Profile' },
       { href: '/monster-tomb', label: 'Tomb of Vanquished Foes', icon: Skull, pageTitle: 'Tomb of Vanquished Foes' },
     ]
   },
-  { 
-    href: '/doctor-portal/dr-middelveen', 
-    label: 'Dr. Middelveen Portal', 
-    icon: FileText, 
+  {
+    href: '/doctor-portal/dr-middelveen',
+    label: 'Dr. Middelveen Portal',
+    icon: FileText,
     pageTitle: 'Dr. Middelveen Portal',
     authRequired: true,
-    devOnly: true 
+    devOnly: true
   },
   { href: '/login', label: 'Warrior Login', icon: LogInIcon, pageTitle: 'Login', noAuthOnly: true },
   { href: '/register', label: 'Join the Ranks', icon: UserPlusIcon, pageTitle: 'Register', noAuthOnly: true },
@@ -185,7 +185,7 @@ function InfoBar() {
         const nextIndex = (currentIndex + 1) % infoTips.length;
         return infoTips[nextIndex];
       });
-    }, 7000); 
+    }, 7000);
 
     return () => clearInterval(intervalId);
   }, []);
@@ -239,9 +239,9 @@ const findCurrentPage = (items: NavItem[], currentPath: string): NavItem | undef
       }
   }
   if (currentPath === '/') return items.find(item => item.href === '/');
-  if (currentPath === '/tutorial') return items.find(item => item.href === '/tutorial'); 
+  if (currentPath === '/tutorial') return items.find(item => item.href === '/tutorial');
   if (currentPath.startsWith('/doctor-portal/dr-middelveen')) return items.find(item => item.href === '/doctor-portal/dr-middelveen');
-  if (currentPath.startsWith('/sleep-log')) return navItemsConfig.flatMap(i => i.children || []).find(c => c.href === '/sleep-log'); // Explicit find for new page
+  if (currentPath.startsWith('/sleep-log')) return navItemsConfig.flatMap(i => i.children || []).find(c => c.href === '/sleep-log');
 
 
   return undefined;
@@ -251,12 +251,12 @@ const findCurrentPage = (items: NavItem[], currentPath: string): NavItem | undef
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, loading, configError } = useAuth(); 
+  const { user, loading, configError } = useAuth();
   const { toast } = useToast();
-  
-  const { state: sidebarState, isMobile } = useSidebar(); 
+
+  const { state: sidebarState, isMobile } = useSidebar();
   const [openAccordionItem, setOpenAccordionItem] = useState<string | undefined>(undefined);
-  
+
   const currentPage = findCurrentPage(navItemsConfig, pathname);
 
 
@@ -281,11 +281,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       });
     }
   };
-  
+
   const filteredNavItems = React.useMemo(() => {
     const isDevelopment = process.env.NODE_ENV === 'development';
     return navItemsConfig.filter(item => {
-      if (item.devOnly && !isDevelopment) return false; 
+      if (item.devOnly && !isDevelopment) return false;
       if (item.authRequired && !user) return false;
       if (item.noAuthOnly && user) return false;
       return true;
@@ -298,23 +298,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             if (child.authRequired && !user) return false;
             if (child.noAuthOnly && user) return false;
             return true;
-          }).sort((a, b) => { // Sort children alphabetically by label
-            if (a.label < b.label) return -1;
-            if (a.label > b.label) return 1;
-            return 0;
-          })
+          }).sort((a, b) => a.label.localeCompare(b.label)) // Sort children alphabetically
         };
       }
       return item;
     }).filter(item => !(item.isParent && item.children && item.children.length === 0))
-    .sort((a,b) => { // Sort top-level items alphabetically by label
-        if (a.label === 'About Fiber Friends') return -1; // Keep About first
-        if (b.label === 'About Fiber Friends') return 1;
-        if (a.label === 'Battle Manual') return -1; // Keep Tutorial second
-        if (b.label === 'Battle Manual') return 1;
-        if (a.label < b.label) return -1;
-        if (a.label > b.label) return 1;
-        return 0;
+    .sort((a,b) => {
+        const fixedOrder = ["About Fiber Friends", "Battle Manual", "Daily Battle Plan"];
+        const indexA = fixedOrder.indexOf(a.label);
+        const indexB = fixedOrder.indexOf(b.label);
+
+        if (indexA !== -1 && indexB !== -1) return indexA - indexB; // Both are in fixed order
+        if (indexA !== -1) return -1; // A is fixed, B is not
+        if (indexB !== -1) return 1;  // B is fixed, A is not
+
+        // Neither are fixed, sort alphabetically
+        return a.label.localeCompare(b.label);
     });
   }, [user]);
 
@@ -349,7 +348,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <SidebarHeader className="p-4 flex items-center justify-between border-b border-sidebar-border">
             <Link href="/landing" className="flex items-center gap-2 group">
               <Image
-                src="https://placehold.co/32x32.png" 
+                src="https://placehold.co/32x32.png"
                 alt="Fiber Friends Logo"
                 width={32}
                 height={32}
@@ -359,7 +358,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <h1 className="text-xl font-headline font-semibold text-sidebar-foreground group-data-[collapsible=icon]:hidden">Fiber Friends</h1>
             </Link>
           </SidebarHeader>
-          
+
           <SidebarContent className="flex-1 overflow-y-auto">
             <Accordion type="single" collapsible value={openAccordionItem} onValueChange={setOpenAccordionItem} className="w-full space-y-0.5 px-2 group-data-[collapsible=icon]:px-0">
               {filteredNavItems.map((item) => (
@@ -392,13 +391,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <AccordionContent className="pt-0 pb-0 pl-1 group-data-[collapsible=icon]:hidden">
                       <SidebarMenu className="py-1 space-y-0.5 border-l-2 border-sidebar-border/30 ml-[calc(0.625rem+4px)] pl-3">
                         {item.children.map((child) => (
-                          child.href && ( 
+                          child.href && (
                             <SidebarMenuItem key={child.href} className="p-0">
                               <Link href={child.href} legacyBehavior passHref>
                                 <SidebarMenuButton
-                                  isActive={(pathname === child.href || (child.href !== '/' && child.href !== '/landing' && pathname.startsWith(child.href.split('#')[0])))}
+                                  isActive={(pathname === child.href.split('#')[0] || (child.href !== '/' && child.href !== '/landing' && pathname.startsWith(child.href.split('#')[0])))}
                                   tooltip={{ children: child.label, side: 'right' }}
-                                  className="w-full justify-start text-xs h-[1.875rem] pl-1.5 py-1" 
+                                  className="w-full justify-start text-xs h-[1.875rem] pl-1.5 py-1"
                                   variant="ghost"
                                 >
                                   <child.icon className="h-3.5 w-3.5 mr-1.5 shrink-0" />
@@ -412,7 +411,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     </AccordionContent>
                   </AccordionItem>
                 ) : (
-                  item.href && ( 
+                  item.href && (
                     <SidebarMenuItem key={item.href} className="px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
                       <Link href={item.href} legacyBehavior passHref>
                         <SidebarMenuButton
