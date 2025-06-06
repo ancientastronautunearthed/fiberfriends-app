@@ -54,4 +54,3 @@ const monsterImageGenerationFlow = ai.defineFlow(
     return { imageUrl: media.url };
   }
 );
-
