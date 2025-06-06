@@ -29,7 +29,7 @@ import {
   Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown,
   HandHeart, LogInIcon, UserPlus as UserPlusIcon, AlertTriangle, ShoppingCart,
   Package, GlassWater, Droplets, ToyBrick, BookOpen, UtensilsCrossed, HelpCircle as TutorialIcon,
-  ClipboardUser // Added for Doctor Portal
+  FileText // Replaced ClipboardUser with FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -141,14 +141,13 @@ const navItemsConfig: NavItem[] = [
       { href: '/monster-tomb', label: 'Tomb of Vanquished Foes', icon: Skull, pageTitle: 'Tomb of Vanquished Foes' },
     ]
   },
-  // Doctor Portal Link - Added as a top-level item for now
   { 
     href: '/doctor-portal/dr-middelveen', 
     label: 'Dr. Middelveen Portal', 
-    icon: ClipboardUser, // Or Microscope, Stethoscope
+    icon: FileText, // Changed from ClipboardUser
     pageTitle: 'Dr. Middelveen Portal',
-    authRequired: true, // Assuming this portal requires login, even if a special one
-    devOnly: true // Let's mark as devOnly for now as it's a prototype with mock data
+    authRequired: true,
+    devOnly: true 
   },
   { href: '/login', label: 'Warrior Login', icon: LogInIcon, pageTitle: 'Login', noAuthOnly: true },
   { href: '/register', label: 'Join the Ranks', icon: UserPlusIcon, pageTitle: 'Register', noAuthOnly: true },
