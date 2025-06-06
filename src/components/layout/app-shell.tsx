@@ -29,7 +29,7 @@ import {
   Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown,
   HandHeart, LogInIcon, UserPlus as UserPlusIcon, AlertTriangle, ShoppingCart,
   Package, GlassWater, Droplets, ToyBrick, BookOpen as BookOpenIcon, UtensilsCrossed, HelpCircle as TutorialIcon,
-  FileText, BedDouble, Target, Settings2 as Settings2Icon // Added Target for Battle Plan & Settings2Icon
+  FileText, BedDouble, Target, Settings2 as Settings2Icon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -51,31 +51,42 @@ interface NavItem {
 
 const navItemsConfig: NavItem[] = [
   { href: '/landing', label: 'About Fiber Friends', icon: LayoutDashboard, pageTitle: 'Welcome to Fiber Friends' },
-  { href: '/tutorial', label: 'Battle Manual', icon: TutorialIcon, pageTitle: 'Fiber Friends Tutorial' },
+  { href: '/tutorial', label: 'User Guide', icon: TutorialIcon, pageTitle: 'Fiber Friends User Guide' },
   {
-    label: 'Daily Battle Plan',
+    label: 'Daily Wellness Log',
     icon: Target, 
-    pageTitle: 'Daily Battle Plan',
+    pageTitle: 'Daily Wellness Log',
     isParent: true,
     authRequired: true,
     children: [
-      { href: '/affirmation-amplifier', label: 'Empowering Mantras', icon: AffirmationIcon, pageTitle: 'Empowering Mantras' },
-      { href: '/exercise-log', label: 'Combat Training', icon: Dumbbell, pageTitle: 'Combat Training Log' },
-      { href: '/food-log', label: 'Monster-Killing Meals', icon: Apple, pageTitle: 'Monster-Killing Meals Log' },
-      { href: '/kindness-challenge', label: 'Warrior\'s Code Quests', icon: HandHeart, pageTitle: 'Warrior\'s Code Quests' },
-      { href: '/knowledge-nugget-quiz', label: 'Test Your Wits', icon: Lightbulb, pageTitle: 'Test Your Wits Quiz' },
-      { href: '/mindful-moment', label: 'Mindful Combat Training', icon: Wind, pageTitle: 'Mindful Combat Training' },
-      { href: '/prescription-tracker', label: 'Battle Potions', icon: Pill, pageTitle: 'Battle Potions & Elixirs' },
-      { href: '/product-tracker', label: 'Gear & Artifacts', icon: ListChecks, pageTitle: 'Gear & Artifacts Tracker' },
+      { href: '/affirmation-amplifier', label: 'Affirmations', icon: AffirmationIcon, pageTitle: 'Positive Affirmations' },
+      { href: '/exercise-log', label: 'Exercise Log', icon: Dumbbell, pageTitle: 'Exercise Log' },
+      { href: '/food-log', label: 'Meal Log', icon: Apple, pageTitle: 'Meal Log' },
+      { href: '/kindness-challenge', label: 'Kindness Challenge', icon: HandHeart, pageTitle: 'Kindness Challenge' },
+      { href: '/knowledge-nugget-quiz', label: 'Wellness Quiz', icon: Lightbulb, pageTitle: 'Wellness Quiz' },
+      { href: '/prescription-tracker', label: 'Medication Log', icon: Pill, pageTitle: 'Medication Log' },
+      { href: '/mindful-moment', label: 'Mindful Moments', icon: Wind, pageTitle: 'Mindful Moments' },
+      { href: '/product-tracker', label: 'Product Log', icon: ListChecks, pageTitle: 'Product Log' },
       { href: '/sleep-log', label: 'Sleep Log', icon: BedDouble, pageTitle: 'Sleep Log' },
-      { href: '/symptom-journal', label: 'Battle Condition Log', icon: BookText, pageTitle: 'Battle Condition Log' },
+      { href: '/symptom-journal', label: 'Symptom Journal', icon: BookText, pageTitle: 'Symptom Journal' },
       { href: '/workout-plan-creator', label: 'Workout Plan Creator', icon: Settings2Icon, pageTitle: 'AI Workout Plan Creator', authRequired: true },
     ]
   },
   {
-    label: 'Allied Healers',
+    label: 'Insights & Analysis',
+    icon: BrainCircuit,
+    pageTitle: 'Insights & Analysis',
+    isParent: true,
+    authRequired: true,
+    children: [
+      { href: '/nutrition-tracker', label: 'Nutrition Analysis', icon: UtensilsCrossed, pageTitle: 'Nutrition Analysis & Coach' },
+      { href: '/pattern-recognition', label: 'Symptom Pattern Analysis', icon: BrainCircuit, pageTitle: 'Symptom Pattern Analysis' },
+    ]
+  },
+  {
+    label: 'Healthcare Providers',
     icon: Stethoscope,
-    pageTitle: 'Allied Healers',
+    pageTitle: 'Healthcare Providers',
     isParent: true,
     authRequired: false,
     children: [
@@ -83,64 +94,53 @@ const navItemsConfig: NavItem[] = [
     ]
   },
   {
-    label: 'Armory & Supplies',
+    label: 'Wellness Resources',
     icon: ShoppingCart,
-    pageTitle: 'Armory & Supplies',
+    pageTitle: 'Wellness Resources',
     isParent: true,
     authRequired: false,
     children: [
-      { href: '/curated-wellness-aids#ai-product-suggester', label: 'AI Battle Aid Suggester', icon: BrainCircuit, pageTitle: 'AI Battle Aid Suggester' },
-      { href: '/curated-wellness-aids#books', label: 'Battle Tomes (Books)', icon: BookOpenIcon, pageTitle: 'Books Category' },
-      { href: '/curated-wellness-aids#beverages', label: 'Potions (Beverages)', icon: GlassWater, pageTitle: 'Beverages Category' },
-      { href: '/curated-wellness-aids#food-items', label: 'Rations (Food Items)', icon: Apple, pageTitle: 'Food Items Category' },
-      { href: '/curated-wellness-aids#supplements', label: 'Reinforcements (Supplements)', icon: Package, pageTitle: 'Supplements Category' },
-      { href: '/curated-wellness-aids#topicals', label: 'Salves (Topicals)', icon: Droplets, pageTitle: 'Topicals Category' },
-      { href: '/curated-wellness-aids#wellness-tools', label: 'Training Gear (Wellness Tools)', icon: ToyBrick, pageTitle: 'Wellness Tools Category' },
+      { href: '/curated-wellness-aids#ai-product-suggester', label: 'AI Product Suggester', icon: BrainCircuit, pageTitle: 'AI Product Suggester' },
+      { href: '/curated-wellness-aids#books', label: 'Books', icon: BookOpenIcon, pageTitle: 'Books Category' },
+      { href: '/curated-wellness-aids#beverages', label: 'Beverages', icon: GlassWater, pageTitle: 'Beverages Category' },
+      { href: '/curated-wellness-aids#food-items', label: 'Food Items', icon: Apple, pageTitle: 'Food Items Category' },
+      { href: '/curated-wellness-aids#supplements', label: 'Supplements', icon: Package, pageTitle: 'Supplements Category' },
+      { href: '/curated-wellness-aids#topicals', label: 'Topicals', icon: Droplets, pageTitle: 'Topicals Category' },
+      { href: '/curated-wellness-aids#wellness-tools', label: 'Wellness Tools', icon: ToyBrick, pageTitle: 'Wellness Tools Category' },
     ]
   },
   {
-    label: 'Intelligence & Strategy',
-    icon: BrainCircuit,
-    pageTitle: 'Intelligence & Strategy',
-    isParent: true,
-    authRequired: true,
-    children: [
-      { href: '/pattern-recognition', label: 'Enemy Intel Reports', icon: BrainCircuit, pageTitle: 'Enemy Intelligence Reports' },
-      { href: '/nutrition-tracker', label: 'Nutrition Strategy & Coach', icon: UtensilsCrossed, pageTitle: 'Nutrition Strategy & Coach' },
-    ]
-  },
-  {
-    label: 'Warrior Network',
+    label: 'Community Network',
     icon: Share2,
-    pageTitle: 'Warrior Network',
+    pageTitle: 'Community Network',
     isParent: true,
     authRequired: true,
     children: [
-      { href: '/matching', label: 'Find Fellow Warriors', icon: Users, pageTitle: 'Find Fellow Warriors' },
-      { href: '/leaderboard', label: 'Hall of Slayers', icon: Trophy, pageTitle: 'Hall of Slayers' },
-      { href: '/fiber-singles', label: 'Warrior Connections Portal', icon: Heart, pageTitle: 'Warrior Connections Portal' },
+      { href: '/fiber-singles', label: 'Connection Portal', icon: Heart, pageTitle: 'Fiber Singles Connection Portal' },
+      { href: '/leaderboard', label: 'Community Leaderboard', icon: Trophy, pageTitle: 'Community Leaderboard' },
+      { href: '/matching', label: 'Peer Matching', icon: Users, pageTitle: 'Peer Matching' },
     ]
   },
   {
-    label: 'Warrior Stronghold',
+    label: 'Community Hub',
     icon: Users, 
-    pageTitle: 'Warrior Stronghold',
+    pageTitle: 'Community Hub',
     isParent: true,
     children: [
-      { href: '/', label: 'Comrades\' Campfire', icon: HeartHandshake, pageTitle: 'Comrades\' Campfire' }, 
-      { href: '/doctor-forum', label: 'Intel on Obstructions', icon: MessageSquareQuote, pageTitle: 'Intel on Obstructions Forum' },
+      { href: '/', label: 'Community Feed (Home)', icon: HeartHandshake, pageTitle: 'Community Feed' }, 
+      { href: '/doctor-forum', label: 'Medical Experiences Forum', icon: MessageSquareQuote, pageTitle: 'Medical Experiences Forum' },
     ]
   },
   {
-    label: 'Your Nemesis',
-    icon: ShieldQuestion,
-    pageTitle: 'Your Nemesis',
+    label: 'My Wellness Profile',
+    icon: ShieldQuestion, // ShieldQuestion might be too "gamey", UserCircle might be better here or Activity
+    pageTitle: 'My Wellness Profile',
     isParent: true,
     authRequired: true,
     children: [
-      { href: '/create-monster', label: 'New/Re-Conjure Foe', icon: Wand2, pageTitle: 'Conjure Your Nemesis' },
-      { href: '/my-profile', label: 'Profile & Stats', icon: UserCircle, pageTitle: 'My Warrior Profile' },
-      { href: '/monster-tomb', label: 'Tomb of Vanquished Foes', icon: Skull, pageTitle: 'Tomb of Vanquished Foes' },
+      { href: '/monster-tomb', label: 'Archived Goals', icon: Skull, pageTitle: 'Archived Goals & Milestones' }, // Renamed Tomb
+      { href: '/my-profile', label: 'My Profile', icon: UserCircle, pageTitle: 'My Profile' },
+      { href: '/create-monster', label: 'Setup/Update Profile Avatar', icon: Wand2, pageTitle: 'Setup/Update Profile Avatar' }, // Renamed "Create Monster"
     ]
   },
   {
@@ -151,9 +151,9 @@ const navItemsConfig: NavItem[] = [
     authRequired: true,
     devOnly: true
   },
-  { href: '/login', label: 'Warrior Login', icon: LogInIcon, pageTitle: 'Login', noAuthOnly: true },
-  { href: '/register', label: 'Join the Ranks', icon: UserPlusIcon, pageTitle: 'Register', noAuthOnly: true },
-  { href: '/support-us', label: 'Reinforce the Ranks', icon: PiggyBank, pageTitle: 'Support Us' },
+  { href: '/login', label: 'Login', icon: LogInIcon, pageTitle: 'Login', noAuthOnly: true },
+  { href: '/register', label: 'Register', icon: UserPlusIcon, pageTitle: 'Register', noAuthOnly: true },
+  { href: '/support-us', label: 'Support Us', icon: PiggyBank, pageTitle: 'Support Fiber Friends' },
 ];
 
 
@@ -301,13 +301,41 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       return item;
     }).filter(item => !(item.isParent && item.children && item.children.length === 0))
     .sort((a,b) => {
-        const fixedOrder = ["About Fiber Friends", "Battle Manual", "Daily Battle Plan"];
+        const fixedOrder = ["About Fiber Friends", "User Guide", "Daily Wellness Log"]; // Updated fixed order
         const indexA = fixedOrder.indexOf(a.label);
         const indexB = fixedOrder.indexOf(b.label);
 
         if (indexA !== -1 && indexB !== -1) return indexA - indexB; 
         if (indexA !== -1) return -1; 
         if (indexB !== -1) return 1;  
+
+        // Fallback for items not in fixedOrder: sort alphabetically
+        // But ensure "My Wellness Profile" comes before "Support Us" etc.
+        const professionalOrder = [
+          "Insights & Analysis", 
+          "Healthcare Providers", 
+          "Wellness Resources", 
+          "Community Network", 
+          "Community Hub", 
+          "My Wellness Profile",
+          "Dr. Middelveen Portal" // Dev only but keep its relative order if shown
+        ];
+        const profIndexA = professionalOrder.indexOf(a.label);
+        const profIndexB = professionalOrder.indexOf(b.label);
+
+        if (profIndexA !== -1 && profIndexB !== -1) return profIndexA - profIndexB;
+        if (profIndexA !== -1) return -1;
+        if (profIndexB !== -1) return 1;
+        
+        // Sort auth links and support us last
+        const lastOrder = ["Login", "Register", "Support Us"];
+        const lastIndexA = lastOrder.indexOf(a.label);
+        const lastIndexB = lastOrder.indexOf(b.label);
+
+        if (lastIndexA !== -1 && lastIndexB !== -1) return lastIndexA - lastIndexB;
+        if (lastIndexA !== -1) return 1; // Put these at the end
+        if (lastIndexB !== -1) return -1;
+
 
         return a.label.localeCompare(b.label);
     });
@@ -451,3 +479,4 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </>
   );
 }
+
