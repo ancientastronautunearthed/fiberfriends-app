@@ -9,29 +9,31 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'genkit'; // Assuming z comes from genkit for schema definition as per previous examples
 
-export const AssistantImageInputSchema = z.object({
+// Schema definitions - NOT EXPORTED
+const AssistantImageInputSchema = z.object({
   assistantName: z.string().describe("The name of the AI assistant."),
   species: z.string().describe("The chosen species category for the assistant (e.g., Human, Animal, Sci-Fi, Monster, Other)."),
   speciesDetails: z.string().optional().describe("Specific details or style notes for the chosen species (e.g., 'wise owl with spectacles', 'friendly robot, blue accents', 'professional human, looking thoughtful')."),
 });
-export type AssistantImageInput = z.infer<typeof AssistantImageInputSchema>;
+export type AssistantImageInput = z.infer<typeof AssistantImageInputSchema>; // TYPE EXPORT - OK
 
-export const AssistantImageOutputSchema = z.object({
+// Schema definitions - NOT EXPORTED
+const AssistantImageOutputSchema = z.object({
   imageUrl: z.string().url().describe('The generated image of the AI assistant as a data URI.'),
 });
-export type AssistantImageOutput = z.infer<typeof AssistantImageOutputSchema>;
+export type AssistantImageOutput = z.infer<typeof AssistantImageOutputSchema>; // TYPE EXPORT - OK
 
-export async function generateAssistantImage(input: AssistantImageInput): Promise<AssistantImageOutput> {
+export async function generateAssistantImage(input: AssistantImageInput): Promise<AssistantImageOutput> { // ASYNC FUNCTION EXPORT - OK
   return assistantImageGenerationFlow(input);
 }
 
 const assistantImageGenerationFlow = ai.defineFlow(
   {
     name: 'assistantImageGenerationFlow',
-    inputSchema: AssistantImageInputSchema,
-    outputSchema: AssistantImageOutputSchema,
+    inputSchema: AssistantImageInputSchema, // INTERNAL USE
+    outputSchema: AssistantImageOutputSchema, // INTERNAL USE
   },
   async ({ assistantName, species, speciesDetails }) => {
     let promptText = `Generate a professional and thematic visual representation for an AI Research Assistant named "${assistantName}". `;
