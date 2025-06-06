@@ -167,6 +167,7 @@ export default function FoodLogPage() {
       localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
       checkMonsterDeath(monsterHealth, "its own wretched existence"); 
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monsterHealth, monsterName]);
 
   useEffect(() => {
@@ -575,8 +576,8 @@ export default function FoodLogPage() {
         
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline">"Monster-Killing" Meal Ideas</CardTitle>
-            <CardDescription>Let {monsterName}'s AI chefs suggest a meal that's good for you (and bad for it!).</CardDescription>
+            <CardTitle className="font-headline flex items-center gap-2"><ChefHat className="h-6 w-6 text-primary"/>AI Chef: Meal Ideas &amp; Recipes</CardTitle>
+            <CardDescription>Let {monsterName}'s AI chefs suggest a meal that's good for you (and bad for it!), and then generate a full recipe.</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {(["breakfast", "lunch", "dinner", "snack"] as const).map((mealType) => {
