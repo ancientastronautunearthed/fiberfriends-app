@@ -28,8 +28,8 @@ import {
   LayoutDashboard, Pill, Wind, Lightbulb, ShieldCheck as AffirmationIcon,
   Activity, HeartPulse as HeartPulseIcon, Share2, ShieldQuestion, ChevronDown,
   HandHeart, LogInIcon, UserPlus as UserPlusIcon, AlertTriangle, ShoppingCart,
-  Package, GlassWater, Droplets, ToyBrick, BookOpen, UtensilsCrossed, HelpCircle as TutorialIcon,
-  FileText // Replaced ClipboardUser with FileText
+  Package, GlassWater, Droplets, ToyBrick, BookOpen as BookOpenIcon, UtensilsCrossed, HelpCircle as TutorialIcon,
+  FileText, BedDouble // Added BedDouble
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -64,6 +64,7 @@ const navItemsConfig: NavItem[] = [
       { href: '/food-log', label: 'Monster-Killing Meals', icon: Apple, pageTitle: 'Monster-Killing Meals Log' },
       { href: '/nutrition-tracker', label: 'Nutrition Strategy', icon: UtensilsCrossed, pageTitle: 'Nutrition Strategy & Coach' },
       { href: '/exercise-log', label: 'Combat Training', icon: Dumbbell, pageTitle: 'Combat Training Log' },
+      { href: '/sleep-log', label: 'Sleep Log', icon: BedDouble, pageTitle: 'Sleep Log' }, // New Sleep Log
       { href: '/product-tracker', label: 'Gear & Artifacts', icon: ListChecks, pageTitle: 'Gear & Artifacts Tracker' },
       { href: '/prescription-tracker', label: 'Battle Potions', icon: Pill, pageTitle: 'Battle Potions & Elixirs' },
     ]
@@ -104,7 +105,7 @@ const navItemsConfig: NavItem[] = [
       { href: '/curated-wellness-aids#beverages', label: 'Potions (Beverages)', icon: GlassWater, pageTitle: 'Beverages Category' },
       { href: '/curated-wellness-aids#topicals', label: 'Salves (Topicals)', icon: Droplets, pageTitle: 'Topicals Category' },
       { href: '/curated-wellness-aids#wellness-tools', label: 'Training Gear (Wellness Tools)', icon: ToyBrick, pageTitle: 'Wellness Tools Category' },
-      { href: '/curated-wellness-aids#books', label: 'Battle Tomes (Books)', icon: BookOpen, pageTitle: 'Books Category' },
+      { href: '/curated-wellness-aids#books', label: 'Battle Tomes (Books)', icon: BookOpenIcon, pageTitle: 'Books Category' },
     ]
   },
   {
@@ -144,7 +145,7 @@ const navItemsConfig: NavItem[] = [
   { 
     href: '/doctor-portal/dr-middelveen', 
     label: 'Dr. Middelveen Portal', 
-    icon: FileText, // Changed from ClipboardUser
+    icon: FileText, 
     pageTitle: 'Dr. Middelveen Portal',
     authRequired: true,
     devOnly: true 
@@ -171,6 +172,7 @@ const infoTips = [
   "Quiz Tip: Boost your knowledge (and weaken your monster!) with the Knowledge Nugget Quiz.",
   "Affirmation Tip: Amplify positive thoughts with the Affirmation Amplifier. It's a small act with big impact.",
   "Kindness Tip: Completing a small act of kindness in the 'Kindness Connection' can brighten your day and someone else's!",
+  "Sleep Tip: Consistent sleep schedules can improve overall well-being. Try the new Sleep Log!"
 ];
 
 function InfoBar() {
@@ -237,8 +239,10 @@ const findCurrentPage = (items: NavItem[], currentPath: string): NavItem | undef
       }
   }
   if (currentPath === '/') return items.find(item => item.href === '/');
-  if (currentPath === '/tutorial') return items.find(item => item.href === '/tutorial'); // Ensure tutorial page title
+  if (currentPath === '/tutorial') return items.find(item => item.href === '/tutorial'); 
   if (currentPath.startsWith('/doctor-portal/dr-middelveen')) return items.find(item => item.href === '/doctor-portal/dr-middelveen');
+  if (currentPath.startsWith('/sleep-log')) return navItemsConfig.flatMap(i => i.children || []).find(c => c.href === '/sleep-log'); // Explicit find for new page
+
 
   return undefined;
 };
@@ -294,11 +298,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             if (child.authRequired && !user) return false;
             if (child.noAuthOnly && user) return false;
             return true;
+          }).sort((a, b) => { // Sort children alphabetically by label
+            if (a.label < b.label) return -1;
+            if (a.label > b.label) return 1;
+            return 0;
           })
         };
       }
       return item;
-    }).filter(item => !(item.isParent && item.children && item.children.length === 0));
+    }).filter(item => !(item.isParent && item.children && item.children.length === 0))
+    .sort((a,b) => { // Sort top-level items alphabetically by label
+        if (a.label === 'About Fiber Friends') return -1; // Keep About first
+        if (b.label === 'About Fiber Friends') return 1;
+        if (a.label === 'Battle Manual') return -1; // Keep Tutorial second
+        if (b.label === 'Battle Manual') return 1;
+        if (a.label < b.label) return -1;
+        if (a.label > b.label) return 1;
+        return 0;
+    });
   }, [user]);
 
 
