@@ -1,19 +1,45 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useTransition, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Heart, MessageCircle, ShieldCheck } from "lucide-react"; // Added ShieldCheck
-import { Badge } from "@/components/ui/badge"; // Import Badge
+import { Heart, MessageCircle, ShieldCheck, CheckCircle, Sparkles, AlertTriangle, Wand2, ListChecks, Eye, Loader2 as IconLoader, Trophy } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
+import { generateMonsterSlayingImageAction } from './page_actions';
+import { Progress } from '@/components/ui/progress';
+import LoadingPlaceholder from '@/components/ui/loading-placeholder'; // New import
+import { cn } from '@/lib/utils';
 
 const MONSTER_NAME_KEY = 'morgellonMonsterName';
 const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
-const TRUSTED_DOCTOR_NAME = "Dr. Anya Sharma, MD"; // Consistent name
+const MONSTER_HEALTH_KEY = 'morgellonMonsterHealth';
+const MONSTER_GENERATED_KEY = 'morgellonMonsterGenerated';
+const USER_POINTS_KEY = 'userPoints';
+const DAILY_REWARD_CLAIMED_PREFIX = 'dailyBattlePlanRewardClaimed_';
+const MONSTER_SLAYING_IMAGE_VAULT_KEY = 'monsterSlayingImageVault';
+
+// Keys for checking task completion from other pages
+const FOOD_LOG_KEY = 'morgellonFoodLogEntries';
+const EXERCISE_LOG_KEY = 'morgellonExerciseLogEntries';
+const PRODUCT_TRACKER_WORKING_KEY = 'workingProducts';
+const PRODUCT_TRACKER_NOT_WORKING_KEY = 'notWorkingProducts';
+const PRESCRIPTION_TRACKER_BENEFICIAL_KEY = 'beneficialPrescriptionsLog';
+const PRESCRIPTION_TRACKER_OTHER_KEY = 'otherPrescriptionsLog';
+const SYMPTOM_JOURNAL_ENTRIES_KEY = 'fiberFriendsSymptomJournalEntries';
+const SLEEP_LOG_ENTRIES_KEY = 'morgellonSleepLogEntries';
+const KNOWLEDGE_NUGGET_LAST_ATTEMPT_DATE_KEY = 'knowledgeNuggetQuizLastAttemptDate';
+const AFFIRMATION_AMPLIFIER_LAST_COMPLETED_DATE_KEY = 'affirmationAmplifierLastCompletedDate';
+const MINDFUL_MOMENT_DAILY_USAGE_KEY = 'mindfulMomentDailyUsage'; // Assuming this stores { date: string, minutesCompletedToday: number }
+const KINDNESS_CHALLENGE_CURRENT_TASK_KEY = 'kindnessChallengeCurrentTask'; // Assuming this stores { date: string, taskId: string, isCompleted: boolean }
+const TRUSTED_DOCTOR_NAME = "Dr. Anya Sharma, MD";
+
+const DAILY_VICTORY_BONUS_POINTS = 75;
 
 interface Story {
   id: string;
@@ -33,7 +59,7 @@ const initialStories: Story[] = [
    {
     id: "doc-story-1",
     author: TRUSTED_DOCTOR_NAME,
-    avatar: "https://placehold.co/40x40.png", // Use a specific avatar if desired
+    avatar: "https://placehold.co/40x40.png",
     avatarAiHint: "professional doctor",
     time: "3 hours ago",
     content: "Hello everyone, Dr. Sharma here. I want to emphasize the importance of self-compassion on this journey. It's okay to have difficult days. Acknowledge your feelings without judgment. Small acts of self-care can make a difference. We're here to support each other.",
@@ -65,7 +91,6 @@ const initialStories: Story[] = [
     likes: 221,
     comments: 83,
   },
-  // ... (keep other existing stories)
   {
     id: "3",
     author: "Aisha Khan",
@@ -80,16 +105,247 @@ const initialStories: Story[] = [
   },
 ];
 
+interface DailyTask {
+  id: string;
+  label: string;
+  href: string;
+  isCompleted: boolean;
+}
+
+function DailyBattlePlanCard({ monsterName, monsterImageUrl, monsterHealth }: { monsterName: string; monsterImageUrl: string; monsterHealth: number | null }) {
+  const [tasks, setTasks] = useState<DailyTask[]>([]);
+  const [allTasksCompleted, setAllTasksCompleted] = useState(false);
+  const [rewardClaimedToday, setRewardClaimedToday] = useState(false);
+  const [generatedSlayingImage, setGeneratedSlayingImage] = useState<string | null>(null);
+  const [isClaimingReward, startClaimRewardTransition] = useTransition();
+  const { toast } = useToast();
+
+  const getCurrentDateString = () => new Date().toISOString().split('T')[0];
+
+  const checkTaskCompletion = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const todayStr = getCurrentDateString();
+    const updatedTasks: DailyTask[] = [
+      { id: 'food', label: "Log a Meal", href: "/food-log", isCompleted: false },
+      { id: 'exercise', label: "Log Exercise", href: "/exercise-log", isCompleted: false },
+      { id: 'product', label: "Track a Product", href: "/product-tracker", isCompleted: false },
+      { id: 'prescription', label: "Track a Prescription", href: "/prescription-tracker", isCompleted: false },
+      { id: 'symptom', label: "Log Symptoms", href: "/symptom-journal", isCompleted: false },
+      { id: 'sleep', label: "Log Sleep", href: "/sleep-log", isCompleted: false },
+      { id: 'quiz', label: "Knowledge Quiz", href: "/knowledge-nugget-quiz", isCompleted: false },
+      { id: 'affirmation', label: "Amplify Affirmation", href: "/affirmation-amplifier", isCompleted: false },
+      { id: 'mindful', label: "Mindful Moment", href: "/mindful-moment", isCompleted: false },
+      { id: 'kindness', label: "Kindness Challenge", href: "/kindness-challenge", isCompleted: false },
+    ];
+
+    const checkLogCompletion = (key: string) => {
+      const logRaw = localStorage.getItem(key);
+      if (!logRaw) return false;
+      try {
+        const logEntries = JSON.parse(logRaw);
+        return logEntries.some((entry: any) => (entry.loggedAt && entry.loggedAt.startsWith(todayStr)) || (entry.date && entry.date === todayStr));
+      } catch { return false; }
+    };
+
+    updatedTasks.find(t => t.id === 'food')!.isCompleted = checkLogCompletion(FOOD_LOG_KEY);
+    updatedTasks.find(t => t.id === 'exercise')!.isCompleted = checkLogCompletion(EXERCISE_LOG_KEY);
+    updatedTasks.find(t => t.id === 'product')!.isCompleted = checkLogCompletion(PRODUCT_TRACKER_WORKING_KEY) || checkLogCompletion(PRODUCT_TRACKER_NOT_WORKING_KEY);
+    updatedTasks.find(t => t.id === 'prescription')!.isCompleted = checkLogCompletion(PRESCRIPTION_TRACKER_BENEFICIAL_KEY) || checkLogCompletion(PRESCRIPTION_TRACKER_OTHER_KEY);
+    updatedTasks.find(t => t.id === 'symptom')!.isCompleted = checkLogCompletion(SYMPTOM_JOURNAL_ENTRIES_KEY);
+    updatedTasks.find(t => t.id === 'sleep')!.isCompleted = checkLogCompletion(SLEEP_LOG_ENTRIES_KEY);
+
+    updatedTasks.find(t => t.id === 'quiz')!.isCompleted = localStorage.getItem(KNOWLEDGE_NUGGET_LAST_ATTEMPT_DATE_KEY) === todayStr;
+    updatedTasks.find(t => t.id === 'affirmation')!.isCompleted = localStorage.getItem(AFFIRMATION_AMPLIFIER_LAST_COMPLETED_DATE_KEY) === todayStr;
+
+    const mindfulUsageRaw = localStorage.getItem(MINDFUL_MOMENT_DAILY_USAGE_KEY);
+    if (mindfulUsageRaw) {
+        try {
+            const mindfulUsage = JSON.parse(mindfulUsageRaw);
+            if (mindfulUsage.date === todayStr && mindfulUsage.minutesCompletedToday > 0) {
+                updatedTasks.find(t => t.id === 'mindful')!.isCompleted = true;
+            }
+        } catch {}
+    }
+
+    const kindnessTaskRaw = localStorage.getItem(KINDNESS_CHALLENGE_CURRENT_TASK_KEY);
+    if (kindnessTaskRaw) {
+        try {
+            const kindnessTask = JSON.parse(kindnessTaskRaw);
+            if (kindnessTask.date === todayStr && kindnessTask.isCompleted) {
+                updatedTasks.find(t => t.id === 'kindness')!.isCompleted = true;
+            }
+        } catch {}
+    }
+    
+    setTasks(updatedTasks);
+    setAllTasksCompleted(updatedTasks.every(task => task.isCompleted));
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    checkTaskCompletion();
+    const claimed = localStorage.getItem(DAILY_REWARD_CLAIMED_PREFIX + getCurrentDateString()) === 'true';
+    setRewardClaimedToday(claimed);
+
+    // Periodically check for task completion if not all done and reward not claimed
+    let intervalId: NodeJS.Timeout | null = null;
+    if (!allTasksCompleted && !claimed) {
+      intervalId = setInterval(checkTaskCompletion, 30000); // Check every 30 seconds
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+
+  }, [checkTaskCompletion, allTasksCompleted, rewardClaimedToday]);
+
+  const handleClaimReward = () => {
+    if (!allTasksCompleted || rewardClaimedToday || isClaimingReward || !monsterName || !monsterImageUrl) return;
+
+    startClaimRewardTransition(async () => {
+      try {
+        // Award points
+        if (typeof window !== 'undefined') {
+            const currentPoints = parseInt(localStorage.getItem(USER_POINTS_KEY) || '0', 10);
+            localStorage.setItem(USER_POINTS_KEY, String(currentPoints + DAILY_VICTORY_BONUS_POINTS));
+        }
+
+        // Generate monster slaying image
+        const imageResult = await generateMonsterSlayingImageAction({
+          monsterName: monsterName,
+          monsterInitialImageUrl: monsterImageUrl, // Pass current image for context
+          achievement: `Victory! ${monsterName} completed the Daily Battle Plan!`,
+        });
+        setGeneratedSlayingImage(imageResult.imageUrl);
+
+        // Save image to vault
+        if (typeof window !== 'undefined') {
+            const vaultRaw = localStorage.getItem(MONSTER_SLAYING_IMAGE_VAULT_KEY);
+            const vault = vaultRaw ? JSON.parse(vaultRaw) : [];
+            vault.unshift({ date: getCurrentDateString(), imageUrl: imageResult.imageUrl, monsterName: monsterName });
+            localStorage.setItem(MONSTER_SLAYING_IMAGE_VAULT_KEY, JSON.stringify(vault.slice(0, 10))); // Keep last 10
+        }
+
+        // Mark reward as claimed
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(DAILY_REWARD_CLAIMED_PREFIX + getCurrentDateString(), 'true');
+        }
+        setRewardClaimedToday(true);
+
+        toast({
+          title: "Daily Victory Achieved!",
+          description: `You earned ${DAILY_VICTORY_BONUS_POINTS} points and a new Slaying Image for ${monsterName}!`,
+          duration: 7000,
+        });
+      } catch (error) {
+        toast({
+          title: "Reward Error",
+          description: `Could not claim reward: ${error instanceof Error ? error.message : "Unknown error"}`,
+          variant: "destructive",
+        });
+      }
+    });
+  };
+
+  const completedCount = tasks.filter(t => t.isCompleted).length;
+  const totalTasks = tasks.length;
+
+  return (
+    <Card className="shadow-lg border-primary/30">
+      <CardHeader>
+        <CardTitle className="font-headline text-2xl flex items-center gap-2">
+          <Trophy className="h-7 w-7 text-primary"/> Daily Battle Plan for {monsterName}
+        </CardTitle>
+        <CardDescription>Complete all daily tasks to earn bonus points and a unique "Monster Slaying" image!</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-1 mb-3">
+            <div className="flex justify-between text-sm font-medium">
+                <span>Progress:</span>
+                <span>{completedCount} / {totalTasks} Tasks</span>
+            </div>
+            <Progress value={(completedCount / totalTasks) * 100} className="h-2.5" />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {tasks.map(task => (
+            <Link href={task.href} key={task.id} legacyBehavior>
+              <a className={cn(
+                "flex items-center justify-between p-3 rounded-md border transition-all hover:shadow-md",
+                task.isCompleted ? "bg-green-100 dark:bg-green-900/30 border-green-500 dark:border-green-700" : "bg-card hover:bg-muted/50"
+              )}>
+                <span className={cn("text-sm", task.isCompleted ? "text-green-700 dark:text-green-300 font-medium" : "text-foreground")}>{task.label}</span>
+                {task.isCompleted ? (
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                ) : (
+                  <Eye className="h-5 w-5 text-muted-foreground" />
+                )}
+              </a>
+            </Link>
+          ))}
+        </div>
+
+        {allTasksCompleted && !rewardClaimedToday && (
+          <Button onClick={handleClaimReward} disabled={isClaimingReward} className="w-full mt-4 bg-gradient-to-r from-primary to-accent text-primary-foreground">
+            {isClaimingReward ? <IconLoader className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
+            {isClaimingReward ? "Claiming Victory..." : "Claim Daily Victory Reward!"}
+          </Button>
+        )}
+        {rewardClaimedToday && (
+          <div className="mt-4 p-3 rounded-md bg-green-100 dark:bg-green-800/30 border border-green-500 dark:border-green-700 text-green-700 dark:text-green-300 flex items-center gap-2">
+            <Trophy className="h-5 w-5" />
+            <div>
+                <p className="font-semibold">Daily Victory Claimed!</p>
+                <p className="text-xs">Excellent work, warrior!</p>
+            </div>
+          </div>
+        )}
+        {generatedSlayingImage && (
+          <div className="mt-4 p-4 border rounded-md bg-muted/30">
+            <h3 className="font-semibold text-lg text-center mb-2">Your {monsterName}'s Victory Pose!</h3>
+            <Image src={generatedSlayingImage} alt={`${monsterName} Slaying Image`} width={512} height={512} className="rounded-md object-cover mx-auto border-2 border-primary shadow-lg" data-ai-hint="generated monster victory pose" />
+            <p className="text-xs text-muted-foreground text-center mt-2">This image has been saved to your Monster Slaying Image Vault (accessible via My Profile in future).</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+
 export default function BeliefCirclePage() {
+  const [isClient, setIsClient] = useState(false);
+  const [monsterGenerated, setMonsterGenerated] = useState(false);
   const [stories, setStories] = useState<Story[]>(initialStories);
   const [newStoryContent, setNewStoryContent] = useState('');
   const [userMonsterName, setUserMonsterName] = useState<string | null>(null);
   const [userMonsterImageUrl, setUserMonsterImageUrl] = useState<string | null>(null);
+  const [userMonsterHealth, setUserMonsterHealth] = useState<number | null>(null);
+  const [monsterDetailsLoading, setMonsterDetailsLoading] = useState(true);
   const { toast } = useToast();
-
+  
   useEffect(() => {
-    setUserMonsterName(localStorage.getItem(MONSTER_NAME_KEY));
-    setUserMonsterImageUrl(localStorage.getItem(MONSTER_IMAGE_KEY));
+    setIsClient(true);
+    const generated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+    setMonsterGenerated(generated);
+
+    if (generated) {
+      const name = localStorage.getItem(MONSTER_NAME_KEY);
+      const imageUrl = localStorage.getItem(MONSTER_IMAGE_KEY);
+      const healthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
+
+      setUserMonsterName(name);
+      setUserMonsterImageUrl(imageUrl);
+      if (healthStr) {
+        setUserMonsterHealth(parseFloat(healthStr));
+      }
+      setMonsterDetailsLoading(false); 
+    } else {
+      setUserMonsterName(null);
+      setUserMonsterImageUrl(null);
+      setUserMonsterHealth(null);
+      setMonsterDetailsLoading(false); 
+    }
+    
   }, []);
 
   const handlePostStory = (e: React.FormEvent) => {
@@ -103,11 +359,16 @@ export default function BeliefCirclePage() {
       return;
     }
 
+    const authorNameToUse = userMonsterName || "Community Member";
+    const authorImageToUse = userMonsterImageUrl || "https://placehold.co/40x40.png?text=CM";
+    const authorImageHint = userMonsterImageUrl ? "user monster" : "community member";
+
+
     const newStory: Story = {
       id: String(Date.now()),
-      author: userMonsterName || "Community Member",
-      avatar: userMonsterImageUrl || "https://placehold.co/40x40.png?text=CM",
-      avatarAiHint: userMonsterImageUrl ? "user monster" : "community member",
+      author: authorNameToUse,
+      avatar: authorImageToUse,
+      avatarAiHint: authorImageHint,
       time: "Just now",
       content: newStoryContent.trim(),
       likes: 0,
@@ -122,8 +383,66 @@ export default function BeliefCirclePage() {
     });
   };
 
+  if (!isClient) {
+    return <LoadingPlaceholder message="Preparing Battle HQ..." />;
+  }
+
+  if (!monsterGenerated) {
+    return (
+      <Card className="max-w-lg mx-auto my-10">
+        <CardHeader className="text-center">
+          <Sparkles className="h-12 w-12 mx-auto text-primary mb-2" />
+          <CardTitle className="font-headline text-2xl">Welcome to Fiber Friends!</CardTitle>
+          <CardDescription>
+            To begin your journey and access all features, you first need to summon your personal Nemesis.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground mb-4 text-center">
+            This unique AI-generated monster will represent your health challenges and react to your daily progress.
+          </p>
+          <Button asChild className="w-full">
+            <Link href="/create-monster"><Wand2 className="mr-2 h-4 w-4" />Summon Your Nemesis</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (monsterDetailsLoading) {
+      return <LoadingPlaceholder message="Loading your Battle HQ details..." />;
+  }
+
+  if (!userMonsterName || !userMonsterImageUrl) {
+      return (
+        <Card className="max-w-lg mx-auto my-10">
+          <CardHeader className="text-center">
+            <AlertTriangle className="h-12 w-12 mx-auto text-destructive mb-2" />
+            <CardTitle className="font-headline text-xl">Nemesis Data Incomplete</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4 text-center">
+              It seems your Nemesis was summoned, but some crucial details are missing. This can sometimes happen if the summoning ritual was interrupted.
+            </p>
+            <p className="text-muted-foreground mb-4 text-center">
+              Please try re-conjuring your Nemesis to ensure all its aspects are correctly recorded.
+            </p>
+            <Button asChild className="w-full">
+              <Link href="/create-monster"><Wand2 className="mr-2 h-4 w-4" />Re-Conjure Your Nemesis</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      <DailyBattlePlanCard
+        monsterName={userMonsterName}
+        monsterImageUrl={userMonsterImageUrl}
+        monsterHealth={userMonsterHealth}
+      />
+      
       <Card>
         <CardHeader>
           <CardTitle className="font-headline">Share Your Story</CardTitle>
