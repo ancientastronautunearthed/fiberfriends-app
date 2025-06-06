@@ -26,16 +26,18 @@ const WorkoutDaySchema = z.object({
   activeRecoverySuggestion: z.string().optional().describe('Suggestion for active recovery if it is a rest day (e.g., "Light walk for 20-30 minutes", "Gentle stretching").')
 });
 
-export const WorkoutPlanInputSchema = z.object({
+// Input Schema - NOT EXPORTED
+const WorkoutPlanInputSchema = z.object({
   equipmentAvailable: z.array(z.string()).describe('List of equipment available to the user.'),
   customEquipment: z.string().optional().describe('Any other equipment specified by the user.'),
   daysPerWeek: z.number().min(1).max(7).describe('Number of days per week the user can work out.'),
   timePerWorkoutMinutes: z.number().min(15).describe('Time available for each workout session in minutes.'),
   fitnessGoals: z.array(z.string()).min(1).describe('User\'s primary fitness goals (e.g., Weight Loss, Muscle Gain).'),
 });
-export type WorkoutPlanInput = z.infer<typeof WorkoutPlanInputSchema>;
+export type WorkoutPlanInput = z.infer<typeof WorkoutPlanInputSchema>; // TYPE EXPORT - OK
 
-export const WorkoutPlanOutputSchema = z.object({
+// Output Schema - NOT EXPORTED
+const WorkoutPlanOutputSchema = z.object({
   planTitle: z.string().describe('A catchy and descriptive title for the workout plan.'),
   planOverview: z.string().describe('A brief overview of the plan, its strategy, and general advice (e.g., importance of warm-up/cool-down, progressive overload).'),
   weeklySchedule: z.array(WorkoutDaySchema).describe('The workout schedule for the week, with details for each day.'),
@@ -43,16 +45,16 @@ export const WorkoutPlanOutputSchema = z.object({
   coolDownSuggestion: z.string().describe('General cool-down routine suggestion (e.g., "5-10 minutes of static stretches, holding each stretch for 20-30 seconds.").'),
   disclaimer: z.string().default('This workout plan is AI-generated. Consult with a healthcare professional or certified fitness trainer before starting any new exercise program, especially if you have pre-existing health conditions. Ensure proper form to prevent injuries.').describe('Standard fitness disclaimer.'),
 });
-export type WorkoutPlanOutput = z.infer<typeof WorkoutPlanOutputSchema>;
+export type WorkoutPlanOutput = z.infer<typeof WorkoutPlanOutputSchema>; // TYPE EXPORT - OK
 
-export async function generateWorkoutPlan(input: WorkoutPlanInput): Promise<WorkoutPlanOutput> {
+export async function generateWorkoutPlan(input: WorkoutPlanInput): Promise<WorkoutPlanOutput> { // ASYNC FUNCTION EXPORT - OK
   return workoutPlanGenerationFlow(input);
 }
 
 const workoutPlanGenerationPrompt = ai.definePrompt({
   name: 'workoutPlanGenerationPrompt',
-  input: {schema: WorkoutPlanInputSchema},
-  output: {schema: WorkoutPlanOutputSchema},
+  input: {schema: WorkoutPlanInputSchema}, // Uses internal schema
+  output: {schema: WorkoutPlanOutputSchema}, // Uses internal schema
   prompt: `You are an expert AI fitness trainer. Generate a comprehensive and safe workout plan based on the user's inputs.
 
 User Profile:
@@ -86,11 +88,11 @@ Example for an exercise: { "name": "Dumbbell Squats", "sets": "3", "reps": "10-1
 `,
 });
 
-const workoutPlanGenerationFlow = ai.defineFlow(
+const workoutPlanGenerationFlow = ai.defineFlow( // INTERNAL - NOT EXPORTED
   {
     name: 'workoutPlanGenerationFlow',
-    inputSchema: WorkoutPlanInputSchema,
-    outputSchema: WorkoutPlanOutputSchema,
+    inputSchema: WorkoutPlanInputSchema, // Uses internal schema
+    outputSchema: WorkoutPlanOutputSchema, // Uses internal schema
   },
   async (input) => {
     const {output} = await workoutPlanGenerationPrompt(input);
