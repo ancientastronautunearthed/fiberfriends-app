@@ -388,8 +388,8 @@ export default function FoodLogPage() {
         const result = await suggestMealAction({ mealType });
         setSuggestedMeal(result);
         toast({
-            title: `Meal Suggestion: ${result.suggestedMealName}`,
-            description: `${monsterName} sneers: "${result.monsterImpactStatement}"`,
+            title: `AI Chef Suggests: ${result.suggestedMealName}`,
+            description: `${monsterName} wants its AI Chef to remind you: "${result.monsterImpactStatement}" This meal is supposedly good for YOU...`,
             duration: Number.MAX_SAFE_INTEGER
         });
       } catch (e) {
@@ -409,8 +409,8 @@ export default function FoodLogPage() {
         const result = await generateRecipeAction({ mealName });
         setGeneratedRecipe(result);
          toast({
-            title: `Recipe Ready for ${result.recipeName}!`,
-            description: `${monsterName} groans: "More 'healthy' plans? Fine, here's how to make that wretched ${result.recipeName}..."`,
+            title: `AI Chef's Recipe: ${result.recipeName}`,
+            description: `${monsterName} grumbles: "My AI Chef reluctantly provides the recipe for ${result.recipeName}. Try not to enjoy it."`,
             duration: Number.MAX_SAFE_INTEGER
         });
       } catch (e) {
@@ -462,8 +462,8 @@ export default function FoodLogPage() {
         const errorMessage = e instanceof Error ? e.message : "Failed to grade recipe.";
         setError(errorMessage);
         toast({
-          title: "Error Grading Recipe",
-          description: `${monsterName} scoffs: 'Your so-called recipe was ungradable! Error: ${errorMessage}'`,
+          title: "AI Chef's Verdict Error",
+          description: `${monsterName} scoffs: 'My AI Chef found your version of the recipe ungradable! Error: ${errorMessage}'`,
           variant: "destructive",
           duration: Number.MAX_SAFE_INTEGER,
         });
@@ -576,8 +576,11 @@ export default function FoodLogPage() {
         
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline flex items-center gap-2"><ChefHat className="h-6 w-6 text-primary"/>AI Chef: Meal Ideas &amp; Recipes</CardTitle>
-            <CardDescription>Let {monsterName}'s AI chefs suggest a meal that's good for you (and bad for it!), and then generate a full recipe.</CardDescription>
+            <CardTitle className="font-headline flex items-center gap-2"><ChefHat className="h-6 w-6 text-primary"/>AI Chef: Meal & Recipe Creation</CardTitle>
+            <CardDescription>
+              This is where {monsterName}'s "AI Chef" comes into play. First, ask the AI Chef for a meal suggestion (e.g., Breakfast).
+              Once suggested, you can then ask the AI Chef to generate a full recipe for that meal.
+            </CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {(["breakfast", "lunch", "dinner", "snack"] as const).map((mealType) => {
