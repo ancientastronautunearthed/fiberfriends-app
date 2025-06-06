@@ -11,9 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { generateMonsterSlayingImageAction } from './page_actions';
+import { generateMonsterSlayingImageAction } from './actions';
 import { Progress } from '@/components/ui/progress';
-import LoadingPlaceholder from '@/components/ui/loading-placeholder'; // New import
+import LoadingPlaceholder from '@/components/ui/loading-placeholder';
 import { cn } from '@/lib/utils';
 
 const MONSTER_NAME_KEY = 'morgellonMonsterName';
@@ -35,8 +35,8 @@ const SYMPTOM_JOURNAL_ENTRIES_KEY = 'fiberFriendsSymptomJournalEntries';
 const SLEEP_LOG_ENTRIES_KEY = 'morgellonSleepLogEntries';
 const KNOWLEDGE_NUGGET_LAST_ATTEMPT_DATE_KEY = 'knowledgeNuggetQuizLastAttemptDate';
 const AFFIRMATION_AMPLIFIER_LAST_COMPLETED_DATE_KEY = 'affirmationAmplifierLastCompletedDate';
-const MINDFUL_MOMENT_DAILY_USAGE_KEY = 'mindfulMomentDailyUsage'; // Assuming this stores { date: string, minutesCompletedToday: number }
-const KINDNESS_CHALLENGE_CURRENT_TASK_KEY = 'kindnessChallengeCurrentTask'; // Assuming this stores { date: string, taskId: string, isCompleted: boolean }
+const MINDFUL_MOMENT_DAILY_USAGE_KEY = 'mindfulMomentDailyUsage'; 
+const KINDNESS_CHALLENGE_CURRENT_TASK_KEY = 'kindnessChallengeCurrentTask'; 
 const TRUSTED_DOCTOR_NAME = "Dr. Anya Sharma, MD";
 
 const DAILY_VICTORY_BONUS_POINTS = 75;
