@@ -14,6 +14,7 @@ import SendMessageModal from '@/components/features/send-message-modal'; // Impo
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 interface Provider {
   id: string;
@@ -245,7 +246,7 @@ export default function ProviderDirectoryPage() {
                   </div>
                 )}
                 <p><strong>Treatment Philosophy:</strong> {provider.philosophy}</p>
-                <p><strong>Morgellons Experience:</strong> <Badge variant={provider.morgellonsExperience.includes("Positive") || provider.morgellonsExperience.includes("Knowledgeable") || provider.morgellonsExperience.includes("Lead Medical Advisor") ? "default" : "secondary"}>{provider.morgellonsExperience}</Badge></p>
+                <div><strong>Morgellons Experience:</strong> <Badge variant={provider.morgellonsExperience.includes("Positive") || provider.morgellonsExperience.includes("Knowledgeable") || provider.morgellonsExperience.includes("Lead Medical Advisor") ? "default" : "secondary"}>{provider.morgellonsExperience}</Badge></div>
               </CardContent>
               <CardFooter className="flex-col gap-2">
                 <Button variant="outline" className="w-full">View Profile & Reviews</Button>
@@ -287,3 +288,4 @@ export default function ProviderDirectoryPage() {
     </>
   );
 }
+
