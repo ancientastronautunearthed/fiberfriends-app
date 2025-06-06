@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BarChart3, UserCheck, Microscope, Search, Download, Brain, Bone, Leaf, CookingPot, Pill, Bot, User, Users2, Sparkles, Settings2, Loader2, Send, ShieldAlert, Palette, Image as ImageIcon } from "lucide-react";
+import { BarChart3, UserCheck, Microscope, Search, Download, Brain, Bone, Leaf, CookingPot, Pill, Bot, User, Users2, Sparkles, Settings2, Loader2, Send, ShieldAlert, Palette, Image as ImageIcon, MessageSquare } from "lucide-react";
 import Image from "next/image";
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -70,6 +70,7 @@ interface AiAssistantConfig {
   imageUrl?: string;
   species?: string;
   speciesDetails?: string;
+  communicationStyle?: string; // New field
 }
 
 interface ChatMessage {
@@ -89,6 +90,14 @@ const PERSONALITY_TRAITS_OPTIONS = [
 
 const ASSISTANT_SPECIES_OPTIONS = ["Human", "Animal", "Sci-Fi", "Monster", "Abstract/Symbolic", "Other"];
 
+const COMMUNICATION_STYLE_OPTIONS = [
+    { value: "neutral", label: "Neutral & Balanced" },
+    { value: "professional", label: "Professional & Direct" },
+    { value: "empathetic", label: "Warm & Empathetic" },
+    { value: "concise", label: "Concise & Data-Oriented" },
+    { value: "inquisitive", label: "Inquisitive & Explanatory" },
+];
+
 const ASSISTANT_CONFIG_KEY = 'drMiddelveenAiAssistantConfig';
 
 export default function DrMiddelveenPortalPage() {
@@ -103,6 +112,7 @@ export default function DrMiddelveenPortalPage() {
   const [selectedTraitsInput, setSelectedTraitsInput] = useState<string[]>([]);
   const [assistantSpeciesInput, setAssistantSpeciesInput] = useState<string>('');
   const [assistantSpeciesDetailsInput, setAssistantSpeciesDetailsInput] = useState('');
+  const [assistantCommunicationStyleInput, setAssistantCommunicationStyleInput] = useState<string>(COMMUNICATION_STYLE_OPTIONS[0].value);
   const [assistantImageUrl, setAssistantImageUrl] = useState<string | null>(null);
   const [isGeneratingAssistantImage, startGeneratingImageTransition] = useTransition();
   const [isConfiguringAssistant, setIsConfiguringAssistant] = useState(true);
@@ -123,6 +133,7 @@ export default function DrMiddelveenPortalPage() {
         setSelectedTraitsInput(parsedConfig.traits);
         setAssistantSpeciesInput(parsedConfig.species || '');
         setAssistantSpeciesDetailsInput(parsedConfig.speciesDetails || '');
+        setAssistantCommunicationStyleInput(parsedConfig.communicationStyle || COMMUNICATION_STYLE_OPTIONS[0].value);
         setAssistantImageUrl(parsedConfig.imageUrl || null);
         setIsConfiguringAssistant(false);
       } catch (e) {
@@ -169,8 +180,8 @@ export default function DrMiddelveenPortalPage() {
   };
 
   const handleActivateAssistant = () => {
-    if (!assistantNameInput.trim() || selectedTraitsInput.length === 0) {
-      toast({title: "Configuration Incomplete", description: "Please provide a name and select at least one personality trait for your assistant.", variant: "destructive"});
+    if (!assistantNameInput.trim() || selectedTraitsInput.length === 0 || !assistantCommunicationStyleInput) {
+      toast({title: "Configuration Incomplete", description: "Please provide a name, select at least one personality trait, and choose a communication style for your assistant.", variant: "destructive"});
       return;
     }
     const newConfig: AiAssistantConfig = {
@@ -179,6 +190,7 @@ export default function DrMiddelveenPortalPage() {
       traits: selectedTraitsInput,
       species: assistantSpeciesInput || undefined,
       speciesDetails: assistantSpeciesDetailsInput.trim() || undefined,
+      communicationStyle: assistantCommunicationStyleInput,
       imageUrl: assistantImageUrl || undefined,
     };
     setAssistantConfig(newConfig);
@@ -190,7 +202,6 @@ export default function DrMiddelveenPortalPage() {
   
   const handleReconfigureAssistant = () => {
     setIsConfiguringAssistant(true);
-    // Don't clear assistantConfig from state immediately, keep current values in form
   };
 
   const handleTraitToggle = (trait: string, checked: boolean) => {
@@ -211,9 +222,18 @@ export default function DrMiddelveenPortalPage() {
     setCurrentQuery('');
     setIsAssistantThinking(true);
 
-    // Simulate AI response
     setTimeout(() => {
-      let responseText = `This is a simulated response from ${assistantConfig.name}. `;
+      let responseText = "";
+      let prefix = "";
+      switch (assistantConfig.communicationStyle) {
+        case "professional": prefix = "Professionally: "; break;
+        case "empathetic": prefix = "Empathetically speaking: "; break;
+        case "concise": prefix = "Concisely: "; break;
+        case "inquisitive": prefix = "Thinking it through: "; break;
+        default: prefix = "Assistant: ";
+      }
+      responseText = prefix;
+
       if (currentQuery.toLowerCase().includes("patient summary") && selectedPatient) {
         responseText += `Regarding patient ${selectedPatient.name}: [Mock detailed summary based on logs - symptoms: ${selectedPatient.commonSymptoms.join(', ')}, recent good food: ${selectedPatient.recentFoodEntries.find(f=>f.grade==='good')?.name || 'N/A'}...]`;
       } else if (currentQuery.toLowerCase().includes("patient summary")) {
@@ -229,10 +249,9 @@ export default function DrMiddelveenPortalPage() {
         responseText += "I am processing your query: '" + userMessage.text + "'. As a prototype, my capabilities are illustrative.";
       }
 
-      if (assistantConfig.traits.includes("Analytical & Data-Driven")) responseText = `From an analytical perspective: ${responseText}`;
-      if (assistantConfig.traits.includes("Empathetic & Patient-Focused")) responseText = `Understanding the patient context is key. ${responseText}`;
-      if (assistantConfig.traits.includes("Concise & Efficient")) responseText = `To summarize: ${responseText.substring(0, 200)}...`;
-
+      if (assistantConfig.traits.includes("Analytical & Data-Driven") && !responseText.toLowerCase().includes("analytical")) responseText = `From an analytical perspective: ${responseText}`;
+      if (assistantConfig.traits.includes("Empathetic & Patient-Focused") && !responseText.toLowerCase().includes("empathetic")) responseText = `Understanding the patient context is key. ${responseText}`;
+      
       const assistantMessage: ChatMessage = {
         id: `asst-${Date.now()}`,
         sender: 'assistant',
@@ -245,11 +264,14 @@ export default function DrMiddelveenPortalPage() {
   };
   
   const getAssistantVisual = () => {
-    if (assistantConfig?.imageUrl) {
-        return <Image src={assistantConfig.imageUrl} alt={assistantConfig.name} width={60} height={60} className="rounded-lg border-2 border-primary object-cover shadow-md" data-ai-hint="ai assistant"/>;
+    // Use a more specific check for assistantConfig before accessing its properties
+    const currentDisplayConfig = assistantConfig || { name: assistantNameInput, gender: assistantGenderInput, imageUrl: assistantImageUrl };
+
+    if (currentDisplayConfig.imageUrl) {
+        return <Image src={currentDisplayConfig.imageUrl} alt={currentDisplayConfig.name || "AI Assistant"} width={60} height={60} className="rounded-lg border-2 border-primary object-cover shadow-md" data-ai-hint="ai assistant"/>;
     }
-    if (assistantConfig?.gender === 'male') return <User className="h-10 w-10 text-blue-500" />;
-    if (assistantConfig?.gender === 'female') return <User className="h-10 w-10 text-pink-500" />;
+    if (currentDisplayConfig.gender === 'male') return <User className="h-10 w-10 text-blue-500" />;
+    if (currentDisplayConfig.gender === 'female') return <User className="h-10 w-10 text-pink-500" />;
     return <Bot className="h-10 w-10 text-gray-500" />;
   };
 
@@ -296,7 +318,7 @@ export default function DrMiddelveenPortalPage() {
             <div className="space-y-6 p-2 border border-dashed rounded-md">
               <h3 className="font-semibold text-lg text-center">Configure Your AI Assistant</h3>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
                 <div>
                     <Label htmlFor="assistant-name">Assistant Name</Label>
                     <Input id="assistant-name" value={assistantNameInput} onChange={(e) => setAssistantNameInput(e.target.value)} placeholder="e.g., Analyzer, InsightBot" />
@@ -308,6 +330,15 @@ export default function DrMiddelveenPortalPage() {
                     <div className="flex items-center space-x-2"><RadioGroupItem value="female" id="gender-female" /><Label htmlFor="gender-female" className="font-normal">Female</Label></div>
                     <div className="flex items-center space-x-2"><RadioGroupItem value="neutral" id="gender-neutral" /><Label htmlFor="gender-neutral" className="font-normal">Neutral</Label></div>
                   </RadioGroup>
+                </div>
+                <div>
+                    <Label htmlFor="communication-style">Communication Style</Label>
+                    <Select value={assistantCommunicationStyleInput} onValueChange={setAssistantCommunicationStyleInput}>
+                        <SelectTrigger id="communication-style"><SelectValue placeholder="Select communication style..." /></SelectTrigger>
+                        <SelectContent>
+                            {COMMUNICATION_STYLE_OPTIONS.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
                 </div>
               </div>
 
@@ -359,7 +390,7 @@ export default function DrMiddelveenPortalPage() {
                   ))}
                 </div>
               </div>
-              <Button onClick={handleActivateAssistant} className="w-full" disabled={!assistantNameInput.trim() || selectedTraitsInput.length === 0}>Activate Assistant</Button>
+              <Button onClick={handleActivateAssistant} className="w-full" disabled={!assistantNameInput.trim() || selectedTraitsInput.length === 0 || !assistantCommunicationStyleInput}>Activate Assistant</Button>
             </div>
           ) : assistantConfig ? (
             <div className="space-y-4">
@@ -369,6 +400,7 @@ export default function DrMiddelveenPortalPage() {
                   <h3 className="text-lg font-semibold">{assistantConfig.name}</h3>
                   <p className="text-sm text-muted-foreground capitalize">{assistantConfig.gender} Persona</p>
                   {assistantConfig.species && <p className="text-xs text-muted-foreground">Species: {assistantConfig.species}{assistantConfig.speciesDetails ? ` (${assistantConfig.speciesDetails})` : ''}</p>}
+                   {assistantConfig.communicationStyle && <p className="text-xs text-muted-foreground">Style: {COMMUNICATION_STYLE_OPTIONS.find(s => s.value === assistantConfig.communicationStyle)?.label || assistantConfig.communicationStyle}</p>}
                   <div className="flex flex-wrap gap-1 mt-1">
                     {assistantConfig.traits.map(trait => <Badge key={trait} variant="secondary">{trait}</Badge>)}
                   </div>
@@ -544,3 +576,4 @@ export default function DrMiddelveenPortalPage() {
     </div>
   );
 }
+

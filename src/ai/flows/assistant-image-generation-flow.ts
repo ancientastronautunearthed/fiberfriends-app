@@ -56,7 +56,7 @@ const assistantImageGenerationFlow = ai.defineFlow(
     }
     promptText += "Style: Clear digital illustration, suitable for a profile image, professional yet characterful. Avoid overly complex backgrounds unless specified in details.";
 
-    const { media } = await ai.generate({
+    const generationResult = await ai.generate({
       model: 'googleai/gemini-2.0-flash-exp',
       prompt: promptText,
       config: {
@@ -70,10 +70,12 @@ const assistantImageGenerationFlow = ai.defineFlow(
       },
     });
 
-    if (!media || !media.url) {
-      throw new Error('AI Assistant image generation failed or did not return an image URL.');
+    if (!generationResult.media || !generationResult.media.url) {
+      console.error('AI Assistant image generation failed. Result:', JSON.stringify(generationResult, null, 2));
+      throw new Error('AI Assistant image generation failed or did not return an image URL. The model might have refused to generate an image for the given prompt due to safety filters or other reasons.');
     }
     
-    return { imageUrl: media.url };
+    return { imageUrl: generationResult.media.url };
   }
 );
+
