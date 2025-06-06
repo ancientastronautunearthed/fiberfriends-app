@@ -220,7 +220,7 @@ export default function CreateMonsterPage() {
         </CardFooter>
         <CardFooter className="flex-col sm:flex-row justify-center gap-x-4 gap-y-2 pt-3 items-center border-t mt-4">
             <Button asChild variant="link" className="text-xs">
-                <Link href="/doctor-forum"> {/* Updated from /doctor-forum to /forum based on previous change */}
+                <Link href="/doctor-forum">
                     <Share className="mr-1 h-3 w-3" /> Share on Forum
                 </Link>
             </Button>
@@ -294,4 +294,3 @@ export default function CreateMonsterPage() {
     </Card>
   );
 }
-
