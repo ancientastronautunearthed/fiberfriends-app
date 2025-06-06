@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { generateMonsterSlayingImageAction } from './actions';
 import { Progress } from '@/components/ui/progress';
-import LoadingPlaceholder from '@/components/ui/loading-placeholder'; // New import
+import LoadingPlaceholder from '@/components/ui/loading-placeholder';
 import { cn } from '@/lib/utils';
 
 const MONSTER_NAME_KEY = 'morgellonMonsterName';
@@ -24,7 +24,6 @@ const USER_POINTS_KEY = 'userPoints';
 const DAILY_REWARD_CLAIMED_PREFIX = 'dailyBattlePlanRewardClaimed_';
 const MONSTER_SLAYING_IMAGE_VAULT_KEY = 'monsterSlayingImageVault';
 
-// Keys for checking task completion from other pages
 const FOOD_LOG_KEY = 'morgellonFoodLogEntries';
 const EXERCISE_LOG_KEY = 'morgellonExerciseLogEntries';
 const PRODUCT_TRACKER_WORKING_KEY = 'workingProducts';
@@ -35,8 +34,8 @@ const SYMPTOM_JOURNAL_ENTRIES_KEY = 'fiberFriendsSymptomJournalEntries';
 const SLEEP_LOG_ENTRIES_KEY = 'morgellonSleepLogEntries';
 const KNOWLEDGE_NUGGET_LAST_ATTEMPT_DATE_KEY = 'knowledgeNuggetQuizLastAttemptDate';
 const AFFIRMATION_AMPLIFIER_LAST_COMPLETED_DATE_KEY = 'affirmationAmplifierLastCompletedDate';
-const MINDFUL_MOMENT_DAILY_USAGE_KEY = 'mindfulMomentDailyUsage'; 
-const KINDNESS_CHALLENGE_CURRENT_TASK_KEY = 'kindnessChallengeCurrentTask'; 
+const MINDFUL_MOMENT_DAILY_USAGE_KEY = 'mindfulMomentDailyUsage';
+const KINDNESS_CHALLENGE_CURRENT_TASK_KEY = 'kindnessChallengeCurrentTask';
 const TRUSTED_DOCTOR_NAME = "Dr. Anya Sharma, MD";
 
 const DAILY_VICTORY_BONUS_POINTS = 75;
@@ -114,7 +113,7 @@ interface DailyTask {
 
 function DailyBattlePlanCard({ monsterName, monsterImageUrl, monsterHealth }: { monsterName: string; monsterImageUrl: string; monsterHealth: number | null }) {
   const [tasks, setTasks] = useState<DailyTask[]>([]);
-  const [tasksLoading, setTasksLoading] = useState(true); // New state for tasks loading
+  const [tasksLoading, setTasksLoading] = useState(true);
   const [allTasksCompleted, setAllTasksCompleted] = useState(false);
   const [rewardClaimedToday, setRewardClaimedToday] = useState(false);
   const [generatedSlayingImage, setGeneratedSlayingImage] = useState<string | null>(null);
@@ -125,7 +124,7 @@ function DailyBattlePlanCard({ monsterName, monsterImageUrl, monsterHealth }: { 
 
   const checkTaskCompletion = useCallback(() => {
     if (typeof window === 'undefined') return;
-    setTasksLoading(true); // Set loading true before checking
+    setTasksLoading(true);
     const todayStr = getCurrentDateString();
     const updatedTasks: DailyTask[] = [
       { id: 'food', label: "Log a Meal", href: "/food-log", isCompleted: false },
@@ -155,7 +154,6 @@ function DailyBattlePlanCard({ monsterName, monsterImageUrl, monsterHealth }: { 
     updatedTasks.find(t => t.id === 'prescription')!.isCompleted = checkLogCompletion(PRESCRIPTION_TRACKER_BENEFICIAL_KEY) || checkLogCompletion(PRESCRIPTION_TRACKER_OTHER_KEY);
     updatedTasks.find(t => t.id === 'symptom')!.isCompleted = checkLogCompletion(SYMPTOM_JOURNAL_ENTRIES_KEY);
     updatedTasks.find(t => t.id === 'sleep')!.isCompleted = checkLogCompletion(SLEEP_LOG_ENTRIES_KEY);
-
     updatedTasks.find(t => t.id === 'quiz')!.isCompleted = localStorage.getItem(KNOWLEDGE_NUGGET_LAST_ATTEMPT_DATE_KEY) === todayStr;
     updatedTasks.find(t => t.id === 'affirmation')!.isCompleted = localStorage.getItem(AFFIRMATION_AMPLIFIER_LAST_COMPLETED_DATE_KEY) === todayStr;
 
@@ -181,7 +179,7 @@ function DailyBattlePlanCard({ monsterName, monsterImageUrl, monsterHealth }: { 
     
     setTasks(updatedTasks);
     setAllTasksCompleted(updatedTasks.every(task => task.isCompleted));
-    setTasksLoading(false); // Set loading to false after tasks are processed
+    setTasksLoading(false);
   }, []);
 
   useEffect(() => {
@@ -289,13 +287,13 @@ function DailyBattlePlanCard({ monsterName, monsterImageUrl, monsterHealth }: { 
           </div>
         )}
 
-        {allTasksCompleted && !rewardClaimedToday && !tasksLoading && (
+        {!tasksLoading && allTasksCompleted && !rewardClaimedToday && (
           <Button onClick={handleClaimReward} disabled={isClaimingReward} className="w-full mt-4 bg-gradient-to-r from-primary to-accent text-primary-foreground">
             {isClaimingReward ? <IconLoader className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
             {isClaimingReward ? "Claiming Victory..." : "Claim Daily Victory Reward!"}
           </Button>
         )}
-        {rewardClaimedToday && !tasksLoading && (
+        {!tasksLoading && rewardClaimedToday && (
           <div className="mt-4 p-3 rounded-md bg-green-100 dark:bg-green-800/30 border border-green-500 dark:border-green-700 text-green-700 dark:text-green-300 flex items-center gap-2">
             <Trophy className="h-5 w-5" />
             <div>
@@ -331,13 +329,15 @@ export default function BeliefCirclePage() {
   useEffect(() => {
     setIsClient(true);
     const generated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+    console.log("[DEBUG] useEffect - MONSTER_GENERATED_KEY:", generated);
     setMonsterGenerated(generated);
-    setMonsterDetailsLoading(true); // Start loading
+    setMonsterDetailsLoading(true); 
 
     if (generated) {
       const name = localStorage.getItem(MONSTER_NAME_KEY);
       const imageUrl = localStorage.getItem(MONSTER_IMAGE_KEY);
       const healthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
+      console.log("[DEBUG] useEffect - Loaded from localStorage:", { name, imageUrl, healthStr });
 
       setUserMonsterName(name);
       setUserMonsterImageUrl(imageUrl);
@@ -349,7 +349,7 @@ export default function BeliefCirclePage() {
       setUserMonsterImageUrl(null);
       setUserMonsterHealth(null);
     }
-    setMonsterDetailsLoading(false); // Finish loading attempt
+    setMonsterDetailsLoading(false);
     
   }, []);
 
@@ -391,6 +391,9 @@ export default function BeliefCirclePage() {
   if (!isClient) {
     return <LoadingPlaceholder message="Preparing Battle HQ..." />;
   }
+  
+  console.log("[DEBUG] Before render - isClient:", isClient, "monsterGenerated:", monsterGenerated, "monsterDetailsLoading:", monsterDetailsLoading, "userMonsterName:", userMonsterName, "userMonsterImageUrl:", userMonsterImageUrl);
+
 
   if (!monsterGenerated) {
     return (
@@ -420,17 +423,18 @@ export default function BeliefCirclePage() {
 
   if (!userMonsterName || !userMonsterImageUrl) {
       return (
-        <Card className="max-w-lg mx-auto my-10">
+        <Card className="max-w-lg mx-auto my-10" data-testid="nemesis-data-incomplete-card">
           <CardHeader className="text-center">
             <AlertTriangle className="h-12 w-12 mx-auto text-destructive mb-2" />
-            <CardTitle className="font-headline text-xl">Nemesis Data Incomplete</CardTitle>
+            <CardTitle className="font-headline text-xl">DEBUG: YOU ARE SEEING THE 'NEMESIS DATA INCOMPLETE' CARD.</CardTitle>
+            <CardTitle className="font-headline text-xl mt-2">Nemesis Data Incomplete</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground mb-4 text-center">
-              It seems your Nemesis was summoned, but some crucial details are missing. This can sometimes happen if the summoning ritual was interrupted.
+              It seems your Nemesis was summoned, but some crucial details (name or image) are missing from local storage. This can sometimes happen if the summoning ritual was interrupted or data was cleared.
             </p>
             <p className="text-muted-foreground mb-4 text-center">
-              Please try re-conjuring your Nemesis to ensure all its aspects are correctly recorded.
+              Please try re-conjuring your Nemesis to ensure all its aspects are correctly recorded. This will allow you to access features like the Daily Battle Plan.
             </p>
             <Button asChild className="w-full">
               <Link href="/create-monster"><Wand2 className="mr-2 h-4 w-4" />Re-Conjure Your Nemesis</Link>
@@ -519,5 +523,4 @@ export default function BeliefCirclePage() {
     </div>
   );
 }
-
     
