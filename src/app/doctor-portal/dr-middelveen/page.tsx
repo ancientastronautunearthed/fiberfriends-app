@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BarChart3, UserCheck, Microscope, Search, Download, Brain, Bone, Leaf, CookingPot, Pill, Bot, User, Users2, Sparkles, Settings2, Loader2, Send, ShieldAlert, Palette, Image as ImageIcon, MessageSquare } from "lucide-react";
+import { BarChart3, UserCheck, Microscope, Search, Download, Brain, Bone, Leaf, CookingPot, Pill, Bot, User, Users2, Sparkles, Settings2, Loader2, Send, ShieldAlert, Palette, Image as ImageIcon, MessageSquare, PieChart as PieChartIcon, Activity as ActivityIcon } from "lucide-react";
 import Image from "next/image";
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -17,6 +17,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { generateAssistantImageAction } from './actions';
 import { useToast } from '@/hooks/use-toast';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import type { ChartConfig } from "@/components/ui/chart";
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+
 
 // Mock data interfaces
 interface MockPatientData {
@@ -70,7 +74,7 @@ interface AiAssistantConfig {
   imageUrl?: string;
   species?: string;
   speciesDetails?: string;
-  communicationStyle?: string; // New field
+  communicationStyle?: string;
 }
 
 interface ChatMessage {
@@ -79,6 +83,12 @@ interface ChatMessage {
   text: string;
   timestamp: string;
 }
+
+// Chart Data Types
+type SymptomFrequencyData = { name: string; totalOccurrences: number; fill: string }[];
+type ProductEffectivenessData = { name: string; benefitPercent: number; fill: string }[];
+type PrescriptionUsageData = { name: string; value: number; fill: string }[];
+
 
 const PERSONALITY_TRAITS_OPTIONS = [
   "Analytical & Data-Driven",
@@ -100,12 +110,22 @@ const COMMUNICATION_STYLE_OPTIONS = [
 
 const ASSISTANT_CONFIG_KEY = 'drMiddelveenAiAssistantConfig';
 
+const chartColors = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+  "hsl(var(--primary))",
+  "hsl(var(--accent))",
+];
+
+
 export default function DrMiddelveenPortalPage() {
   const [patientSearchTerm, setPatientSearchTerm] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<MockPatientData | null>(null);
   const [isLoadingPatient, setIsLoadingPatient] = useState(false);
 
-  // AI Assistant State
   const [assistantConfig, setAssistantConfig] = useState<AiAssistantConfig | null>(null);
   const [assistantNameInput, setAssistantNameInput] = useState('');
   const [assistantGenderInput, setAssistantGenderInput] = useState<'male' | 'female' | 'neutral'>('neutral');
@@ -121,8 +141,62 @@ export default function DrMiddelveenPortalPage() {
   const [isAssistantThinking, setIsAssistantThinking] = useState(false);
   const { toast } = useToast();
 
+  // Mock chart data states
+  const [symptomFrequencyData, setSymptomFrequencyData] = useState<SymptomFrequencyData>([]);
+  const [productEffectivenessData, setProductEffectivenessData] = useState<ProductEffectivenessData>([]);
+  const [prescriptionUsageData, setPrescriptionUsageData] = useState<PrescriptionUsageData>([]);
+
+  // Chart Configs
+  const symptomChartConfig = React.useMemo(() => {
+    const config: ChartConfig = {};
+    symptomFrequencyData.forEach(item => {
+      config[item.name] = { label: item.name, color: item.fill };
+    });
+    return config;
+  }, [symptomFrequencyData]);
+
+  const productChartConfig = React.useMemo(() => {
+    const config: ChartConfig = {};
+    productEffectivenessData.forEach(item => {
+      config[item.name] = { label: item.name, color: item.fill };
+    });
+    return config;
+  }, [productEffectivenessData]);
+
+  const prescriptionChartConfig = React.useMemo(() => {
+    const config: ChartConfig = {};
+    prescriptionUsageData.forEach(item => {
+      config[item.name] = { label: item.name, color: item.fill };
+    });
+    return config;
+  }, [prescriptionUsageData]);
+
 
   useEffect(() => {
+    // Generate mock chart data on mount
+    setSymptomFrequencyData([
+      { name: 'Itching', totalOccurrences: Math.floor(Math.random() * 150) + 50, fill: chartColors[0] },
+      { name: 'Fatigue', totalOccurrences: Math.floor(Math.random() * 120) + 40, fill: chartColors[1] },
+      { name: 'Brain Fog', totalOccurrences: Math.floor(Math.random() * 100) + 30, fill: chartColors[2] },
+      { name: 'Skin Lesions', totalOccurrences: Math.floor(Math.random() * 80) + 20, fill: chartColors[3] },
+      { name: 'Joint Pain', totalOccurrences: Math.floor(Math.random() * 70) + 15, fill: chartColors[4] },
+    ].sort((a,b) => b.totalOccurrences - a.totalOccurrences));
+
+    setProductEffectivenessData([
+      { name: 'Vit D3', benefitPercent: Math.floor(Math.random() * 30) + 50, fill: chartColors[0] }, // 50-80%
+      { name: 'Mg Cream', benefitPercent: Math.floor(Math.random() * 30) + 40, fill: chartColors[1] }, // 40-70%
+      { name: 'Probiotic X', benefitPercent: Math.floor(Math.random() * 25) + 60, fill: chartColors[2] }, // 60-85%
+      { name: 'Omega-3', benefitPercent: Math.floor(Math.random() * 30) + 45, fill: chartColors[3] }, // 45-75%
+    ].sort((a,b) => b.benefitPercent - a.benefitPercent));
+
+    setPrescriptionUsageData([
+      { name: 'Antibiotic A', value: Math.floor(Math.random() * 20) + 20, fill: chartColors[0] }, // 20-40%
+      { name: 'Antifungal B', value: Math.floor(Math.random() * 15) + 15, fill: chartColors[1] }, // 15-30%
+      { name: 'Pain Reliever C', value: Math.floor(Math.random() * 10) + 10, fill: chartColors[2] }, // 10-20%
+      { name: 'SSRI D', value: Math.floor(Math.random() * 10) + 5, fill: chartColors[3] }, // 5-15%
+      { name: 'Other Rx', value: Math.floor(Math.random() * 10) + 5, fill: chartColors[4] }, // 5-15%
+    ]);
+
     const storedConfig = localStorage.getItem(ASSISTANT_CONFIG_KEY);
     if (storedConfig) {
       try {
@@ -264,7 +338,6 @@ export default function DrMiddelveenPortalPage() {
   };
   
   const getAssistantVisual = () => {
-    // Use a more specific check for assistantConfig before accessing its properties
     const currentDisplayConfig = assistantConfig || { name: assistantNameInput, gender: assistantGenderInput, imageUrl: assistantImageUrl };
 
     if (currentDisplayConfig.imageUrl) {
@@ -446,29 +519,94 @@ export default function DrMiddelveenPortalPage() {
       <Card>
         <CardHeader>
           <CardTitle className="font-headline text-xl flex items-center gap-2"><BarChart3 className="text-primary"/>Aggregated Anonymous Research Data</CardTitle>
-          <CardDescription>Overview of trends and patterns from all anonymized user data. (Data below is illustrative)</CardDescription>
+          <CardDescription>Overview of trends and patterns from all anonymized user data (6-month mock data). Real data would be aggregated from consented user logs.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <Card className="p-4">
-              <h3 className="font-semibold mb-2 text-md flex items-center gap-1.5"><Brain className="h-4 w-4"/>Symptom Frequency</h3>
-              <p className="text-sm text-muted-foreground">Placeholder for symptom frequency chart. (e.g., Itching: 75%, Fatigue: 60%)</p>
-              <div className="h-40 bg-muted rounded-md flex items-center justify-center text-muted-foreground text-xs mt-2" data-ai-hint="bar chart mockup">Mock Chart Area</div>
+              <h3 className="font-semibold mb-2 text-md flex items-center gap-1.5"><ActivityIcon className="h-4 w-4"/>Symptom Frequency (Last 6 Months)</h3>
+              {symptomFrequencyData.length > 0 ? (
+                <ChartContainer config={symptomChartConfig} className="h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={symptomFrequencyData} layout="vertical" margin={{ left: 10, right: 30, top: 5, bottom: 5 }}>
+                      <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+                      <XAxis type="number" />
+                      <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 10 }} interval={0} />
+                      <RechartsTooltip 
+                        cursor={{fill: 'hsl(var(--muted))'}}
+                        contentStyle={{backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)'}}
+                        labelStyle={{color: 'hsl(var(--foreground))'}}
+                      />
+                      <Bar dataKey="totalOccurrences" radius={4}>
+                        {symptomFrequencyData.map((entry) => (
+                          <Cell key={`cell-${entry.name}`} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              ) : <p className="text-sm text-muted-foreground text-center py-10">Loading symptom data...</p>}
             </Card>
             <Card className="p-4">
-              <h3 className="font-semibold mb-2 text-md flex items-center gap-1.5"><CookingPot className="h-4 w-4"/>Common Food Correlations</h3>
-              <p className="text-sm text-muted-foreground">Placeholder for food correlation insights. (e.g., High sugar intake correlated with increased fatigue for 30% of users)</p>
-              <div className="h-40 bg-muted rounded-md flex items-center justify-center text-muted-foreground text-xs mt-2" data-ai-hint="scatter plot mockup">Mock Insights Area</div>
+              <h3 className="font-semibold mb-2 text-md flex items-center gap-1.5"><CookingPot className="h-4 w-4"/>Common Food Correlations (Mock Insights)</h3>
+              <p className="text-sm text-muted-foreground">
+                Illustrative insights based on 6 months of mock aggregated data:
+              </p>
+              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 mt-2">
+                <li>Approx. 35% of users logging high sugar intake also reported increased fatigue within 24 hours.</li>
+                <li>Dairy consumption was associated with skin flare-ups in 15% of relevant user logs.</li>
+                <li>Increased leafy green intake showed a positive correlation with reported energy levels for 20% of users.</li>
+              </ul>
+               <div className="h-20 bg-muted rounded-md flex items-center justify-center text-muted-foreground text-xs mt-2" data-ai-hint="text list data">Further analysis would be needed for statistical significance.</div>
             </Card>
             <Card className="p-4">
-              <h3 className="font-semibold mb-2 text-md flex items-center gap-1.5"><Leaf className="h-4 w-4"/>Product Effectiveness Overview</h3>
-              <p className="text-sm text-muted-foreground">Placeholder for product effectiveness summary. (e.g., "Vitamin D" reported beneficial by 55% of users tracking it)</p>
-               <div className="h-40 bg-muted rounded-md flex items-center justify-center text-muted-foreground text-xs mt-2" data-ai-hint="data table mockup">Mock Table/Summary Area</div>
+              <h3 className="font-semibold mb-2 text-md flex items-center gap-1.5"><Leaf className="h-4 w-4"/>Product Effectiveness (Last 6 Months)</h3>
+              {productEffectivenessData.length > 0 ? (
+                <ChartContainer config={productChartConfig} className="h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={productEffectivenessData} margin={{ top: 5, right: 5, left: 5, bottom: 40 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={50} interval={0} tick={{ fontSize: 10 }} />
+                      <YAxis label={{ value: '% Benefit', angle: -90, position: 'insideLeft', offset: -5, fontSize: 10 }} />
+                      <RechartsTooltip 
+                        cursor={{fill: 'hsl(var(--muted))'}}
+                        contentStyle={{backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)'}}
+                        labelStyle={{color: 'hsl(var(--foreground))'}}
+                        formatter={(value: number) => [`${value}%`, "Benefit"]}
+                      />
+                       <Bar dataKey="benefitPercent" radius={4}>
+                        {productEffectivenessData.map((entry) => (
+                          <Cell key={`cell-${entry.name}`} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              ) : <p className="text-sm text-muted-foreground text-center py-10">Loading product data...</p>}
             </Card>
              <Card className="p-4">
-              <h3 className="font-semibold mb-2 text-md flex items-center gap-1.5"><Pill className="h-4 w-4"/>Prescription Usage Patterns</h3>
-              <p className="text-sm text-muted-foreground">Placeholder for prescription trends. (e.g., 20% of users logging Amoxicillin reported significant improvement)</p>
-               <div className="h-40 bg-muted rounded-md flex items-center justify-center text-muted-foreground text-xs mt-2" data-ai-hint="pie chart mockup">Mock Chart Area</div>
+              <h3 className="font-semibold mb-2 text-md flex items-center gap-1.5"><PieChartIcon className="h-4 w-4"/>Prescription Usage (Last 6 Months)</h3>
+              {prescriptionUsageData.length > 0 ? (
+                <ChartContainer config={prescriptionChartConfig} className="h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                       <RechartsTooltip 
+                        cursor={{fill: 'hsl(var(--muted))'}}
+                        contentStyle={{backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)'}}
+                        labelStyle={{color: 'hsl(var(--foreground))'}}
+                        formatter={(value: number, name: string) => [`${value}%`, name]}
+                       />
+                      <Pie data={prescriptionUsageData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} labelLine={false} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                         className="[&_.recharts-pie-label-text]:fill-foreground [&_.recharts-pie-label-text]:text-xs">
+                        {prescriptionUsageData.map((entry) => (
+                          <Cell key={`cell-${entry.name}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Legend verticalAlign="bottom" iconSize={10} wrapperStyle={{paddingTop: '15px', fontSize: '10px'}} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              ): <p className="text-sm text-muted-foreground text-center py-10">Loading prescription data...</p>}
             </Card>
           </div>
           <div className="pt-2 text-right">
