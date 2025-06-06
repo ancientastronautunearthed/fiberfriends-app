@@ -16,10 +16,13 @@ let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let firebaseConfigError: string | null = null;
 
+// Check if running in demo mode
+const IS_DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+
 if (
   !firebaseConfig.apiKey ||
-  firebaseConfig.apiKey.includes("YOUR_API_KEY") || // Basic check for placeholder
-  firebaseConfig.apiKey.includes("NEXT_PUBLIC_") || // Basic check if value is still variable name
+  firebaseConfig.apiKey.includes("YOUR_API_KEY") || 
+  firebaseConfig.apiKey.includes("NEXT_PUBLIC_") || 
   !firebaseConfig.authDomain ||
   !firebaseConfig.projectId
 ) {
@@ -28,7 +31,11 @@ if (
     "Please ensure NEXT_PUBLIC_FIREBASE_API_KEY, NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN, " +
     "and NEXT_PUBLIC_FIREBASE_PROJECT_ID are set correctly in your .env file and the server is restarted. " +
     "Authentication and Firebase-dependent features will not work.";
-  console.error("Firebase Init Error:", firebaseConfigError);
+  
+  if (!IS_DEMO_MODE) {
+    // Only log the error to console if not in demo mode, to keep console cleaner during demo dev
+    console.error("Firebase Init Error:", firebaseConfigError);
+  }
 } else {
   if (!getApps().length) {
     try {
@@ -36,23 +43,24 @@ if (
       auth = getAuth(app);
     } catch (e) {
       firebaseConfigError = `Firebase initialization failed: ${e instanceof Error ? e.message : String(e)}`;
-      console.error("Firebase Caught Init Error:", firebaseConfigError);
-      app = null; // Ensure app is null on error
-      auth = null; // Ensure auth is null on error
+      if (!IS_DEMO_MODE) {
+        console.error("Firebase Caught Init Error:", firebaseConfigError);
+      }
+      app = null; 
+      auth = null; 
     }
   } else {
     app = getApps()[0]!;
-    // It's possible getAuth could fail if the app instance is problematic,
-    // though less likely if initializeApp succeeded or getApps()[0] is valid.
     try {
         auth = getAuth(app);
     } catch (e) {
         firebaseConfigError = `Firebase getAuth failed: ${e instanceof Error ? e.message : String(e)}`;
-        console.error("Firebase getAuth Error:", firebaseConfigError);
+        if (!IS_DEMO_MODE) {
+            console.error("Firebase getAuth Error:", firebaseConfigError);
+        }
         auth = null;
     }
   }
 }
 
 export { app, auth, firebaseConfigError };
-
