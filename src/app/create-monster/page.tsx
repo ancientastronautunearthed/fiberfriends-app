@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Wand2, Sparkles, Share } from "lucide-react";
+import { Loader2, Wand2, Sparkles, Share, ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from 'next/link';
 import { expandMonsterPromptAction, generateMonsterImageAction } from './actions';
 import { useToast } from '@/hooks/use-toast';
+import { Separator } from '@/components/ui/separator';
 
 const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
 const MONSTER_NAME_KEY = 'morgellonMonsterName';
@@ -196,26 +197,40 @@ export default function CreateMonsterPage() {
       <Card className="max-w-lg mx-auto">
         <CardHeader>
           <CardTitle className="font-headline flex items-center gap-2"><Sparkles className="h-6 w-6 text-primary"/>Your Morgellon Monster: {monsterName}</CardTitle>
-          <CardDescription>This is your unique, inner monster. Its name, form, and deep voice are now bound to your profile.</CardDescription>
+          <CardDescription>
+            This is your unique, inner monster. Its name, form, and deep voice are now bound to your profile. 
+            What's next? Explore the app or check out our Getting Started Guide!
+          </CardDescription>
         </CardHeader>
         <CardContent className="text-center">
             <Image src={imageUrl} alt={`Your Morgellon Monster: ${monsterName}`} width={512} height={512} className="rounded-lg border object-cover mx-auto shadow-lg" data-ai-hint="generated monster" />
-            <p className="text-sm text-muted-foreground mt-4">You can view it on your profile page and track its health in the Food Log. It might even have a riddle for you...</p>
+            <p className="text-sm text-muted-foreground mt-4">You can view it on your profile page and track its health in the Meal Log. It might even have a riddle for you...</p>
         </CardContent>
-        <CardFooter className="flex-col sm:flex-row justify-center gap-2 pt-4">
-             <Button asChild variant="outline">
-                <Link href="/doctor-forum">
-                    <Share className="mr-2 h-4 w-4" />
-                    Share Your Monster on the Forum!
+        <CardFooter className="flex-col gap-3 pt-4 items-center">
+            <Button asChild size="lg">
+                <Link href="/">
+                    <Sparkles className="mr-2 h-4 w-4" /> Explore Fiber Friends (Home)
                 </Link>
             </Button>
-             <Button onClick={() => {
+            <Button asChild variant="outline">
+                <Link href="/getting-started">
+                   <ArrowRight className="mr-2 h-4 w-4" /> View Getting Started Guide
+                </Link>
+            </Button>
+        </CardFooter>
+        <CardFooter className="flex-col sm:flex-row justify-center gap-x-4 gap-y-2 pt-3 items-center border-t mt-4">
+            <Button asChild variant="link" className="text-xs">
+                <Link href="/doctor-forum"> {/* Updated from /doctor-forum to /forum based on previous change */}
+                    <Share className="mr-1 h-3 w-3" /> Share on Forum
+                </Link>
+            </Button>
+            <Button onClick={() => {
                 setHasGeneratedInSession(false); 
                 setImageUrl(null);
                 setMonsterName(null);
                 setWords('');
-             }} variant="secondary">
-                Create Another Monster
+             }} variant="link" className="text-xs text-muted-foreground">
+                Create a Different Monster
             </Button>
         </CardFooter>
       </Card>
