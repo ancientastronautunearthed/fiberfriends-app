@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BarChart3, UserCheck, Microscope, Search, Download, Brain, Bone, Leaf, CookingPot, Pill, Bot, User, Users2, Sparkles, Settings2, Loader2, Send } from "lucide-react";
+import { BarChart3, UserCheck, Microscope, Search, Download, Brain, Bone, Leaf, CookingPot, Pill, Bot, User, Users2, Sparkles, Settings2, Loader2, Send, ShieldAlert } from "lucide-react";
 import Image from "next/image";
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -226,11 +226,13 @@ export default function DrMiddelveenPortalPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-            <Alert variant="default" className="bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700">
-                <Microscope className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                <AlertTitle className="text-blue-700 dark:text-blue-300 font-semibold">Important Note</AlertTitle>
-                <AlertDescription className="text-blue-600 dark:text-blue-400 text-sm">
-                    This portal is a prototype. All data displayed is illustrative. In a production system, robust security, anonymization, and patient consent mechanisms would be implemented, adhering to all relevant data privacy regulations (e.g., HIPAA). The AI Assistant's responses are simulated.
+            <Alert variant="default" className="bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300">
+                <ShieldAlert className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                <AlertTitle className="font-semibold">Prototype & Security Notice</AlertTitle>
+                <AlertDescription className="text-sm">
+                    This portal is a <strong>prototype for demonstration purposes</strong>. All data displayed is illustrative and mock.
+                    In a production system, robust security, strict anonymization techniques, and explicit patient consent mechanisms would be paramount, adhering to all relevant data privacy regulations (e.g., HIPAA).
+                    Access to this portal would require separate, secure authentication and authorization for verified medical professionals.
                 </AlertDescription>
             </Alert>
         </CardContent>
@@ -467,3 +469,4 @@ export default function DrMiddelveenPortalPage() {
   );
 }
 
+    
