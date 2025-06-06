@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { generateMonsterSlayingImageAction } from './actions';
 import { Progress } from '@/components/ui/progress';
-import LoadingPlaceholder from '@/components/ui/loading-placeholder';
+import LoadingPlaceholder from '@/components/ui/loading-placeholder'; // New import
 import { cn } from '@/lib/utils';
 
 const MONSTER_NAME_KEY = 'morgellonMonsterName';
@@ -323,21 +323,22 @@ export default function BeliefCirclePage() {
   const [userMonsterName, setUserMonsterName] = useState<string | null>(null);
   const [userMonsterImageUrl, setUserMonsterImageUrl] = useState<string | null>(null);
   const [userMonsterHealth, setUserMonsterHealth] = useState<number | null>(null);
-  const [monsterDetailsLoading, setMonsterDetailsLoading] = useState(true);
+  const [monsterDetailsLoading, setMonsterDetailsLoading] = useState(true); // New loading state
   const { toast } = useToast();
   
   useEffect(() => {
+    console.log("[DEBUG] BeliefCirclePage: Main useEffect triggered.");
     setIsClient(true);
     const generated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
-    console.log("[DEBUG] useEffect - MONSTER_GENERATED_KEY:", generated);
+    console.log("[DEBUG] BeliefCirclePage: MONSTER_GENERATED_KEY from localStorage:", generated);
     setMonsterGenerated(generated);
-    setMonsterDetailsLoading(true); 
+    setMonsterDetailsLoading(true); // Start loading monster details
 
     if (generated) {
       const name = localStorage.getItem(MONSTER_NAME_KEY);
       const imageUrl = localStorage.getItem(MONSTER_IMAGE_KEY);
       const healthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
-      console.log("[DEBUG] useEffect - Loaded from localStorage:", { name, imageUrl, healthStr });
+      console.log("[DEBUG] BeliefCirclePage: Loaded from localStorage:", { name, imageUrl, healthStr });
 
       setUserMonsterName(name);
       setUserMonsterImageUrl(imageUrl);
@@ -349,7 +350,7 @@ export default function BeliefCirclePage() {
       setUserMonsterImageUrl(null);
       setUserMonsterHealth(null);
     }
-    setMonsterDetailsLoading(false);
+    setMonsterDetailsLoading(false); // Finished loading monster details
     
   }, []);
 
@@ -389,13 +390,15 @@ export default function BeliefCirclePage() {
   };
 
   if (!isClient) {
+    console.log("[DEBUG] BeliefCirclePage: Rendering LoadingPlaceholder (isClient false).");
     return <LoadingPlaceholder message="Preparing Battle HQ..." />;
   }
   
-  console.log("[DEBUG] Before render - isClient:", isClient, "monsterGenerated:", monsterGenerated, "monsterDetailsLoading:", monsterDetailsLoading, "userMonsterName:", userMonsterName, "userMonsterImageUrl:", userMonsterImageUrl);
+  console.log("[DEBUG] BeliefCirclePage: Before main render - isClient:", isClient, "monsterGenerated:", monsterGenerated, "monsterDetailsLoading:", monsterDetailsLoading, "userMonsterName:", userMonsterName, "userMonsterImageUrl:", userMonsterImageUrl);
 
 
   if (!monsterGenerated) {
+    console.log("[DEBUG] BeliefCirclePage: Rendering 'Create Monster' prompt.");
     return (
       <Card className="max-w-lg mx-auto my-10">
         <CardHeader className="text-center">
@@ -418,10 +421,12 @@ export default function BeliefCirclePage() {
   }
 
   if (monsterDetailsLoading) {
+      console.log("[DEBUG] BeliefCirclePage: Rendering LoadingPlaceholder (monsterDetailsLoading true).");
       return <LoadingPlaceholder message="Loading your Battle HQ details..." />;
   }
 
   if (!userMonsterName || !userMonsterImageUrl) {
+      console.log("[DEBUG] BeliefCirclePage: Rendering 'Nemesis Data Incomplete' card.");
       return (
         <Card className="max-w-lg mx-auto my-10" data-testid="nemesis-data-incomplete-card">
           <CardHeader className="text-center">
@@ -444,6 +449,7 @@ export default function BeliefCirclePage() {
       );
   }
 
+  console.log("[DEBUG] BeliefCirclePage: Rendering DailyBattlePlanCard and community stories.");
   return (
     <div className="space-y-8">
       <DailyBattlePlanCard
