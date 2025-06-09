@@ -1,4 +1,4 @@
-import type { Config } from 'tailwindcss';
+import type {Config} from 'tailwindcss';
 
 export default {
   darkMode: ['class'],
@@ -285,9 +285,9 @@ export default {
   },
   plugins: [
     require('tailwindcss-animate'),
-    require('@tailwindcss/typography'), // Added typography plugin
+    require('@tailwindcss/typography'), // Added this line
     // Custom plugin for glass utilities
-    function({ addUtilities }: { addUtilities: any }) { // Typed the addUtilities parameter
+    function({ addUtilities }: { addUtilities: any }) {
       addUtilities({
         '.glass-sm': {
           backdropFilter: 'blur(4px)',

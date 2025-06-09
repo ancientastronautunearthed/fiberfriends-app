@@ -2,42 +2,42 @@
 
 import {
   generateDietician,
-  DieticianGenerationInput,
-  DieticianGenerationOutput,
+  DieticianGenerationInput, // This will be the updated type from the flow
 } from '@/ai/flows/dietician-generation-flow';
 
 import {
   createDietPlan,
-  DietPlanGenerationInput,
-  DietPlanGenerationOutput,
+  DietPlanGenerationInput, // This will be the updated type from the flow
 } from '@/ai/flows/diet-plan-generation-flow';
 
-export async function generateDieticianAction(
-  input: DieticianGenerationInput
-): Promise<DieticianGenerationOutput> {
-  try {
-    const result = await generateDietician(input);
-    return result;
-  } catch (error) {
-    console.error("Error in generateDieticianAction:", error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to generate dietician: ${error.message}`);
-    }
-    throw new Error("An unexpected error occurred during dietician generation.");
-  }
+// The input type for this action now matches what the page sends
+export async function generateDieticianAction(input: {
+  gender: string;
+  type: string;
+  communicationStyle: string;
+  additionalTraits: string;
+  symptoms: string[];
+}) {
+  // We no longer pass a separate 'specialization'.
+  // The 'symptoms' array is now part of the input for the AI flow.
+  const result = await generateDietician(input);
+  return result;
 }
 
-export async function createDietPlanAction(
-  input: DietPlanGenerationInput
-): Promise<DietPlanGenerationOutput> {
-  try {
+// The input type for this action now also includes symptoms
+export async function createDietPlanAction(input: {
+    dietaryRestrictions: string;
+    allergies: string;
+    favoriteFoods: string;
+    dislikedFoods: string;
+    badFoodFrequency: string;
+    healthGoals: string;
+    mealPrepTime: string;
+    budget: string;
+    dieticianName: string;
+    symptoms: string[];
+}) {
+    // We pass the entire input, now including symptoms, to the diet plan flow.
     const result = await createDietPlan(input);
     return result;
-  } catch (error) {
-    console.error("Error in createDietPlanAction:", error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to create diet plan: ${error.message}`);
-    }
-    throw new Error("An unexpected error occurred during diet plan creation.");
-  }
 }

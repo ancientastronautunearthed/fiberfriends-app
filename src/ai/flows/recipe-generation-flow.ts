@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview A Genkit flow for generating a recipe for a given meal.
@@ -23,6 +22,9 @@ const IngredientSchema = z.object({
   isLinkable: z.boolean().default(false).describe('True if this ingredient is a common packaged good that could potentially be linked to an online store like Amazon (e.g., "rolled oats", "chia seeds", "canned tomatoes"). False for fresh produce like "fresh basil" or generic items like "water".'),
   notes: z.string().optional().describe('Optional notes for the ingredient, e.g., "finely chopped", "or alternative sweetener".')
 });
+
+// FIX: Export the Ingredient type
+export type Ingredient = z.infer<typeof IngredientSchema>;
 
 const RecipeGenerationOutputSchema = z.object({
   recipeName: z.string().describe('The confirmed or full name of the recipe, often same as input mealName.'),
@@ -49,11 +51,11 @@ The user wants a recipe for: {{{mealName}}}
 Generate a complete recipe including:
 1.  **recipeName**: The official name of the recipe (often the same as the input mealName).
 2.  **ingredients**: An array of objects, each with:
-    *   **name**: Ingredient name.
-    *   **quantity**: Numerical or fractional quantity.
-    *   **unit**: Measurement unit (e.g., cup, tsp, grams, item, to taste).
-    *   **isLinkable**: Set to \`true\` if the ingredient is a common, non-perishable, packaged item that someone might buy online (e.g., 'rolled oats', 'canned chickpeas', 'olive oil', 'almond flour', 'maple syrup', 'protein powder', 'specific spice blend name'). Set to \`false\` for fresh produce (e.g., 'fresh spinach', 'apple', 'onion'), very generic items like 'water', 'salt', 'black pepper', or items that are highly variable/brand-dependent if not specified.
-    *   **notes**: (Optional) Any specific preparation for the ingredient, like "finely chopped" or "melted".
+    * **name**: Ingredient name.
+    * **quantity**: Numerical or fractional quantity.
+    * **unit**: Measurement unit (e.g., cup, tsp, grams, item, to taste).
+    * **isLinkable**: Set to \`true\` if the ingredient is a common, non-perishable, packaged item that someone might buy online (e.g., 'rolled oats', 'canned chickpeas', 'olive oil', 'almond flour', 'maple syrup', 'protein powder', 'specific spice blend name'). Set to \`false\` for fresh produce (e.g., 'fresh spinach', 'apple', 'onion'), very generic items like 'water', 'salt', 'black pepper', or items that are highly variable/brand-dependent if not specified.
+    * **notes**: (Optional) Any specific preparation for the ingredient, like "finely chopped" or "melted".
 3.  **instructions**: A list of clear, step-by-step instructions.
 4.  **prepTime**: (Optional) Estimated preparation time.
 5.  **cookTime**: (Optional) Estimated cooking time.
