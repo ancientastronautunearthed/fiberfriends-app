@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -14,7 +13,7 @@ const gettingStartedSteps = [
     icon: CheckCircle,
     title: "Welcome & Registration Complete!",
     description: "You've successfully created your Fiber Friends account. Welcome to the community!",
-    image: "https://placehold.co/600x400.png",
+    image: "https://picsum.photos/seed/welcome-community/600/400",
     imageAiHint: "welcome community celebration",
     links: [],
   },
@@ -23,7 +22,7 @@ const gettingStartedSteps = [
     icon: Wand2,
     title: "Summon Your Nemesis (Profile Avatar)",
     description: "Your Nemesis is a unique, AI-generated monster that represents your personal health journey. Its name and appearance will become your profile identity. This is a one-time creative step.",
-    image: "https://placehold.co/600x400.png",
+    image: "https://picsum.photos/seed/monster-creation/600/400",
     imageAiHint: "monster creation ui",
     links: [{ href: "/create-monster", text: "Summon Your Nemesis Now" }],
   },
@@ -32,7 +31,7 @@ const gettingStartedSteps = [
     icon: ShieldQuestion,
     title: "Understand Your Nemesis's Health",
     description: "Your Nemesis's health dynamically changes based on your logged activities. Healthy food and exercise weaken it, while less optimal choices might strengthen it. Track its status on pages like the Meal Log or Exercise Log.",
-    image: "https://placehold.co/600x400.png",
+    image: "https://picsum.photos/seed/health-status-bar/600/400",
     imageAiHint: "health bar monster status",
     links: [
         { href: "/food-log", text: "Go to Meal Log" },
@@ -44,7 +43,7 @@ const gettingStartedSteps = [
     icon: BookOpen,
     title: "Your First Daily Wellness Log",
     description: "The 'Daily Wellness Log' on the main page is your daily checklist for various activities like logging meals, exercise, symptoms, and engaging in challenges. Completing these tasks helps you and impacts your Nemesis!",
-    image: "https://placehold.co/600x400.png",
+    image: "https://picsum.photos/seed/daily-checklist-tasks/600/400",
     imageAiHint: "checklist daily tasks",
     links: [{ href: "/", text: "View Daily Wellness Log (Home)" }],
   },
@@ -53,7 +52,7 @@ const gettingStartedSteps = [
     icon: Users,
     title: "Explore the Community Hub",
     description: "Connect with others! Share your story in the Community Feed, find camaraderie in the Medical Experiences Forum, and discover validated providers.",
-    image: "https://placehold.co/600x400.png",
+    image: "https://picsum.photos/seed/community-connection/600/400",
     imageAiHint: "community people connecting",
     links: [
         { href: "/", text: "Go to Community Feed" },
@@ -65,7 +64,7 @@ const gettingStartedSteps = [
     icon: BrainCircuit,
     title: "Discover Insights & Resources",
     description: "Use AI-powered tools like Symptom Pattern Analysis and the AI Product Suggester. Browse curated wellness aids and learn more about your journey.",
-    image: "https://placehold.co/600x400.png",
+    image: "https://picsum.photos/seed/ai-insights-brain/600/400",
     imageAiHint: "ai brain data",
     links: [
         { href: "/pattern-recognition", text: "Analyze Symptom Patterns" },
@@ -77,7 +76,7 @@ const gettingStartedSteps = [
     icon: Trophy,
     title: "Ready for More? Check the Full User Guide!",
     description: "This was a quick start. For a comprehensive overview of all features, challenges, and how to make the most of Fiber Friends, please visit our full User Guide.",
-    image: "https://placehold.co/600x400.png",
+    image: "https://picsum.photos/seed/user-guide-book/600/400",
     imageAiHint: "open book guide",
     links: [{ href: "/tutorial", text: "Read Full User Guide" }],
   },
