@@ -4,37 +4,17 @@
  * particularly considering sensitivities relevant to conditions like Morgellons.
  */
 
-// Core Genkit and AI Model Imports
-import { configure } from '@genkit-ai/core';
-import { defineFlow, runFlow } from '@genkit-ai/flow';
-import { generate } from '@genkit-ai/ai';
-import { vertexAI } from '@genkit-ai/vertexai';
-import { firebase } from '@genkit-ai/firebase/plugin';
+import { defineFlow } from '@genkit-ai/flow';
 import { z } from 'zod';
-
-// Initialize Genkit with necessary plugins. This should be done once per server instance.
-configure({
-  plugins: [
-    firebase(), // For logging and tracing
-    vertexAI({ location: 'us-central1' }), // Define the AI provider
-  ],
-  logSinks: ['firebase'],
-  enableTracing: true,
-  flowStateStore: 'firebase',
-});
-
-// Define the input schema for the flow
-const FoodGradingInputSchema = z.object({
-  foodItem: z.string().describe('The name of the food item to be graded.'),
-});
-export type FoodGradingInput = z.infer<typeof FoodGradingInputSchema>;
+import { ai } from '@/ai/genkit';
+import { gemini10Pro } from '@genkit-ai/vertexai';
 
 // Define the structured output we expect from the AI
 const FoodGradingOutputSchema = z.object({
   foodName: z.string().describe('The recognized name of the food item.'),
   grade: z.enum(['good', 'bad', 'neutral']).describe('The overall grade of the food: "good" (hurts monster), "bad" (helps monster), or "neutral".'),
   healthImpactPercentage: z.number().min(-2.0).max(3.0).describe('The percentage impact on monster health. Negative for "good" foods (up to -2.0, monster is hurt), positive for "bad" foods (up to +3.0, monster is healed/strengthened), and 0 for "neutral".'),
-  reasoning: z.string().describe('The monster\'s brief, in-character explanation for the grade and health impact. If the food is garlic, the monster should be particularly annoyed and explain (in a slightly folkloric or pseudo-scientific monster way) why it specifically despises garlic.'),
+  reasoning: z.string().describe("The monster's brief, in-character explanation for the grade and health impact. If the food is garlic, the monster should be particularly annoyed and explain (in a slightly folkloric or pseudo-scientific monster way) why it specifically despises garlic."),
   calories: z.number().optional().describe('Estimated calories for the serving size. Provide only if food item is specific enough for estimation.'),
   proteinGrams: z.number().optional().describe('Estimated protein in grams. Provide only if food item is specific enough.'),
   carbGrams: z.number().optional().describe('Estimated carbohydrates in grams. Provide only if food item is specific enough.'),
@@ -51,14 +31,14 @@ export type FoodGradingOutput = z.infer<typeof FoodGradingOutputSchema>;
 export const foodGradingFlow = defineFlow(
   {
     name: 'foodGradingFlow',
-    inputSchema: FoodGradingInputSchema,
+    inputSchema: z.string(), // The input is just the food item string
     outputSchema: FoodGradingOutputSchema,
   },
-  async (input) => {
+  async (foodItem) => {
     
     const prompt = `You are the user's inner "Morgellon Monster". Your personality is a bit grumpy, self-serving, and you get annoyed when the user eats "good" foods that weaken you, and pleased when they eat "bad" foods that strengthen you.
 
-    User's food item: ${input.foodItem}
+    User's food item: ${foodItem}
 
     First, perform your monster grading:
     1.  foodName: The recognized or canonical name of the food item.
@@ -89,36 +69,38 @@ export const foodGradingFlow = defineFlow(
     Return ONLY the JSON object based on the FoodGradingOutputSchema.
     `;
 
-    // Use the standard 'generate' function to call the AI model
-    const llmResponse = await generate({
+    // Use the central 'ai' object to call the generate method
+    const llmResponse = await ai.generate({
         prompt: prompt,
-        model: 'vertexai/gemini-1.0-pro', // Reference the model by its string ID
+        model: gemini10Pro, // Use the imported model reference
         output: {
             schema: FoodGradingOutputSchema,
         },
+        config: {
+            temperature: 0.5,
+        }
     });
     
-    const output = llmResponse.output();
+    const output = llmResponse.output;
 
     if (!output) {
       throw new Error("The AI model (monster) did not return a valid food grading. It's probably sulking.");
     }
 
-    // Fallback logic to ensure foodName is populated
-    if (!output.foodName && input.foodItem) {
-        output.foodName = input.foodItem;
+    if (!output.foodName && foodItem) {
+        output.foodName = foodItem;
     }
     
-    // Clean up the output to ensure data consistency
+    // CORRECTED BLOCK
     if (output.clarifyingQuestions && output.clarifyingQuestions.length > 0) {
-        delete output.calories;
-        delete output.proteinGrams;
-        delete output.carbGrams;
-        delete output.fatGrams;
-        delete output.sugarGrams;
-        delete output.sodiumMilligrams;
-        delete output.servingDescription;
-        delete output.nutritionDisclaimer;
+        delete (output as any).calories;
+        delete (output as any).proteinGrams;
+        delete (output as any).carbGrams;
+        delete (output as any).fatGrams;
+        delete (output as any).sugarGrams;
+        delete (output as any).sodiumMilligrams;
+        delete (output as any).servingDescription;
+        delete (output as any).nutritionDisclaimer;
     }
     return output;
   }
