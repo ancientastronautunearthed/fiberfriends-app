@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useTransition, useCallback } from 'react';
@@ -18,14 +17,20 @@ import { gradeExerciseAction } from './actions';
 import type { ExerciseGradingOutput } from '@/ai/flows/exercise-grading-flow';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/context/auth-context';
+import { firestoreService, type MonsterData, type ExerciseEntry } from '@/lib/firestore-service';
 
-const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
-const MONSTER_NAME_KEY = 'morgellonMonsterName';
-const MONSTER_HEALTH_KEY = 'morgellonMonsterHealth';
-const MONSTER_GENERATED_KEY = 'morgellonMonsterGenerated';
-const EXERCISE_LOG_KEY = 'morgellonExerciseLogEntries';
-const MONSTER_TOMB_KEY = 'morgellonMonsterTomb';
-const MONSTER_LAST_RECOVERY_DATE_KEY = 'monsterLastRecoveryDate';
+const predefinedExercises = [
+  "Walking (Brisk)", "Running/Jogging", "Cycling (Outdoor)", "Cycling (Stationary)",
+  "Swimming", "Yoga (Gentle)", "Yoga (Vigorous)", "Pilates",
+  "Strength Training (Weights)", "Strength Training (Bodyweight)",
+  "HIIT (High-Intensity Interval Training)", "Dancing", "Hiking",
+  "Stretching/Flexibility", "Tai Chi", "Water Aerobics", "Rowing",
+  "Elliptical Trainer", "Stair Climbing", "Gardening/Yard Work",
+  "House Cleaning (Active)", "Sports (e.g., Tennis, Basketball)",
+  "Martial Arts", "Jump Rope", "Core Exercises (e.g., Planks, Crunches)"
+];
+const CUSTOM_EXERCISE_VALUE = "custom";
 
 const EXERCISE_GRADE_CACHE_PREFIX = 'exercise_grade_cache_';
 const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -42,19 +47,7 @@ const INITIAL_HEALTH_MAX = 100;
 const MIN_RECOVERY = 10;
 const MAX_RECOVERY = 20;
 
-const predefinedExercises = [
-  "Walking (Brisk)", "Running/Jogging", "Cycling (Outdoor)", "Cycling (Stationary)",
-  "Swimming", "Yoga (Gentle)", "Yoga (Vigorous)", "Pilates",
-  "Strength Training (Weights)", "Strength Training (Bodyweight)",
-  "HIIT (High-Intensity Interval Training)", "Dancing", "Hiking",
-  "Stretching/Flexibility", "Tai Chi", "Water Aerobics", "Rowing",
-  "Elliptical Trainer", "Stair Climbing", "Gardening/Yard Work",
-  "House Cleaning (Active)", "Sports (e.g., Tennis, Basketball)",
-  "Martial Arts", "Jump Rope", "Core Exercises (e.g., Planks, Crunches)"
-];
-const CUSTOM_EXERCISE_VALUE = "custom";
-
-interface ExerciseLogEntry extends ExerciseGradingOutput {
+interface ExerciseLogEntryClient extends ExerciseGradingOutput {
   id: string;
   loggedAt: string;
   durationMinutes: number;
@@ -62,17 +55,21 @@ interface ExerciseLogEntry extends ExerciseGradingOutput {
   healthAfter: number;
 }
 
-interface TombEntry {
-  name: string;
-  imageUrl: string;
-  diedAt: string;
+function LoadingPlaceholder() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[300px] w-full">
+      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <p className="mt-4 text-muted-foreground">Loading Exercise Log...</p>
+    </div>
+  );
 }
 
 export default function ExerciseLogPage() {
-  const [monsterImageUrl, setMonsterImageUrl] = useState<string | null>(null);
-  const [monsterName, setMonsterName] = useState<string | null>(null);
-  const [monsterHealth, setMonsterHealth] = useState<number | null>(null);
-  const [exerciseLogEntries, setExerciseLogEntries] = useState<ExerciseLogEntry[]>([]);
+  const [isClientReady, setIsClientReady] = useState(false);
+  const [isMonsterActuallyGenerated, setIsMonsterActuallyGenerated] = useState(false);
+
+  const [monsterData, setMonsterData] = useState<MonsterData | null>(null);
+  const [exerciseLogEntries, setExerciseLogEntries] = useState<ExerciseLogEntryClient[]>([]);
   
   const [exerciseInput, setExerciseInput] = useState('');
   const [selectedPredefinedExercise, setSelectedPredefinedExercise] = useState<string>('');
@@ -83,132 +80,162 @@ export default function ExerciseLogPage() {
   const [showDamageEffect, setShowDamageEffect] = useState(false);
   const router = useRouter();
 
-  const performNightlyRecovery = useCallback(() => {
-    const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
-    if (monsterGenerated !== 'true') return;
+  const { user, refreshUserProfile } = useAuth();
 
-    const storedName = localStorage.getItem(MONSTER_NAME_KEY);
-    const storedHealthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
-    if (!storedHealthStr || !storedName) return;
-    
-    let currentHealth = parseFloat(storedHealthStr);
-    if (isNaN(currentHealth) || currentHealth <= MONSTER_DEATH_THRESHOLD) return;
+  const performNightlyRecovery = useCallback(async () => {
+    if (!user || !monsterData) return;
 
-    const lastRecoveryDate = localStorage.getItem(MONSTER_LAST_RECOVERY_DATE_KEY);
+    const lastRecoveryDate = monsterData.lastRecoveryDate;
     const todayDateStr = new Date().toDateString();
 
-    if (lastRecoveryDate !== todayDateStr) {
+    if (lastRecoveryDate !== todayDateStr && monsterData.health > MONSTER_DEATH_THRESHOLD) {
       const recoveryAmount = Math.floor(Math.random() * (MAX_RECOVERY - MIN_RECOVERY + 1)) + MIN_RECOVERY;
-      const newHealth = Math.min(currentHealth + recoveryAmount, MAX_MONSTER_HEALTH);
-      
-      setMonsterHealth(newHealth); 
-      localStorage.setItem(MONSTER_HEALTH_KEY, String(newHealth));
-      localStorage.setItem(MONSTER_LAST_RECOVERY_DATE_KEY, todayDateStr);
-      
+      const newHealth = Math.min(monsterData.health + recoveryAmount, MAX_MONSTER_HEALTH);
+
+      await firestoreService.updateMonsterData(user.uid, {
+        health: newHealth,
+        lastRecoveryDate: todayDateStr
+      });
+
+      setMonsterData(prev => prev ? { ...prev, health: newHealth, lastRecoveryDate: todayDateStr } : null);
+
       toast({
-        title: `${storedName} Stirs...`,
+        title: `${monsterData.name} Stirs...`,
         description: `Heh. While you slept, I regained ${recoveryAmount} health. I'm now at ${newHealth.toFixed(1)}%.`,
         variant: "default",
         duration: 7000,
       });
     }
-  }, [toast]);
-
+  }, [user, monsterData, toast]);
 
   useEffect(() => {
-    const storedImage = localStorage.getItem(MONSTER_IMAGE_KEY);
-    const storedName = localStorage.getItem(MONSTER_NAME_KEY);
-    const monsterGenerated = localStorage.getItem(MONSTER_GENERATED_KEY);
-
-    if (monsterGenerated === 'true' && storedImage && storedName) {
-      setMonsterImageUrl(storedImage);
-      setMonsterName(storedName);
-      const storedHealth = localStorage.getItem(MONSTER_HEALTH_KEY);
-      if (storedHealth) {
-        setMonsterHealth(parseFloat(storedHealth));
-      } else {
-        const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
-        setMonsterHealth(initialHealth);
-        localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
+    const loadData = async () => {
+      setIsClientReady(true);
+      
+      if (!user) {
+        setIsMonsterActuallyGenerated(false);
+        return;
       }
-      performNightlyRecovery(); 
-    } else {
-      setMonsterImageUrl(null);
-      setMonsterName(null);
-      setMonsterHealth(null);
-    }
 
-    const storedExerciseLog = localStorage.getItem(EXERCISE_LOG_KEY);
-    if (storedExerciseLog) {
-      setExerciseLogEntries(JSON.parse(storedExerciseLog));
-    }
-  }, [performNightlyRecovery]);
+      try {
+        // Load monster data
+        const monster = await firestoreService.getMonsterData(user.uid);
+        if (monster && monster.generated) {
+          setMonsterData(monster);
+          setIsMonsterActuallyGenerated(true);
 
-  useEffect(() => {
-    if (monsterHealth !== null && localStorage.getItem(MONSTER_GENERATED_KEY) === 'true' && monsterName) {
-      localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
-      checkMonsterDeath(monsterHealth, "the strain of existence"); 
-    }
-  }, [monsterHealth, monsterName]);
+          // If no health is set, initialize it
+          if (monster.health === undefined || monster.health === null) {
+            const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
+            await firestoreService.updateMonsterData(user.uid, { health: initialHealth });
+            setMonsterData(prev => prev ? { ...prev, health: initialHealth } : null);
+          }
+        } else {
+          setIsMonsterActuallyGenerated(false);
+        }
 
-  useEffect(() => {
-    if (exerciseLogEntries.length > 0 || localStorage.getItem(EXERCISE_LOG_KEY)) {
-      localStorage.setItem(EXERCISE_LOG_KEY, JSON.stringify(exerciseLogEntries));
-    }
-  }, [exerciseLogEntries]);
+        // Load exercise entries
+        const exerciseEntries = await firestoreService.getUserExercises(user.uid);
+        const entriesConverted = exerciseEntries.map(entry => ({
+          id: entry.id,
+          exerciseName: entry.exerciseName,
+          durationMinutes: entry.durationMinutes,
+          benefitScore: entry.benefitScore,
+          reasoning: entry.reasoning,
+          healthBefore: entry.healthBefore,
+          healthAfter: entry.healthAfter,
+          loggedAt: entry.createdAt.toDate().toISOString()
+        }));
+        setExerciseLogEntries(entriesConverted);
 
-  const checkMonsterDeath = (currentHealth: number, cause: string) => {
-     if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterName && monsterImageUrl) {
-        const tomb: TombEntry[] = JSON.parse(localStorage.getItem(MONSTER_TOMB_KEY) || '[]');
-        tomb.unshift({ name: monsterName, imageUrl: monsterImageUrl, diedAt: new Date().toISOString() });
-        localStorage.setItem(MONSTER_TOMB_KEY, JSON.stringify(tomb.slice(0, 50)));
-
-        localStorage.removeItem(MONSTER_IMAGE_KEY);
-        localStorage.removeItem(MONSTER_NAME_KEY);
-        localStorage.removeItem(MONSTER_HEALTH_KEY);
-        localStorage.removeItem(MONSTER_GENERATED_KEY);
-        
-        setMonsterImageUrl(null);
-        setMonsterName(null);
-        setMonsterHealth(null);
-
+      } catch (error) {
+        console.error('Error loading data:', error);
         toast({
-          title: `${monsterName} Has Perished!`,
-          description: `Its reign of internal terror ends, falling to ${currentHealth.toFixed(1)}% health due to ${cause}. A new shadow will soon take its place... Create it now!`,
-          variant: "destructive",
-          duration: Number.MAX_SAFE_INTEGER,
+          title: "Loading Error",
+          description: "Failed to load your data. Please refresh the page.",
+          variant: "destructive"
         });
-        router.push('/create-monster'); 
-        return true; 
       }
-      return false; 
-  };
+    };
 
-  const processExerciseGradingResult = (result: ExerciseGradingOutput, duration: number, isCached: boolean) => {
-    if (monsterHealth === null || !monsterName) return;
+    loadData();
+  }, [user, toast]);
 
-    const healthBefore = monsterHealth;
+  useEffect(() => {
+    if (isMonsterActuallyGenerated && monsterData) {
+      performNightlyRecovery();
+    }
+  }, [isMonsterActuallyGenerated, monsterData, performNightlyRecovery]);
+
+  const checkMonsterDeath = useCallback(async (currentHealth: number, cause: string) => {
+    if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterData && user) {
+      // Add to tomb
+      await firestoreService.addToTomb(user.uid, {
+        name: monsterData.name,
+        imageUrl: monsterData.imageUrl,
+        cause
+      });
+
+      // Delete current monster
+      await firestoreService.deleteMonster(user.uid);
+
+      setMonsterData(null);
+      setIsMonsterActuallyGenerated(false);
+
+      toast({
+        title: `${monsterData.name} Has Perished!`,
+        description: `Its reign of internal terror ends, falling to ${currentHealth.toFixed(1)}% health due to ${cause}. A new shadow will soon take its place... Create it now!`,
+        variant: "destructive",
+        duration: Number.MAX_SAFE_INTEGER,
+      });
+
+      router.push('/create-monster');
+      return true;
+    }
+    return false;
+  }, [monsterData, user, router, toast]);
+
+  const processExerciseGradingResult = async (result: ExerciseGradingOutput, duration: number, isCached: boolean) => {
+    if (!monsterData || !user) return;
+
+    const healthBefore = monsterData.health;
     let newHealth = healthBefore - result.benefitScore;
     newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth);
 
-    setMonsterHealth(newHealth);
+    // Update monster health
+    await firestoreService.updateMonsterData(user.uid, { health: newHealth });
+    setMonsterData(prev => prev ? { ...prev, health: newHealth } : null);
+
     setShowDamageEffect(true);
     setTimeout(() => setShowDamageEffect(false), 700);
 
-    const newLogEntry: ExerciseLogEntry = {
-      ...result,
+    // Add exercise entry to Firestore
+    await firestoreService.addExercise(user.uid, {
+      exerciseName: result.exerciseName,
       durationMinutes: duration,
-      id: Date.now().toString(),
-      loggedAt: new Date().toISOString(),
+      benefitScore: result.benefitScore,
+      reasoning: result.reasoning,
+      healthBefore,
+      healthAfter: newHealth
+    });
+
+    // Add to local state for immediate display
+    const newLogEntry: ExerciseLogEntryClient = {
+      id: Date.now().toString(), // Temporary ID for display
+      exerciseName: result.exerciseName,
+      durationMinutes: duration,
+      benefitScore: result.benefitScore,
+      reasoning: result.reasoning,
       healthBefore,
       healthAfter: newHealth,
+      loggedAt: new Date().toISOString(),
     };
     setExerciseLogEntries(prev => [newLogEntry, ...prev].slice(0, 20));
 
-    if (!checkMonsterDeath(newHealth, `the exertion of ${result.exerciseName}`)) {
+    if (!(await checkMonsterDeath(newHealth, `the exertion of ${result.exerciseName}`))) {
       toast({
-        title: (isCached ? "[Cache] " : "") + `${monsterName} Groans!`,
-        description: `Exercising with ${result.exerciseName} for ${duration} minutes? My health is now ${newHealth.toFixed(1)}% (-${result.benefitScore.toFixed(1)}%). ${monsterName} says: '${result.reasoning.substring(0, 70)}...' Must you?`,
+        title: (isCached ? "[Cache] " : "") + `${monsterData.name} Groans!`,
+        description: `Exercising with ${result.exerciseName} for ${duration} minutes? My health is now ${newHealth.toFixed(1)}% (-${result.benefitScore.toFixed(1)}%). ${monsterData.name} says: '${result.reasoning.substring(0, 70)}...' Must you?`,
         variant: "default",
         duration: Number.MAX_SAFE_INTEGER,
       });
@@ -238,7 +265,7 @@ export default function ExerciseLogPage() {
       setError("Please enter a valid positive number for duration.");
       return;
     }
-    if (monsterHealth === null || !monsterName || !monsterImageUrl) {
+    if (!monsterData || !user) {
         setError("Monster not found or health not initialized. Please create a monster first.");
         return;
     }
@@ -251,8 +278,10 @@ export default function ExerciseLogPage() {
         try {
           const cachedItem: CachedAIResponse<ExerciseGradingOutput> = JSON.parse(cachedItemRaw);
           if (Date.now() - cachedItem.timestamp < CACHE_DURATION_MS) {
-            processExerciseGradingResult(cachedItem.data, duration, true);
-            setExerciseInput(''); setSelectedPredefinedExercise(''); setDurationInput('');
+            await processExerciseGradingResult(cachedItem.data, duration, true);
+            setExerciseInput(''); 
+            setSelectedPredefinedExercise(''); 
+            setDurationInput('');
             return;
           } else {
             localStorage.removeItem(cacheKey); // Stale cache
@@ -271,14 +300,16 @@ export default function ExerciseLogPage() {
           const newCachedItem: CachedAIResponse<ExerciseGradingOutput> = { timestamp: Date.now(), data: result };
           localStorage.setItem(cacheKey, JSON.stringify(newCachedItem));
         }
-        processExerciseGradingResult(result, duration, false);
-        setExerciseInput(''); setSelectedPredefinedExercise(''); setDurationInput('');
+        await processExerciseGradingResult(result, duration, false);
+        setExerciseInput(''); 
+        setSelectedPredefinedExercise(''); 
+        setDurationInput('');
       } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "Failed to grade exercise.";
         setError(errorMessage);
         toast({
           title: "Error Grading Exercise",
-          description: `${monsterName} scoffs: 'Your attempt to log exercise was pathetic and failed. Error: ${errorMessage}'`,
+          description: `${monsterData?.name || 'The monster'} scoffs: 'Your attempt to log exercise was pathetic and failed. Error: ${errorMessage}'`,
           variant: "destructive",
           duration: Number.MAX_SAFE_INTEGER,
         });
@@ -287,39 +318,73 @@ export default function ExerciseLogPage() {
   };
   
   const getMonsterStatusMessage = () => {
-    if (monsterHealth === null || !monsterName) return "Awaiting its creation...";
-    if (monsterHealth <= MONSTER_DEATH_THRESHOLD) return `${monsterName} has perished! Its reign is over.`;
-    if (monsterHealth < 0) return `${monsterName} is critically weak at ${monsterHealth.toFixed(1)}%! It's on the verge of oblivion!`;
-    if (monsterHealth < 20) return `${monsterName} is very weak! It can barely sustain its shadowy form.`;
-    if (monsterHealth < INITIAL_HEALTH_MIN) return `${monsterName} is feeling weak! Your efforts are noticeable.`;
-    if (monsterHealth > (MAX_MONSTER_HEALTH - (MAX_MONSTER_HEALTH - INITIAL_HEALTH_MAX)/2) ) return `${monsterName} is overwhelmingly powerful! Its presence is suffocating.`;
-    if (monsterHealth > INITIAL_HEALTH_MAX + 20) return `${monsterName} is significantly strengthened! It crackles with dark energy.`;
-    if (monsterHealth > INITIAL_HEALTH_MAX) return `${monsterName} is gaining strength. It seems pleased.`;
-    return `${monsterName}'s health is stable... for now.`;
+    if (!monsterData) return "Awaiting its creation...";
+    if (monsterData.health <= MONSTER_DEATH_THRESHOLD) return `${monsterData.name} has perished! Its reign is over.`;
+    if (monsterData.health < 0) return `${monsterData.name} is critically weak at ${monsterData.health.toFixed(1)}%! It's on the verge of oblivion!`;
+    if (monsterData.health < 20) return `${monsterData.name} is very weak! It can barely sustain its shadowy form.`;
+    if (monsterData.health < INITIAL_HEALTH_MIN) return `${monsterData.name} is feeling weak! Your efforts are noticeable.`;
+    if (monsterData.health > (MAX_MONSTER_HEALTH - (MAX_MONSTER_HEALTH - INITIAL_HEALTH_MAX)/2) ) return `${monsterData.name} is overwhelmingly powerful! Its presence is suffocating.`;
+    if (monsterData.health > INITIAL_HEALTH_MAX + 20) return `${monsterData.name} is significantly strengthened! It crackles with dark energy.`;
+    if (monsterData.health > INITIAL_HEALTH_MAX) return `${monsterData.name} is gaining strength. It seems pleased.`;
+    return `${monsterData.name}'s health is stable... for now.`;
   };
   
   const getHealthBarValue = () => {
-      if (monsterHealth === null) return 0;
+      if (!monsterData) return 0;
       const range = MAX_MONSTER_HEALTH - MONSTER_DEATH_THRESHOLD;
-      const currentValInRange = monsterHealth - MONSTER_DEATH_THRESHOLD;
+      const currentValInRange = monsterData.health - MONSTER_DEATH_THRESHOLD;
       return Math.max(0, Math.min((currentValInRange / range) * 100, 100));
+  };
+
+  if (!isClientReady) {
+    return <LoadingPlaceholder />;
   }
 
-  if (!monsterName || !monsterImageUrl || monsterHealth === null) {
+  if (!user) {
     return (
       <Card className="max-w-lg mx-auto">
         <CardHeader>
-          <CardTitle className="font-headline flex items-center gap-2"><Info className="h-6 w-6 text-primary"/>Monster Not Found or Perished</CardTitle>
+          <CardTitle className="font-headline flex items-center gap-2">
+            <Info className="h-6 w-6 text-primary"/>
+            Authentication Required
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-muted-foreground mb-4">
+            Please log in to track your exercises.
+          </p>
+          <Button asChild className="w-full">
+            <Link href="/login">Log In</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!isMonsterActuallyGenerated || !monsterData) {
+    return (
+      <Card className="max-w-lg mx-auto">
+        <CardHeader>
+          <CardTitle className="font-headline flex items-center gap-2">
+            <Info className="h-6 w-6 text-primary"/>
+            Monster Not Found or Perished
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-center text-muted-foreground mb-4">
             You need to create your Morgellon Monster, or your previous one has fallen.
           </p>
           <Button asChild className="w-full mb-2">
-            <Link href="/create-monster"><Sparkles className="mr-2 h-4 w-4"/>Create a New Monster</Link>
+            <Link href="/create-monster">
+              <Sparkles className="mr-2 h-4 w-4"/>
+              Create a New Monster
+            </Link>
           </Button>
           <Button asChild variant="outline" className="w-full">
-            <Link href="/monster-tomb"><Skull className="mr-2 h-4 w-4"/>View Tomb of Monsters</Link>
+            <Link href="/monster-tomb">
+              <Skull className="mr-2 h-4 w-4"/>
+              View Tomb of Monsters
+            </Link>
           </Button>
         </CardContent>
       </Card>
@@ -331,16 +396,27 @@ export default function ExerciseLogPage() {
       <div className="lg:col-span-1 space-y-6">
         <Card className={cn(showDamageEffect && 'animate-damage-flash')}>
           <CardHeader className="items-center text-center">
-            <Image src={monsterImageUrl} alt={monsterName} width={128} height={128} className="rounded-full border-2 border-primary shadow-md mx-auto" data-ai-hint="generated monster" />
-            <CardTitle className="font-headline text-2xl pt-2">{monsterName}</CardTitle>
+            <Image 
+              src={monsterData.imageUrl} 
+              alt={monsterData.name} 
+              width={128} 
+              height={128} 
+              className="rounded-full border-2 border-primary shadow-md mx-auto" 
+              data-ai-hint="generated monster" 
+            />
+            <CardTitle className="font-headline text-2xl pt-2">{monsterData.name}</CardTitle>
             <CardDescription>{getMonsterStatusMessage()}</CardDescription>
           </CardHeader>
           <CardContent>
             <Label htmlFor="monster-health-progress" className="text-sm font-medium text-center block mb-1">
-              Monster Health: {monsterHealth.toFixed(1)}% (Dies at {MONSTER_DEATH_THRESHOLD}%, Max: {MAX_MONSTER_HEALTH}%)
+              Monster Health: {monsterData.health.toFixed(1)}% (Dies at {MONSTER_DEATH_THRESHOLD}%, Max: {MAX_MONSTER_HEALTH}%)
             </Label>
-            <Progress id="monster-health-progress" value={getHealthBarValue()} className="w-full h-3" 
-                aria-label={`Monster health: ${monsterHealth.toFixed(1)}%`} />
+            <Progress 
+              id="monster-health-progress" 
+              value={getHealthBarValue()} 
+              className="w-full h-3" 
+              aria-label={`Monster health: ${monsterData.health.toFixed(1)}%`} 
+            />
              <p className="text-xs text-muted-foreground text-center mt-1">Positive activities help weaken your monster.</p>
           </CardContent>
         </Card>
@@ -349,8 +425,13 @@ export default function ExerciseLogPage() {
       <div className="lg:col-span-2 space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline flex items-center gap-2"><Dumbbell className="h-6 w-6 text-primary"/>Log Exercise</CardTitle>
-            <CardDescription>Select or enter your exercise. The AI will gauge its impact on {monsterName}'s health (cached for 24hrs for same exercise/duration), and {monsterName} will react!</CardDescription>
+            <CardTitle className="font-headline flex items-center gap-2">
+              <Dumbbell className="h-6 w-6 text-primary"/>
+              Log Exercise
+            </CardTitle>
+            <CardDescription>
+              Select or enter your exercise. The AI will gauge its impact on {monsterData.name}'s health (cached for 24hrs for same exercise/duration), and {monsterData.name} will react!
+            </CardDescription>
           </CardHeader>
           <form onSubmit={handleExerciseSubmit}>
             <CardContent className="space-y-4">
@@ -413,7 +494,7 @@ export default function ExerciseLogPage() {
             <CardFooter>
               <Button type="submit" disabled={isGrading || !exerciseInput.trim() || !durationInput.trim()} className="w-full sm:w-auto">
                 {isGrading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Activity className="mr-2 h-4 w-4" />}
-                {isGrading ? `Analyzing with ${monsterName}'s disdain...` : `Log Exercise & See ${monsterName}'s Reaction`}
+                {isGrading ? `Analyzing with ${monsterData.name}'s disdain...` : `Log Exercise & See ${monsterData.name}'s Reaction`}
               </Button>
             </CardFooter>
           </form>
@@ -422,7 +503,7 @@ export default function ExerciseLogPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline">Recent Exercise Log</CardTitle>
-            <CardDescription>Your last 20 exercise entries and their impact on {monsterName}.</CardDescription>
+            <CardDescription>Your last 20 exercise entries and their impact on {monsterData.name}.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 max-h-96 overflow-y-auto">
             {exerciseLogEntries.length === 0 && <p className="text-sm text-muted-foreground">No exercises logged yet.</p>}
@@ -440,7 +521,9 @@ export default function ExerciseLogPage() {
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5 text-right flex-shrink-0">Health After: {entry.healthAfter.toFixed(1)}%</p>
                 </div>
-                <p className="text-sm text-foreground/80 mt-1 pl-1 border-l-2 border-accent/50 ml-1.5 "> <span className="italic text-muted-foreground">{monsterName} said:</span> "{entry.reasoning}"</p>
+                <p className="text-sm text-foreground/80 mt-1 pl-1 border-l-2 border-accent/50 ml-1.5 "> 
+                  <span className="italic text-muted-foreground">{monsterData.name} said:</span> "{entry.reasoning}"
+                </p>
               </Card>
             ))}
           </CardContent>
@@ -449,5 +532,3 @@ export default function ExerciseLogPage() {
     </div>
   );
 }
-
-    

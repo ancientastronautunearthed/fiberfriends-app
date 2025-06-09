@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useTransition, useCallback, useRef } from 'react';
@@ -16,17 +15,8 @@ import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showSocialProofToast } from '@/lib/social-proof-toast';
 import { Badge } from "@/components/ui/badge";
-
-const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
-const MONSTER_NAME_KEY = 'morgellonMonsterName';
-const MONSTER_HEALTH_KEY = 'morgellonMonsterHealth';
-const MONSTER_GENERATED_KEY = 'morgellonMonsterGenerated';
-const MONSTER_TOMB_KEY = 'morgellonMonsterTomb';
-const USER_POINTS_KEY = 'userPoints';
-const MONSTER_LAST_RECOVERY_DATE_KEY = 'monsterLastRecoveryDate';
-const MINDFUL_MOMENT_STREAK_KEY = 'mindfulMomentStreak';
-const MINDFUL_STREAK_BONUS_KEY = 'mindfulStreakBonusDamage';
-const MINDFUL_MOMENT_DAILY_USAGE_KEY = 'mindfulMomentDailyUsage';
+import { useAuth } from '@/context/auth-context';
+import { firestoreService, type MonsterData, type StreakData } from '@/lib/firestore-service';
 
 const MONSTER_DEATH_THRESHOLD = -50;
 const MAX_MONSTER_HEALTH = 200;
@@ -44,17 +34,6 @@ const DURATION_OPTIONS = [
   { value: 2, label: "2 Minutes", baseDamage: 7, points: 25 },
   { value: 3, label: "3 Minutes", baseDamage: 12, points: 45 },
 ];
-
-interface TombEntry {
-  name: string;
-  imageUrl: string;
-  diedAt: string;
-}
-
-interface StreakData {
-  date: string; // YYYY-MM-DD
-  count: number;
-}
 
 interface DailyUsageData {
     date: string; // YYYY-MM-DD
@@ -74,9 +53,7 @@ export default function MindfulMomentPage() {
   const [isClientReady, setIsClientReady] = useState(false);
   const [isMonsterActuallyGenerated, setIsMonsterActuallyGenerated] = useState(false);
 
-  const [monsterImageUrl, setMonsterImageUrl] = useState<string | null>(null);
-  const [monsterName, setMonsterName] = useState<string | null>(null);
-  const [monsterHealth, setMonsterHealth] = useState<number | null>(null);
+  const [monsterData, setMonsterData] = useState<MonsterData | null>(null);
   
   const [selectedDuration, setSelectedDuration] = useState(DURATION_OPTIONS[0].value);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -91,155 +68,132 @@ export default function MindfulMomentPage() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const phaseTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [mindfulStreak, setMindfulStreak] = useState<StreakData>({ date: '', count: 0 });
+  const [mindfulStreak, setMindfulStreak] = useState<StreakData | null>(null);
   const [streakBonusDamage, setStreakBonusDamage] = useState(0);
   const [dailyUsage, setDailyUsage] = useState<DailyUsageData>({ date: '', minutesCompletedToday: 0 });
 
-  const updateStreak = useCallback(() => {
-    if (typeof window === 'undefined') return 0;
-    const today = new Date().toISOString().split('T')[0];
-    const storedStreak = localStorage.getItem(MINDFUL_MOMENT_STREAK_KEY);
-    let currentStreakData: StreakData = { date: today, count: 0 };
-    let currentBonus = streakBonusDamage;
+  const { user, refreshUserProfile } = useAuth();
 
+  const performNightlyRecovery = useCallback(async () => {
+    if (!user || !monsterData) return;
 
-    if (storedStreak) { 
-      currentStreakData = JSON.parse(storedStreak);
-      if (currentStreakData.date === today) { 
-      } else {
-        const lastDate = new Date(currentStreakData.date);
-        const currentDate = new Date(today);
-        const diffTime = Math.abs(currentDate.getTime() - lastDate.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        if (diffDays === 1) {
-          currentStreakData.count += 1;
-        } else { 
-          currentStreakData.count = 1;
-          currentBonus = 0; 
-        }
-        currentStreakData.date = today;
-
-        if (currentStreakData.count > 0 && currentStreakData.count % 3 === 0) {
-          currentBonus = Math.min(5, currentBonus + 1); 
-        }
-      }
-    } else {
-      currentStreakData.count = 1; 
-      currentBonus = 0; 
-      if (currentStreakData.count > 0 && currentStreakData.count % 3 === 0) { // Check for initial bonus
-        currentBonus = Math.min(5, currentBonus + 1);
-      }
-    }
-    
-    setMindfulStreak(currentStreakData);
-    localStorage.setItem(MINDFUL_MOMENT_STREAK_KEY, JSON.stringify(currentStreakData));
-    setStreakBonusDamage(currentBonus);
-    localStorage.setItem(MINDFUL_STREAK_BONUS_KEY, String(currentBonus));
-    return currentStreakData.count;
-  }, [streakBonusDamage]);
-
-
-  const performNightlyRecovery = useCallback(() => {
-    if (typeof window === 'undefined' || !isMonsterActuallyGenerated) return;
-
-    const storedName = localStorage.getItem(MONSTER_NAME_KEY);
-    const storedHealthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
-    if (!storedHealthStr || !storedName) return;
-    
-    let currentHealth = parseFloat(storedHealthStr);
-    if (isNaN(currentHealth) || currentHealth <= MONSTER_DEATH_THRESHOLD) return;
-
-    const lastRecoveryDate = localStorage.getItem(MONSTER_LAST_RECOVERY_DATE_KEY);
+    const lastRecoveryDate = monsterData.lastRecoveryDate;
     const todayDateStr = new Date().toDateString();
 
-    if (lastRecoveryDate !== todayDateStr) {
+    if (lastRecoveryDate !== todayDateStr && monsterData.health > MONSTER_DEATH_THRESHOLD) {
       const recoveryAmount = Math.floor(Math.random() * (MAX_RECOVERY - MIN_RECOVERY + 1)) + MIN_RECOVERY;
-      const newHealth = Math.min(currentHealth + recoveryAmount, MAX_MONSTER_HEALTH);
-      
-      setMonsterHealth(newHealth); 
-      localStorage.setItem(MONSTER_HEALTH_KEY, String(newHealth));
-      localStorage.setItem(MONSTER_LAST_RECOVERY_DATE_KEY, todayDateStr);
-      
+      const newHealth = Math.min(monsterData.health + recoveryAmount, MAX_MONSTER_HEALTH);
+
+      await firestoreService.updateMonsterData(user.uid, {
+        health: newHealth,
+        lastRecoveryDate: todayDateStr
+      });
+
+      setMonsterData(prev => prev ? { ...prev, health: newHealth, lastRecoveryDate: todayDateStr } : null);
+
       toast({
-        title: `${storedName} Stirs...`,
-        description: `Heh. While you slept, I regained ${recoveryAmount} health. I'm now at ${newHealth.toFixed(1)}%. Not bad.`,
-        variant: "default", duration: 7000,
+        title: `${monsterData.name} Stirs...`,
+        description: `Heh. While you slept, I regained ${recoveryAmount} health. Now at ${newHealth.toFixed(1)}%.`,
+        variant: "default", 
+        duration: 7000,
       });
     }
-  }, [toast, isMonsterActuallyGenerated]);
+  }, [user, monsterData, toast]);
 
   useEffect(() => {
-    setIsClientReady(true);
-    const generated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
-    setIsMonsterActuallyGenerated(generated);
-
-    if (generated) {
-      setMonsterImageUrl(localStorage.getItem(MONSTER_IMAGE_KEY));
-      setMonsterName(localStorage.getItem(MONSTER_NAME_KEY));
-      const storedHealth = localStorage.getItem(MONSTER_HEALTH_KEY);
-      if (storedHealth) setMonsterHealth(parseFloat(storedHealth));
-      else {
-        const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
-        setMonsterHealth(initialHealth); localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
+    const loadData = async () => {
+      setIsClientReady(true);
+      
+      if (!user) {
+        setIsMonsterActuallyGenerated(false);
+        return;
       }
+
+      try {
+        // Load monster data
+        const monster = await firestoreService.getMonsterData(user.uid);
+        if (monster && monster.generated) {
+          setMonsterData(monster);
+          setIsMonsterActuallyGenerated(true);
+
+          // If no health is set, initialize it
+          if (monster.health === undefined || monster.health === null) {
+            const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
+            await firestoreService.updateMonsterData(user.uid, { health: initialHealth });
+            setMonsterData(prev => prev ? { ...prev, health: initialHealth } : null);
+          }
+        } else {
+          setIsMonsterActuallyGenerated(false);
+        }
+
+        // Load streak data
+        const streak = await firestoreService.getStreak(user.uid, 'mindful');
+        setMindfulStreak(streak);
+        
+        // Calculate streak bonus damage
+        if (streak) {
+          const newBonusDamage = Math.min(5, Math.floor(streak.count / 3));
+          setStreakBonusDamage(newBonusDamage);
+        }
+
+        // Load daily usage data
+        const todayStr = new Date().toISOString().split('T')[0];
+        const completion = await firestoreService.getCompletion(user.uid, 'mindful', todayStr);
+        if (completion && completion.data?.minutesCompletedToday) {
+          setDailyUsage({ 
+            date: todayStr, 
+            minutesCompletedToday: completion.data.minutesCompletedToday 
+          });
+        } else {
+          setDailyUsage({ date: todayStr, minutesCompletedToday: 0 });
+        }
+
+      } catch (error) {
+        console.error('Error loading data:', error);
+        toast({
+          title: "Loading Error",
+          description: "Failed to load your data. Please refresh the page.",
+          variant: "destructive"
+        });
+      }
+    };
+
+    loadData();
+  }, [user, toast]);
+
+  useEffect(() => {
+    if (isMonsterActuallyGenerated && monsterData) {
       performNightlyRecovery();
     }
+  }, [isMonsterActuallyGenerated, monsterData, performNightlyRecovery]);
 
-    const storedStreak = localStorage.getItem(MINDFUL_MOMENT_STREAK_KEY);
-    if (storedStreak) setMindfulStreak(JSON.parse(storedStreak));
-    const storedBonus = localStorage.getItem(MINDFUL_STREAK_BONUS_KEY);
-    if (storedBonus) setStreakBonusDamage(parseInt(storedBonus, 10));
+  const checkMonsterDeath = useCallback(async (currentHealth: number, cause: string) => {
+    if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterData && user) {
+      // Add to tomb
+      await firestoreService.addToTomb(user.uid, {
+        name: monsterData.name,
+        imageUrl: monsterData.imageUrl,
+        cause
+      });
 
-    const storedDailyUsage = localStorage.getItem(MINDFUL_MOMENT_DAILY_USAGE_KEY);
-    const todayStr = new Date().toISOString().split('T')[0];
-    if (storedDailyUsage) {
-        const parsedUsage: DailyUsageData = JSON.parse(storedDailyUsage);
-        if (parsedUsage.date === todayStr) {
-            setDailyUsage(parsedUsage);
-        } else {
-            setDailyUsage({ date: todayStr, minutesCompletedToday: 0 });
-            localStorage.setItem(MINDFUL_MOMENT_DAILY_USAGE_KEY, JSON.stringify({ date: todayStr, minutesCompletedToday: 0 }));
-        }
-    } else {
-        setDailyUsage({ date: todayStr, minutesCompletedToday: 0 });
-        localStorage.setItem(MINDFUL_MOMENT_DAILY_USAGE_KEY, JSON.stringify({ date: todayStr, minutesCompletedToday: 0 }));
+      // Delete current monster
+      await firestoreService.deleteMonster(user.uid);
+
+      setMonsterData(null);
+      setIsMonsterActuallyGenerated(false);
+
+      toast({
+        title: `${monsterData.name} Has Vanished!`,
+        description: `Its form dissipates, succumbing to ${cause} at ${currentHealth.toFixed(1)}% health. The quiet is... unsettling. A new presence may emerge.`,
+        variant: "destructive", 
+        duration: Number.MAX_SAFE_INTEGER,
+      });
+
+      router.push('/create-monster');
+      return true;
     }
-
-  }, [performNightlyRecovery]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && monsterHealth !== null && isMonsterActuallyGenerated && monsterName) {
-      localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
-      checkMonsterDeath(monsterHealth, "the burden of tranquility"); 
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monsterHealth, monsterName, isMonsterActuallyGenerated]);
-
-  const checkMonsterDeath = (currentHealth: number, cause: string) => {
-     if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterName && monsterImageUrl) {
-        if (typeof window === 'undefined') return true;
-        const tomb: TombEntry[] = JSON.parse(localStorage.getItem(MONSTER_TOMB_KEY) || '[]');
-        tomb.unshift({ name: monsterName, imageUrl: monsterImageUrl, diedAt: new Date().toISOString() });
-        localStorage.setItem(MONSTER_TOMB_KEY, JSON.stringify(tomb.slice(0, 50)));
-        localStorage.removeItem(MONSTER_IMAGE_KEY); localStorage.removeItem(MONSTER_NAME_KEY);
-        localStorage.removeItem(MONSTER_HEALTH_KEY); localStorage.removeItem(MONSTER_GENERATED_KEY);
-        setMonsterImageUrl(null); setMonsterName(null); setMonsterHealth(null);
-        setIsMonsterActuallyGenerated(false);
-        toast({
-          title: `${monsterName} Has Vanished!`,
-          description: `Its form dissipates, succumbing to ${cause} at ${currentHealth.toFixed(1)}% health. The quiet is... unsettling. A new presence may emerge.`,
-          variant: "destructive", duration: Number.MAX_SAFE_INTEGER,
-        });
-        router.push('/create-monster'); return true;
-      } return false;
-  };
-
-  const addPoints = (points: number) => {
-    if (typeof window === 'undefined') return;
-    const currentPoints = parseInt(localStorage.getItem(USER_POINTS_KEY) || '0', 10);
-    localStorage.setItem(USER_POINTS_KEY, String(currentPoints + points));
-  };
+    return false;
+  }, [monsterData, user, router, toast]);
 
   const runBreathingCycle = () => {
     setBreathingPhase('inhale');
@@ -270,7 +224,6 @@ export default function MindfulMomentPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSessionActive, timeLeft]);
 
-
   useEffect(() => {
     if (isSessionActive && timeLeft > 0) { // Only start if session is active and time is left
         runBreathingCycle();
@@ -284,10 +237,10 @@ export default function MindfulMomentPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSessionActive, timeLeft > 0]); // Added timeLeft > 0
 
-
   const handleStartSession = () => {
-    if (!monsterName || monsterHealth === null) {
-      setError("Monster data not loaded. Please ensure your monster is created."); return;
+    if (!monsterData || !user) {
+      setError("Monster data not loaded. Please ensure your monster is created."); 
+      return;
     }
     if (dailyUsage.minutesCompletedToday + selectedDuration > MAX_MINDFUL_MINUTES_PER_DAY) {
         setError(`You can only complete ${MAX_MINDFUL_MINUTES_PER_DAY} minutes of mindful moments per day. You have ${MAX_MINDFUL_MINUTES_PER_DAY - dailyUsage.minutesCompletedToday} minutes remaining today.`);
@@ -308,50 +261,84 @@ export default function MindfulMomentPage() {
     }
 
     startProcessingCompletionTransition(async () => {
-      if (monsterHealth === null || !monsterName) return;
+      if (!monsterData || !user) return;
 
-      const durationOption = DURATION_OPTIONS.find(opt => opt.value === selectedDuration);
-      if (!durationOption) return;
+      try {
+        const durationOption = DURATION_OPTIONS.find(opt => opt.value === selectedDuration);
+        if (!durationOption) return;
 
-      const newMinutesCompletedToday = dailyUsage.minutesCompletedToday + durationOption.value;
-      const newDailyUsage: DailyUsageData = { date: new Date().toISOString().split('T')[0], minutesCompletedToday: newMinutesCompletedToday };
-      setDailyUsage(newDailyUsage);
-      if (typeof window !== 'undefined') localStorage.setItem(MINDFUL_MOMENT_DAILY_USAGE_KEY, JSON.stringify(newDailyUsage));
+        // Update daily usage
+        const newMinutesCompletedToday = dailyUsage.minutesCompletedToday + durationOption.value;
+        const newDailyUsage: DailyUsageData = { 
+          date: new Date().toISOString().split('T')[0], 
+          minutesCompletedToday: newMinutesCompletedToday 
+        };
+        setDailyUsage(newDailyUsage);
 
-      const currentStreakCount = updateStreak();
-      const totalDamage = durationOption.baseDamage + streakBonusDamage;
-      
-      const newHealth = Math.min(MAX_MONSTER_HEALTH, monsterHealth - totalDamage);
-      setMonsterHealth(newHealth);
-      addPoints(durationOption.points);
+        // Save completion to Firestore
+        await firestoreService.setCompletion(user.uid, 'mindful', newDailyUsage);
 
-      setShowDamageEffect(true);
-      setTimeout(() => setShowDamageEffect(false), 700);
+        // Update streak
+        const currentStreakCount = await firestoreService.updateStreak(user.uid, 'mindful');
+        const updatedStreak: StreakData = { 
+          uid: user.uid, 
+          type: 'mindful', 
+          date: new Date().toISOString().split('T')[0], 
+          count: currentStreakCount, 
+          updatedAt: new Date() as any 
+        };
+        setMindfulStreak(updatedStreak);
 
-      let toastMessage = `${monsterName} shudders! ${durationOption.label} of mindfulness dealt ${totalDamage.toFixed(1)} damage (Base: ${durationOption.baseDamage}, Streak Bonus: ${streakBonusDamage}). Its health is now ${newHealth.toFixed(1)}%. You earned ${durationOption.points} points.`;
-      if (currentStreakCount > 1) {
-        toastMessage += ` Mindful streak: ${currentStreakCount} days!`;
-      }
-      
-      if (!checkMonsterDeath(newHealth, `a moment of calm (${durationOption.label})`)) {
+        // Update streak bonus damage
+        const newBonusDamage = Math.min(5, Math.floor(currentStreakCount / 3));
+        setStreakBonusDamage(newBonusDamage);
+
+        const totalDamage = durationOption.baseDamage + streakBonusDamage;
+        
+        // Update monster health
+        const newHealth = Math.min(MAX_MONSTER_HEALTH, monsterData.health - totalDamage);
+        await firestoreService.updateMonsterData(user.uid, { health: newHealth });
+        setMonsterData(prev => prev ? { ...prev, health: newHealth } : null);
+
+        // Add points
+        await firestoreService.addPoints(user.uid, durationOption.points);
+        await refreshUserProfile();
+
+        setShowDamageEffect(true);
+        setTimeout(() => setShowDamageEffect(false), 700);
+
+        let toastMessage = `${monsterData.name} shudders! ${durationOption.label} of mindfulness dealt ${totalDamage.toFixed(1)} damage (Base: ${durationOption.baseDamage}, Streak Bonus: ${streakBonusDamage}). Its health is now ${newHealth.toFixed(1)}%. You earned ${durationOption.points} points.`;
+        if (currentStreakCount > 1) {
+          toastMessage += ` Mindful streak: ${currentStreakCount} days!`;
+        }
+        
+        if (!(await checkMonsterDeath(newHealth, `a moment of calm (${durationOption.label})`))) {
+          toast({
+            title: "Mindful Moment Complete!",
+            description: toastMessage,
+            variant: "default",
+            duration: Number.MAX_SAFE_INTEGER,
+          });
+        }
+        
+        if (currentStreakCount >= 3 && currentStreakCount % 3 === 0) {
+          showSocialProofToast(`${currentStreakCount}-day mindful moment streak!`, undefined, true);
+        }
+      } catch (error) {
+        console.error('Error completing session:', error);
         toast({
-          title: "Mindful Moment Complete!",
-          description: toastMessage,
-          variant: "default",
-          duration: Number.MAX_SAFE_INTEGER,
+          title: "Error",
+          description: "Failed to save mindful moment completion.",
+          variant: "destructive"
         });
-      }
-      
-      if (currentStreakCount >= 3 && currentStreakCount % 3 === 0) {
-        showSocialProofToast(`${currentStreakCount}-day mindful moment streak!`, undefined, true);
       }
     });
   };
   
   const getHealthBarValue = () => {
-      if (monsterHealth === null) return 0;
+      if (!monsterData) return 0;
       const range = MAX_MONSTER_HEALTH - MONSTER_DEATH_THRESHOLD;
-      const currentValInRange = monsterHealth - MONSTER_DEATH_THRESHOLD;
+      const currentValInRange = monsterData.health - MONSTER_DEATH_THRESHOLD;
       return Math.max(0, Math.min((currentValInRange / range) * 100, 100));
   };
 
@@ -359,12 +346,42 @@ export default function MindfulMomentPage() {
     return <LoadingPlaceholder />;
   }
 
+  if (!user) {
+    return (
+      <Card className="max-w-lg mx-auto">
+        <CardHeader>
+          <CardTitle className="font-headline flex items-center gap-2">
+            <Info className="h-6 w-6 text-primary" />
+            Authentication Required
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-muted-foreground mb-4">Please log in to engage in mindful moments.</p>
+          <Button asChild className="w-full">
+            <Link href="/login">Log In</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (!isMonsterActuallyGenerated) {
     return (
       <Card className="max-w-lg mx-auto">
-        <CardHeader><CardTitle className="font-headline flex items-center gap-2"><Info />Monster Required</CardTitle></CardHeader>
-        <CardContent><p className="text-center text-muted-foreground mb-4">Your inner monster must be created to engage in mindful moments.</p>
-          <Button asChild className="w-full"><Link href="/create-monster"><Sparkles className="mr-2 h-4 w-4"/>Create Your Monster</Link></Button>
+        <CardHeader>
+          <CardTitle className="font-headline flex items-center gap-2">
+            <Info className="h-6 w-6 text-primary" />
+            Monster Required
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-muted-foreground mb-4">Your inner monster must be created to engage in mindful moments.</p>
+          <Button asChild className="w-full">
+            <Link href="/create-monster">
+              <Sparkles className="mr-2 h-4 w-4"/>
+              Create Your Monster
+            </Link>
+          </Button>
         </CardContent>
       </Card>
     );
@@ -381,18 +398,35 @@ export default function MindfulMomentPage() {
   return (
     <div className="grid lg:grid-cols-3 gap-6">
       <div className="lg:col-span-1 space-y-6">
-        {monsterName && monsterImageUrl && monsterHealth !== null && (
+        {monsterData && (
           <Card className={cn(showDamageEffect && 'animate-damage-flash')}>
             <CardHeader className="items-center text-center">
               <Link href="/my-profile">
-                <Image src={monsterImageUrl} alt={monsterName} width={100} height={100} className="rounded-full border-2 border-primary shadow-md mx-auto cursor-pointer hover:opacity-80 transition-opacity" data-ai-hint="generated monster"/>
+                <Image 
+                  src={monsterData.imageUrl} 
+                  alt={monsterData.name} 
+                  width={100} 
+                  height={100} 
+                  className="rounded-full border-2 border-primary shadow-md mx-auto cursor-pointer hover:opacity-80 transition-opacity" 
+                  data-ai-hint="generated monster"
+                />
               </Link>
-              <CardTitle className="font-headline text-xl pt-2">{monsterName}</CardTitle>
-              <Badge variant="secondary" className="mt-1">Mindful Streak: {mindfulStreak.count} day{mindfulStreak.count === 1 ? '' : 's'}</Badge>
-              {streakBonusDamage > 0 && <Badge variant="outline" className="mt-1 text-green-600 border-green-500">+{streakBonusDamage} Bonus HP Dmg</Badge>}
+              <CardTitle className="font-headline text-xl pt-2">{monsterData.name}</CardTitle>
+              {mindfulStreak && (
+                <Badge variant="secondary" className="mt-1">
+                  Mindful Streak: {mindfulStreak.count} day{mindfulStreak.count === 1 ? '' : 's'}
+                </Badge>
+              )}
+              {streakBonusDamage > 0 && (
+                <Badge variant="outline" className="mt-1 text-green-600 border-green-500">
+                  +{streakBonusDamage} Bonus HP Dmg
+                </Badge>
+              )}
             </CardHeader>
             <CardContent className="text-center">
-              <Label htmlFor="monster-health-mindful" className="text-sm font-medium block mb-1">Monster Health: {monsterHealth.toFixed(1)}%</Label>
+              <Label htmlFor="monster-health-mindful" className="text-sm font-medium block mb-1">
+                Monster Health: {monsterData.health.toFixed(1)}%
+              </Label>
               <Progress id="monster-health-mindful" value={getHealthBarValue()} className="w-full h-2.5" />
               <p className="text-xs text-muted-foreground mt-1">Dies at {MONSTER_DEATH_THRESHOLD}%, Max: {MAX_MONSTER_HEALTH}%</p>
             </CardContent>
@@ -403,8 +437,13 @@ export default function MindfulMomentPage() {
       <div className="lg:col-span-2 space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline flex items-center gap-2"><Wind className="h-6 w-6 text-primary"/>Mindful Moment: Calm the Chaos</CardTitle>
-            <CardDescription>Engage in a guided breathing exercise. Max {MAX_MINDFUL_MINUTES_PER_DAY} minutes per day. You have {minutesRemainingToday} minutes remaining today.</CardDescription>
+            <CardTitle className="font-headline flex items-center gap-2">
+              <Wind className="h-6 w-6 text-primary"/>
+              Mindful Moment: Calm the Chaos
+            </CardTitle>
+            <CardDescription>
+              Engage in a guided breathing exercise. Max {MAX_MINDFUL_MINUTES_PER_DAY} minutes per day. You have {minutesRemainingToday} minutes remaining today.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {!isSessionActive ? (
@@ -472,7 +511,12 @@ export default function MindfulMomentPage() {
                 </Button>
               </div>
             )}
-            {error && <Alert variant="destructive"><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+            {error && (
+              <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
           </CardContent>
           <CardFooter>
             <p className="text-xs text-muted-foreground">Completing mindful moments regularly strengthens your resolve and grants streak bonuses against your monster!</p>

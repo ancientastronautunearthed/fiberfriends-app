@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useTransition, useCallback } from 'react';
@@ -16,17 +15,8 @@ import { cn } from '@/lib/utils';
 import { generateQuizQuestionAction } from './actions';
 import type { QuizQuestionOutput } from '@/ai/flows/knowledge-nugget-quiz-flow';
 import { Badge } from '@/components/ui/badge';
-
-const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
-const MONSTER_NAME_KEY = 'morgellonMonsterName';
-const MONSTER_HEALTH_KEY = 'morgellonMonsterHealth';
-const MONSTER_GENERATED_KEY = 'morgellonMonsterGenerated';
-const MONSTER_TOMB_KEY = 'morgellonMonsterTomb';
-const USER_POINTS_KEY = 'userPoints';
-const MONSTER_LAST_RECOVERY_DATE_KEY = 'monsterLastRecoveryDate';
-
-const KNOWLEDGE_NUGGET_QUIZ_LEVEL_KEY = 'knowledgeNuggetQuizLevel';
-const KNOWLEDGE_NUGGET_LAST_ATTEMPT_DATE_KEY = 'knowledgeNuggetQuizLastAttemptDate';
+import { useAuth } from '@/context/auth-context';
+import { firestoreService, type MonsterData } from '@/lib/firestore-service';
 
 const MAX_QUIZ_LEVEL = 10;
 const MAX_BASIC_QUIZ_LEVEL = 5; 
@@ -41,13 +31,6 @@ const POINTS_FOR_CORRECT_QUIZ_ANSWER = 15;
 const MONSTER_HP_REDUCTION_BASE = 4; 
 const PERFECT_LEVEL_10_BONUS_POINTS = 100;
 
-
-interface TombEntry {
-  name: string;
-  imageUrl: string;
-  diedAt: string;
-}
-
 function LoadingPlaceholder() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[300px] w-full">
@@ -61,12 +44,9 @@ export default function KnowledgeNuggetQuizPage() {
   const [isClientReady, setIsClientReady] = useState(false);
   const [isMonsterActuallyGenerated, setIsMonsterActuallyGenerated] = useState(false);
 
-  const [monsterImageUrl, setMonsterImageUrl] = useState<string | null>(null);
-  const [monsterName, setMonsterName] = useState<string | null>(null);
-  const [monsterHealth, setMonsterHealth] = useState<number | null>(null);
+  const [monsterData, setMonsterData] = useState<MonsterData | null>(null);
   
   const [currentQuizLevel, setCurrentQuizLevel] = useState<number>(1);
-  const [lastQuizAttemptDate, setLastQuizAttemptDate] = useState<string | null>(null);
   const [hasAttemptedQuizToday, setHasAttemptedQuizToday] = useState<boolean>(false);
   const [showPremiumUpgradePrompt, setShowPremiumUpgradePrompt] = useState<boolean>(false);
 
@@ -81,26 +61,34 @@ export default function KnowledgeNuggetQuizPage() {
   const { toast } = useToast();
   const router = useRouter();
 
+  const { user, refreshUserProfile } = useAuth();
+
   const getCurrentDateString = () => new Date().toISOString().split('T')[0];
 
-  const performNightlyRecovery = useCallback(() => {
-    if (typeof window === 'undefined' || !isMonsterActuallyGenerated) return;
-    const storedName = localStorage.getItem(MONSTER_NAME_KEY);
-    const storedHealthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
-    if (!storedHealthStr || !storedName) return;
-    let currentHealth = parseFloat(storedHealthStr);
-    if (isNaN(currentHealth) || currentHealth <= MONSTER_DEATH_THRESHOLD) return;
-    const lastRecoveryDate = localStorage.getItem(MONSTER_LAST_RECOVERY_DATE_KEY);
+  const performNightlyRecovery = useCallback(async () => {
+    if (!user || !monsterData) return;
+
+    const lastRecoveryDate = monsterData.lastRecoveryDate;
     const todayDateStr = new Date().toDateString();
-    if (lastRecoveryDate !== todayDateStr) {
+
+    if (lastRecoveryDate !== todayDateStr && monsterData.health > MONSTER_DEATH_THRESHOLD) {
       const recoveryAmount = Math.floor(Math.random() * (MAX_RECOVERY - MIN_RECOVERY + 1)) + MIN_RECOVERY;
-      const newHealth = Math.min(currentHealth + recoveryAmount, MAX_MONSTER_HEALTH);
-      setMonsterHealth(newHealth); 
-      localStorage.setItem(MONSTER_HEALTH_KEY, String(newHealth));
-      localStorage.setItem(MONSTER_LAST_RECOVERY_DATE_KEY, todayDateStr);
-      toast({ title: `${storedName} Regenerates`, description: `While you rested, I regained ${recoveryAmount} health. Now at ${newHealth.toFixed(1)}%.`, duration: 7000 });
+      const newHealth = Math.min(monsterData.health + recoveryAmount, MAX_MONSTER_HEALTH);
+
+      await firestoreService.updateMonsterData(user.uid, {
+        health: newHealth,
+        lastRecoveryDate: todayDateStr
+      });
+
+      setMonsterData(prev => prev ? { ...prev, health: newHealth, lastRecoveryDate: todayDateStr } : null);
+
+      toast({ 
+        title: `${monsterData.name} Regenerates`, 
+        description: `While you rested, I regained ${recoveryAmount} health. Now at ${newHealth.toFixed(1)}%.`, 
+        duration: 7000 
+      });
     }
-  }, [toast, isMonsterActuallyGenerated]);
+  }, [user, monsterData, toast]);
 
   const fetchQuizQuestion = useCallback((levelToFetch: number) => {
     if (hasAttemptedQuizToday || showPremiumUpgradePrompt) return;
@@ -117,97 +105,116 @@ export default function KnowledgeNuggetQuizPage() {
         setShuffledOptions([...result.options].sort(() => Math.random() - 0.5));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to fetch quiz question.");
-        toast({ title: "Quiz Error", description: e instanceof Error ? e.message : "Unknown error fetching quiz.", variant: "destructive" });
+        toast({ 
+          title: "Quiz Error", 
+          description: e instanceof Error ? e.message : "Unknown error fetching quiz.", 
+          variant: "destructive" 
+        });
       }
     });
   }, [toast, hasAttemptedQuizToday, showPremiumUpgradePrompt]);
 
   useEffect(() => {
-    setIsClientReady(true);
-    const generated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
-    setIsMonsterActuallyGenerated(generated);
+    const loadData = async () => {
+      setIsClientReady(true);
+      
+      if (!user) {
+        setIsMonsterActuallyGenerated(false);
+        return;
+      }
 
-    if (generated) {
+      try {
+        // Load monster data
+        const monster = await firestoreService.getMonsterData(user.uid);
+        if (monster && monster.generated) {
+          setMonsterData(monster);
+          setIsMonsterActuallyGenerated(true);
+
+          // If no health is set, initialize it
+          if (monster.health === undefined || monster.health === null) {
+            const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
+            await firestoreService.updateMonsterData(user.uid, { health: initialHealth });
+            setMonsterData(prev => prev ? { ...prev, health: initialHealth } : null);
+          }
+        } else {
+          setIsMonsterActuallyGenerated(false);
+        }
+
+        // Load quiz progress from completion data
+        const today = getCurrentDateString();
+        const completion = await firestoreService.getCompletion(user.uid, 'quiz', today);
+        
         let loadedLevel = 1;
-        const storedLevel = localStorage.getItem(KNOWLEDGE_NUGGET_QUIZ_LEVEL_KEY);
-        if (storedLevel) loadedLevel = parseInt(storedLevel, 10);
+        if (completion && completion.data?.currentLevel) {
+          loadedLevel = completion.data.currentLevel;
+        }
         setCurrentQuizLevel(loadedLevel);
 
-        const storedLastAttemptDate = localStorage.getItem(KNOWLEDGE_NUGGET_LAST_ATTEMPT_DATE_KEY);
-        setLastQuizAttemptDate(storedLastAttemptDate);
-        const today = getCurrentDateString();
-        
         let attemptToday = false;
-        if (storedLastAttemptDate === today) {
+        if (completion && completion.completed) {
           attemptToday = true;
           setHasAttemptedQuizToday(true);
         }
 
         let shouldShowPremium = false;
         if (loadedLevel > MAX_BASIC_QUIZ_LEVEL) {
-            shouldShowPremium = true;
-            setShowPremiumUpgradePrompt(true);
+          shouldShowPremium = true;
+          setShowPremiumUpgradePrompt(true);
         }
         
         if (!attemptToday && !shouldShowPremium) {
-            fetchQuizQuestion(loadedLevel);
+          fetchQuizQuestion(loadedLevel);
         }
 
-        setMonsterImageUrl(localStorage.getItem(MONSTER_IMAGE_KEY));
-        setMonsterName(localStorage.getItem(MONSTER_NAME_KEY));
-        const storedHealth = localStorage.getItem(MONSTER_HEALTH_KEY);
-        if (storedHealth) setMonsterHealth(parseFloat(storedHealth));
-        else {
-            const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
-            setMonsterHealth(initialHealth); localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
-        }
-        performNightlyRecovery();
-    }
-  }, [performNightlyRecovery, fetchQuizQuestion]);
+      } catch (error) {
+        console.error('Error loading data:', error);
+        toast({
+          title: "Loading Error",
+          description: "Failed to load your data. Please refresh the page.",
+          variant: "destructive"
+        });
+      }
+    };
+
+    loadData();
+  }, [user, fetchQuizQuestion, toast]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-        localStorage.setItem(KNOWLEDGE_NUGGET_QUIZ_LEVEL_KEY, String(currentQuizLevel));
+    if (isMonsterActuallyGenerated && monsterData) {
+      performNightlyRecovery();
     }
-  }, [currentQuizLevel]);
+  }, [isMonsterActuallyGenerated, monsterData, performNightlyRecovery]);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined' && lastQuizAttemptDate) {
-      localStorage.setItem(KNOWLEDGE_NUGGET_LAST_ATTEMPT_DATE_KEY, lastQuizAttemptDate);
+  const checkMonsterDeath = useCallback(async (currentHealth: number, cause: string) => {
+    if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterData && user) {
+      // Add to tomb
+      await firestoreService.addToTomb(user.uid, {
+        name: monsterData.name,
+        imageUrl: monsterData.imageUrl,
+        cause
+      });
+
+      // Delete current monster
+      await firestoreService.deleteMonster(user.uid);
+
+      setMonsterData(null);
+      setIsMonsterActuallyGenerated(false);
+
+      toast({ 
+        title: `${monsterData.name} Crumbles!`, 
+        description: `Overwhelmed by ${cause}, its essence dissipates at ${currentHealth.toFixed(1)}% health.`, 
+        variant: "destructive", 
+        duration: Number.MAX_SAFE_INTEGER 
+      });
+
+      router.push('/create-monster');
+      return true;
     }
-  }, [lastQuizAttemptDate]);
+    return false;
+  }, [monsterData, user, router, toast]);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined' && monsterHealth !== null && isMonsterActuallyGenerated && monsterName) {
-      localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
-      checkMonsterDeath(monsterHealth, "the weight of knowledge"); 
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monsterHealth, monsterName, isMonsterActuallyGenerated]);
-
-  const checkMonsterDeath = (currentHealth: number, cause: string) => {
-     if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterName && monsterImageUrl) {
-        if (typeof window === 'undefined') return true;
-        const tomb: TombEntry[] = JSON.parse(localStorage.getItem(MONSTER_TOMB_KEY) || '[]');
-        tomb.unshift({ name: monsterName, imageUrl: monsterImageUrl, diedAt: new Date().toISOString() });
-        localStorage.setItem(MONSTER_TOMB_KEY, JSON.stringify(tomb.slice(0, 50)));
-        localStorage.removeItem(MONSTER_IMAGE_KEY); localStorage.removeItem(MONSTER_NAME_KEY);
-        localStorage.removeItem(MONSTER_HEALTH_KEY); localStorage.removeItem(MONSTER_GENERATED_KEY);
-        setMonsterImageUrl(null); setMonsterName(null); setMonsterHealth(null);
-        setIsMonsterActuallyGenerated(false);
-        toast({ title: `${monsterName} Crumbles!`, description: `Overwhelmed by ${cause}, its essence dissipates at ${currentHealth.toFixed(1)}% health.`, variant: "destructive", duration: Number.MAX_SAFE_INTEGER });
-        router.push('/create-monster'); return true;
-      } return false;
-  };
-
-  const addPoints = (points: number) => {
-    if (typeof window === 'undefined') return;
-    const currentPoints = parseInt(localStorage.getItem(USER_POINTS_KEY) || '0', 10);
-    localStorage.setItem(USER_POINTS_KEY, String(currentPoints + points));
-  };
-
-  const handleAnswerSelect = (answer: string) => {
-    if (isAnswered || !quizData || !monsterName || monsterHealth === null || hasAttemptedQuizToday || showPremiumUpgradePrompt) return;
+  const handleAnswerSelect = async (answer: string) => {
+    if (isAnswered || !quizData || !monsterData || !user || hasAttemptedQuizToday || showPremiumUpgradePrompt) return;
     
     setSelectedAnswer(answer);
     setIsAnswered(true);
@@ -215,68 +222,131 @@ export default function KnowledgeNuggetQuizPage() {
     let toastDescription = "";
     let totalPointsAwarded = 0;
 
-    if (isCorrect) {
-      totalPointsAwarded += POINTS_FOR_CORRECT_QUIZ_ANSWER;
-      const monsterDamage = MONSTER_HP_REDUCTION_BASE + currentQuizLevel;
-      const newHealth = Math.min(MAX_MONSTER_HEALTH, monsterHealth - monsterDamage);
-      setMonsterHealth(newHealth);
-      setShowDamageEffect(true);
-      setTimeout(() => setShowDamageEffect(false), 700);
+    try {
+      if (isCorrect) {
+        totalPointsAwarded += POINTS_FOR_CORRECT_QUIZ_ANSWER;
+        const monsterDamage = MONSTER_HP_REDUCTION_BASE + currentQuizLevel;
+        const newHealth = Math.min(MAX_MONSTER_HEALTH, monsterData.health - monsterDamage);
+        
+        // Update monster health
+        await firestoreService.updateMonsterData(user.uid, { health: newHealth });
+        setMonsterData(prev => prev ? { ...prev, health: newHealth } : null);
 
-      toastDescription = `${monsterName} winces! Your Lvl ${currentQuizLevel} knowledge dealt ${monsterDamage} damage. Health: ${newHealth.toFixed(1)}%. You earned ${POINTS_FOR_CORRECT_QUIZ_ANSWER} points.`;
+        setShowDamageEffect(true);
+        setTimeout(() => setShowDamageEffect(false), 700);
 
-      const nextLevel = currentQuizLevel + 1;
-      if (currentQuizLevel === MAX_QUIZ_LEVEL) {
-        totalPointsAwarded += PERFECT_LEVEL_10_BONUS_POINTS;
-        toastDescription += ` Max Level ${MAX_QUIZ_LEVEL} Mastered! +${PERFECT_LEVEL_10_BONUS_POINTS} Bonus Points!`;
-      } else if (nextLevel > MAX_BASIC_QUIZ_LEVEL && nextLevel <= MAX_QUIZ_LEVEL) {
-        if (currentQuizLevel === MAX_BASIC_QUIZ_LEVEL) {
-           setShowPremiumUpgradePrompt(true); 
-           toastDescription += ` You've mastered Level ${currentQuizLevel}! Advanced levels require Premium.`;
-           setCurrentQuizLevel(nextLevel); 
-        } else {
-            setCurrentQuizLevel(nextLevel);
-            toastDescription += ` Leveled up to Quiz Level ${nextLevel}!`;
+        toastDescription = `${monsterData.name} winces! Your Lvl ${currentQuizLevel} knowledge dealt ${monsterDamage} damage. Health: ${newHealth.toFixed(1)}%. You earned ${POINTS_FOR_CORRECT_QUIZ_ANSWER} points.`;
+
+        const nextLevel = currentQuizLevel + 1;
+        if (currentQuizLevel === MAX_QUIZ_LEVEL) {
+          totalPointsAwarded += PERFECT_LEVEL_10_BONUS_POINTS;
+          toastDescription += ` Max Level ${MAX_QUIZ_LEVEL} Mastered! +${PERFECT_LEVEL_10_BONUS_POINTS} Bonus Points!`;
+        } else if (nextLevel > MAX_BASIC_QUIZ_LEVEL && nextLevel <= MAX_QUIZ_LEVEL) {
+          if (currentQuizLevel === MAX_BASIC_QUIZ_LEVEL) {
+             setShowPremiumUpgradePrompt(true); 
+             toastDescription += ` You've mastered Level ${currentQuizLevel}! Advanced levels require Premium.`;
+             setCurrentQuizLevel(nextLevel); 
+          } else {
+              setCurrentQuizLevel(nextLevel);
+              toastDescription += ` Leveled up to Quiz Level ${nextLevel}!`;
+          }
+        } else { 
+          setCurrentQuizLevel(nextLevel);
+          toastDescription += ` Leveled up to Quiz Level ${nextLevel}!`;
         }
-      } else { 
-        setCurrentQuizLevel(nextLevel);
-        toastDescription += ` Leveled up to Quiz Level ${nextLevel}!`;
-      }
-      addPoints(totalPointsAwarded);
-      if (!checkMonsterDeath(newHealth, `a correct Lvl ${currentQuizLevel} answer`)) {
-        toast({ title: "Correct!", description: toastDescription, duration: 7000 });
-      }
-    } else {
-      toastDescription = `${monsterName} scoffs: "Your ignorance at Level ${currentQuizLevel} is amusing." The correct answer was: ${quizData.correctAnswer}.`;
-      toast({ title: "Incorrect!", description: toastDescription, variant: "destructive", duration: 7000 });
-    }
 
-    setLastQuizAttemptDate(getCurrentDateString());
-    setHasAttemptedQuizToday(true);
+        // Add points
+        await firestoreService.addPoints(user.uid, totalPointsAwarded);
+        await refreshUserProfile();
+
+        if (!(await checkMonsterDeath(newHealth, `a correct Lvl ${currentQuizLevel} answer`))) {
+          toast({ 
+            title: "Correct!", 
+            description: toastDescription, 
+            duration: 7000 
+          });
+        }
+      } else {
+        toastDescription = `${monsterData.name} scoffs: "Your ignorance at Level ${currentQuizLevel} is amusing." The correct answer was: ${quizData.correctAnswer}.`;
+        toast({ 
+          title: "Incorrect!", 
+          description: toastDescription, 
+          variant: "destructive", 
+          duration: 7000 
+        });
+      }
+
+      // Save completion data
+      const today = getCurrentDateString();
+      await firestoreService.setCompletion(user.uid, 'quiz', {
+        currentLevel: currentQuizLevel,
+        answeredCorrectly: isCorrect,
+        completedAt: new Date().toISOString()
+      });
+
+      setHasAttemptedQuizToday(true);
+    } catch (error) {
+      console.error('Error handling answer selection:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process quiz answer.",
+        variant: "destructive"
+      });
+    }
   };
   
   const getHealthBarValue = () => {
-      if (monsterHealth === null) return 0;
+      if (!monsterData) return 0;
       const range = MAX_MONSTER_HEALTH - MONSTER_DEATH_THRESHOLD;
-      const currentValInRange = monsterHealth - MONSTER_DEATH_THRESHOLD;
+      const currentValInRange = monsterData.health - MONSTER_DEATH_THRESHOLD;
       return Math.max(0, Math.min((currentValInRange / range) * 100, 100));
   };
 
   const handleGetNextQuestion = () => {
     if (showPremiumUpgradePrompt) return; // If prompt is shown, don't fetch new question.
     fetchQuizQuestion(currentQuizLevel);
-  }
+  };
 
   if (!isClientReady) {
     return <LoadingPlaceholder />;
   }
 
+  if (!user) {
+    return (
+      <Card className="max-w-lg mx-auto">
+        <CardHeader>
+          <CardTitle className="font-headline flex items-center gap-2">
+            <HelpCircle className="h-6 w-6 text-primary" />
+            Authentication Required
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-muted-foreground mb-4">Please log in to challenge your knowledge!</p>
+          <Button asChild className="w-full">
+            <Link href="/login">Log In</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (!isMonsterActuallyGenerated) {
     return (
       <Card className="max-w-lg mx-auto">
-        <CardHeader><CardTitle className="font-headline flex items-center gap-2"><HelpCircle />Monster Required</CardTitle></CardHeader>
-        <CardContent><p className="text-center text-muted-foreground mb-4">Create your monster to challenge its knowledge!</p>
-          <Button asChild className="w-full"><Link href="/create-monster"><Sparkles className="mr-2 h-4 w-4"/>Create Your Monster</Link></Button>
+        <CardHeader>
+          <CardTitle className="font-headline flex items-center gap-2">
+            <HelpCircle className="h-6 w-6 text-primary" />
+            Monster Required
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-muted-foreground mb-4">Create your monster to challenge its knowledge!</p>
+          <Button asChild className="w-full">
+            <Link href="/create-monster">
+              <Sparkles className="mr-2 h-4 w-4"/>
+              Create Your Monster
+            </Link>
+          </Button>
         </CardContent>
       </Card>
     );
@@ -285,17 +355,26 @@ export default function KnowledgeNuggetQuizPage() {
   return (
     <div className="grid lg:grid-cols-3 gap-6">
       <div className="lg:col-span-1 space-y-6">
-        {monsterName && monsterImageUrl && monsterHealth !== null && (
+        {monsterData && (
           <Card className={cn(showDamageEffect && 'animate-damage-flash')}>
             <CardHeader className="items-center text-center">
               <Link href="/my-profile">
-                <Image src={monsterImageUrl} alt={monsterName} width={100} height={100} className="rounded-full border-2 border-primary shadow-md mx-auto cursor-pointer hover:opacity-80 transition-opacity" data-ai-hint="generated monster"/>
+                <Image 
+                  src={monsterData.imageUrl} 
+                  alt={monsterData.name} 
+                  width={100} 
+                  height={100} 
+                  className="rounded-full border-2 border-primary shadow-md mx-auto cursor-pointer hover:opacity-80 transition-opacity" 
+                  data-ai-hint="generated monster"
+                />
               </Link>
-              <CardTitle className="font-headline text-xl pt-2">{monsterName}</CardTitle>
+              <CardTitle className="font-headline text-xl pt-2">{monsterData.name}</CardTitle>
               <Badge variant="outline" className="mt-1">Quiz Level: {currentQuizLevel}</Badge>
             </CardHeader>
             <CardContent className="text-center">
-              <Label htmlFor="monster-health-quiz" className="text-sm font-medium block mb-1">Monster Health: {monsterHealth.toFixed(1)}%</Label>
+              <Label htmlFor="monster-health-quiz" className="text-sm font-medium block mb-1">
+                Monster Health: {monsterData.health.toFixed(1)}%
+              </Label>
               <Progress id="monster-health-quiz" value={getHealthBarValue()} className="w-full h-2.5" />
               <p className="text-xs text-muted-foreground mt-1">Base Damage: {MONSTER_HP_REDUCTION_BASE + currentQuizLevel} HP</p>
             </CardContent>
@@ -306,7 +385,10 @@ export default function KnowledgeNuggetQuizPage() {
       <div className="lg:col-span-2 space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline flex items-center gap-2"><Lightbulb className="h-6 w-6 text-primary"/>Knowledge Nugget Quiz</CardTitle>
+            <CardTitle className="font-headline flex items-center gap-2">
+              <Lightbulb className="h-6 w-6 text-primary"/>
+              Knowledge Nugget Quiz
+            </CardTitle>
             <CardDescription>
               Test your knowledge. Level {currentQuizLevel}/{MAX_QUIZ_LEVEL}. Correct answers empower you and weaken your monster! One attempt per day.
               Levels {MAX_BASIC_QUIZ_LEVEL + 1}-{MAX_QUIZ_LEVEL} are a Premium feature.
@@ -336,7 +418,7 @@ export default function KnowledgeNuggetQuizPage() {
             {isLoadingQuiz && !hasAttemptedQuizToday && !showPremiumUpgradePrompt && (
               <div className="flex items-center justify-center p-10">
                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                <p className="ml-3 text-muted-foreground">{monsterName || "The AI"} is preparing a Level {currentQuizLevel} question...</p>
+                <p className="ml-3 text-muted-foreground">{monsterData?.name || "The AI"} is preparing a Level {currentQuizLevel} question...</p>
               </div>
             )}
             {error && !isLoadingQuiz && !hasAttemptedQuizToday && !showPremiumUpgradePrompt && (
