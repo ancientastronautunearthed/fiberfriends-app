@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+// Assuming 'generateAffirmationAction' is the correct export from './actions'
 import { generateAffirmationAction } from './actions';
 import type { AffirmationOutput } from '@/ai/flows/affirmation-generation-flow';
 import { useAuth } from '@/context/auth-context';
@@ -256,9 +257,9 @@ export default function AffirmationAmplifierPage() {
     if (!monsterData?.voiceConfig || isSpeaking || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    if (monsterData.voiceConfig.voiceURI) {
+    if (monsterData.voiceConfig && monsterData.voiceConfig.voiceURI) {
         const voices = speechSynthesis.getVoices();
-        const selectedVoice = voices.find(v => v.voiceURI === monsterData.voiceConfig.voiceURI);
+        const selectedVoice = voices.find(v => v.voiceURI === monsterData.voiceConfig!.voiceURI);
         if (selectedVoice) utterance.voice = selectedVoice;
     }
     utterance.pitch = monsterData.voiceConfig.pitch;
