@@ -20,8 +20,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const AI_DIETICIAN_KEY = 'aiDietician';
 const AI_DIET_PLAN_KEY = 'aiDietPlan';
-const SYMPTOM_JOURNAL_KEY = 'symptomJournal';
-
+// This key now matches the one used in the Symptom Journal page.
+const SYMPTOM_JOURNAL_ENTRIES_KEY = 'fiberFriendsSymptomJournalEntries';
 
 interface AIDietician {
   name: string;
@@ -47,6 +47,17 @@ interface DietPlan {
   restrictions: string[];
 }
 
+// This interface matches the data structure from the Symptom Journal.
+interface SymptomEntry {
+  id: string;
+  date: string;
+  symptoms: string[];
+  notes: string;
+  photoDataUri?: string;
+  photoAiHint?: string;
+}
+
+
 // Data for the selection menus
 const dietaryRestrictionOptions = ['Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Keto', 'Paleo', 'Low-FODMAP', 'Soy-Free', 'Nut-Free'];
 const allergyOptions = ['Peanuts', 'Tree Nuts', 'Dairy', 'Eggs', 'Soy', 'Wheat', 'Shellfish', 'Fish', 'Nightshades', 'Histamine Intolerance'];
@@ -66,8 +77,6 @@ export default function CreateDieticianPage() {
   
   const [gender, setGender] = useState('');
   const [dieticianType, setDieticianType] = useState('');
-  // Specialization state is no longer needed
-  // const [specialization, setSpecialization] = useState(''); 
   const [communicationStyle, setCommunicationStyle] = useState('');
   const [additionalTraits, setAdditionalTraits] = useState('');
   
@@ -82,33 +91,34 @@ export default function CreateDieticianPage() {
   
   const [error, setError] = useState<string | null>(null);
   
-  // NEW: State to hold symptoms from journal. `undefined` means we haven't checked yet.
   const [symptoms, setSymptoms] = useState<string[] | undefined>(undefined);
 
   useEffect(() => {
-    // Check for symptoms from the journal first
-    const storedJournal = localStorage.getItem(SYMPTOM_JOURNAL_KEY);
-    if (storedJournal) {
+    // Correctly load and parse symptoms from the Symptom Journal's localStorage.
+    const storedEntriesRaw = localStorage.getItem(SYMPTOM_JOURNAL_ENTRIES_KEY);
+    if (storedEntriesRaw) {
       try {
-        const journalData = JSON.parse(storedJournal);
-        const symptomEntries = Array.isArray(journalData) 
-          ? journalData.map((entry: { symptom: string }) => entry.symptom).filter(Boolean)
-          : [];
-        setSymptoms(symptomEntries);
+        const parsedEntries = JSON.parse(storedEntriesRaw) as SymptomEntry[];
+        // We use a Set to ensure we only have unique symptom names.
+        const allSymptoms = new Set<string>();
+        parsedEntries.forEach(entry => {
+          entry.symptoms.forEach(symptom => allSymptoms.add(symptom));
+        });
+        setSymptoms(Array.from(allSymptoms));
       } catch (error) {
-        console.error("Failed to parse symptom journal:", error);
-        setSymptoms([]); // Assume no symptoms if parsing fails
+        console.error("Failed to parse symptom journal entries:", error);
+        setSymptoms([]);
       }
     } else {
-      setSymptoms([]); // No journal found
+      setSymptoms([]);
     }
 
     const storedDietician = localStorage.getItem(AI_DIETICIAN_KEY);
     if (storedDietician) {
       setDietician(JSON.parse(storedDietician));
-      setCurrentStep(3); 
+      setCurrentStep(3);
     }
-    
+
     const storedDietPlan = localStorage.getItem(AI_DIET_PLAN_KEY);
     if (storedDietPlan) {
       setDietPlan(JSON.parse(storedDietPlan));
@@ -116,7 +126,6 @@ export default function CreateDieticianPage() {
   }, []);
 
   const handleCreateDietician = () => {
-    // UPDATE: Removed `specialization` from validation
     if (!gender || !dieticianType || !communicationStyle) {
       setError('Please fill in all required fields');
       return;
@@ -128,10 +137,9 @@ export default function CreateDieticianPage() {
         const result = await generateDieticianAction({
           gender,
           type: dieticianType,
-          // specialization is no longer passed
           communicationStyle,
           additionalTraits,
-          symptoms: symptoms || [], // Pass symptoms to the action
+          symptoms: symptoms || [],
         });
         
         setDietician(result);
@@ -175,7 +183,7 @@ export default function CreateDieticianPage() {
           mealPrepTime,
           budget,
           dieticianName: dietician?.name || 'Your AI Dietician',
-          symptoms: symptoms || [], // Pass symptoms to this action as well
+          symptoms: symptoms || [],
         });
         
         setDietPlan(result);
@@ -206,7 +214,6 @@ export default function CreateDieticianPage() {
     
     setGender('');
     setDieticianType('');
-    // setSpecialization(''); // No longer needed
     setCommunicationStyle('');
     setAdditionalTraits('');
     setDietaryRestrictions('');
@@ -237,7 +244,6 @@ export default function CreateDieticianPage() {
 
   const progressValue = dietician ? 100 : (currentStep === 1 ? 33 : 66);
 
-  // NEW: While checking for symptoms, show a loading state.
   if (symptoms === undefined) {
       return (
           <div className="container mx-auto flex items-center justify-center min-h-[60vh]">
@@ -246,7 +252,6 @@ export default function CreateDieticianPage() {
       );
   }
 
-  // NEW: If no symptoms are logged AND no dietician exists yet, block the form.
   if (symptoms.length === 0 && !dietician) {
       return (
           <div className="container mx-auto max-w-2xl py-8">
@@ -350,34 +355,11 @@ export default function CreateDieticianPage() {
                 </SelectContent>
               </Select>
             </div>
-
-            {/* THIS ENTIRE DIV IS REMOVED
-            <div>
-              <Label htmlFor="specialization" className="text-base font-semibold mb-3 block">
-                Specialization *
-              </Label>
-              <Select value={specialization} onValueChange={setSpecialization}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select specialization" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="anti-inflammatory">Anti-Inflammatory Specialist</SelectItem>
-                  <SelectItem value="gut-health">Gut Health Expert</SelectItem>
-                  <SelectItem value="immune-support">Immune System Support</SelectItem>
-                  <SelectItem value="holistic">Holistic Nutrition</SelectItem>
-                  <SelectItem value="functional">Functional Medicine</SelectItem>
-                  <SelectItem value="plant-based">Plant-Based Specialist</SelectItem>
-                  <SelectItem value="traditional">Traditional Medicine</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            */}
-
           </CardContent>
           <CardFooter>
             <Button 
               onClick={() => setCurrentStep(2)} 
-              disabled={!gender || !dieticianType} // UPDATE: `specialization` removed from check
+              disabled={!gender || !dieticianType}
               className="w-full"
             >
               Next Step

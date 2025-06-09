@@ -1,10 +1,9 @@
-
 'use client';
 
 import React, { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, firebaseConfigError } from '@/lib/firebase'; // Import auth and the potential config error
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,31 +25,58 @@ export default function LoginPage() {
     event.preventDefault();
     setError(null);
 
+    // --- FIX V2 START ---
+    // The logic is moved inside the startTransition callback to ensure
+    // TypeScript correctly infers the type of 'auth'.
     startTransition(async () => {
+      // First, check if the auth object is available.
+      if (!auth) {
+        const errorMessage = firebaseConfigError || "Firebase is not configured correctly. Cannot log in.";
+        setError(errorMessage);
+        toast({
+            title: 'Configuration Error',
+            description: errorMessage,
+            variant: 'destructive',
+        });
+        return; // Stop the function if auth is not available
+      }
+
       try {
+        // At this point, TypeScript knows `auth` is not null.
         await signInWithEmailAndPassword(auth, email, password);
+        
         toast({
           title: 'Login Successful',
           description: 'Welcome back to Fiber Friends!',
         });
         router.push('/'); // Redirect to home or dashboard after login
+
       } catch (e: any) {
-        setError(e.message || 'Failed to login. Please check your credentials.');
+        // Provide more user-friendly error messages for common cases
+        let errorMessage = 'An unexpected error occurred. Please try again.';
+        if (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-email') {
+            errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+        } else if (e.message) {
+            errorMessage = e.message;
+        }
+        
+        setError(errorMessage);
         toast({
           title: 'Login Failed',
-          description: e.message || 'Please check your credentials.',
+          description: errorMessage,
           variant: 'destructive',
         });
       }
     });
+     // --- FIX V2 END ---
   };
 
   return (
     <div className="flex items-center justify-center min-h-screen px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-headline">Login to Fiber Friends</CardTitle>
-          <CardDescription>Access your account and connect with the community.</CardDescription>
+          <CardTitle className="text-2xl font-headline">Welcome Back</CardTitle>
+          <CardDescription>Log in to continue your journey with Fiber Friends.</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">

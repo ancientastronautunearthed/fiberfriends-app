@@ -1,6 +1,6 @@
-
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
+import { getFirestore, type Firestore } from 'firebase/firestore'; // Import firestore
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -14,9 +14,9 @@ const firebaseConfig = {
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
+let db: Firestore | null = null; // Add db variable
 let firebaseConfigError: string | null = null;
 
-// Check if running in demo mode
 const IS_DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
 if (
@@ -33,7 +33,6 @@ if (
     "Authentication and Firebase-dependent features will not work.";
   
   if (!IS_DEMO_MODE) {
-    // Only log the error to console if not in demo mode, to keep console cleaner during demo dev
     console.error("Firebase Init Error:", firebaseConfigError);
   }
 } else {
@@ -41,6 +40,7 @@ if (
     try {
       app = initializeApp(firebaseConfig);
       auth = getAuth(app);
+      db = getFirestore(app); // Initialize Firestore
     } catch (e) {
       firebaseConfigError = `Firebase initialization failed: ${e instanceof Error ? e.message : String(e)}`;
       if (!IS_DEMO_MODE) {
@@ -48,19 +48,22 @@ if (
       }
       app = null; 
       auth = null; 
+      db = null;
     }
   } else {
     app = getApps()[0]!;
     try {
         auth = getAuth(app);
+        db = getFirestore(app); // Initialize Firestore for existing app
     } catch (e) {
-        firebaseConfigError = `Firebase getAuth failed: ${e instanceof Error ? e.message : String(e)}`;
+        firebaseConfigError = `Firebase getAuth/getFirestore failed: ${e instanceof Error ? e.message : String(e)}`;
         if (!IS_DEMO_MODE) {
-            console.error("Firebase getAuth Error:", firebaseConfigError);
+            console.error("Firebase getAuth/getFirestore Error:", firebaseConfigError);
         }
         auth = null;
+        db = null;
     }
   }
 }
 
-export { app, auth, firebaseConfigError };
+export { app, auth, db, firebaseConfigError }; // Export db

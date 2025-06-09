@@ -1,7 +1,8 @@
-
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useTransition } from 'react';
+import { useAuth } from '@/context/auth-context'; // Import useAuth to get the current user
+import { saveSymptomEntry, getSymptomEntries, deleteSymptomEntry } from './actions'; // Import server actions
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,23 +11,25 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Paperclip, BarChartHorizontalBig, PlusCircle, X, Trash2 } from "lucide-react";
+import { CalendarIcon, BarChartHorizontalBig, PlusCircle, X, Trash2, Loader2 } from "lucide-react"; // Added Loader2
 import { format, parseISO } from "date-fns";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell } from 'recharts';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useToast } from '@/hooks/use-toast';
 
-const SYMPTOM_JOURNAL_ENTRIES_KEY = 'fiberFriendsSymptomJournalEntries';
 
-interface SymptomEntry {
-  id: string;
-  date: string; // Store as YYYY-MM-DD string
+// This interface now matches the data structure coming from Firestore
+export interface SymptomEntry {
+  id: string; // The document ID from Firestore
+  userId: string;
+  date: string; // Stored as yyyy-MM-dd string
   symptoms: string[];
   notes: string;
   photoDataUri?: string;
-  photoAiHint?: string;
+  createdAt: string; // ISO string from Firestore's Timestamp
 }
 
 interface ProcessedChartData {
@@ -49,36 +52,41 @@ const staticChartConfig = {
 
 
 export default function SymptomJournalPage() {
+  const { user } = useAuth(); // Get the authenticated user
+  const { toast } = useToast();
+
+  // State for form inputs remains the same
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [currentSymptoms, setCurrentSymptoms] = useState<string[]>([]);
   const [customSymptom, setCustomSymptom] = useState('');
   const [notes, setNotes] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  
+  // State for entries and chart data remains the same
   const [entries, setEntries] = useState<SymptomEntry[]>([]);
   const [processedChartData, setProcessedChartData] = useState<ProcessedChartData[]>([]);
   const [dynamicChartConfig, setDynamicChartConfig] = useState<ChartConfig>(staticChartConfig);
 
+  // useTransition is used to manage the loading state of server actions
+  const [isPending, startTransition] = useTransition();
 
+  // --- DATA FETCHING (Replaced localStorage with Firestore) ---
   useEffect(() => {
-    const storedEntriesRaw = localStorage.getItem(SYMPTOM_JOURNAL_ENTRIES_KEY);
-    if (storedEntriesRaw) {
-      try {
-        const parsedEntries = JSON.parse(storedEntriesRaw) as SymptomEntry[];
-        // Dates are already strings, no need to parse to Date objects for internal state
-        setEntries(parsedEntries);
-      } catch (error) {
-        console.error("Error parsing symptom journal entries from localStorage:", error);
-        setEntries([]);
-      }
+    // Only fetch data if the user is logged in
+    if (user?.uid) {
+      startTransition(async () => {
+        const fetchedEntries = await getSymptomEntries(user.uid);
+        if (Array.isArray(fetchedEntries)) {
+            setEntries(fetchedEntries as SymptomEntry[]);
+        }
+      });
     }
-  }, []);
+  }, [user]); // Rerun this effect when the user object changes
 
+  // --- CHART DATA PROCESSING (No changes needed) ---
+  // This useEffect still works perfectly as it just depends on the 'entries' state
   useEffect(() => {
-    if (entries.length > 0 || localStorage.getItem(SYMPTOM_JOURNAL_ENTRIES_KEY)) { // Save even if entries becomes empty to clear storage
-        localStorage.setItem(SYMPTOM_JOURNAL_ENTRIES_KEY, JSON.stringify(entries));
-    }
-
     const symptomCounts: { [key: string]: number } = entries.reduce((acc, entry) => {
       entry.symptoms.forEach(symptom => {
         const s = symptom.trim().toLowerCase();
@@ -106,6 +114,7 @@ export default function SymptomJournalPage() {
 
   }, [entries]);
 
+  // --- FORM HANDLERS (No changes needed) ---
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -137,35 +146,84 @@ export default function SymptomJournalPage() {
   const handleRemoveSymptom = (symptomToRemove: string) => {
     setCurrentSymptoms(prev => prev.filter(s => s !== symptomToRemove));
   };
-
+  
+  // --- DELETE HANDLER (Replaced state update with server action) ---
   const handleDeleteEntry = (id: string) => {
-    setEntries(prevEntries => prevEntries.filter(entry => entry.id !== id));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedDate || currentSymptoms.length === 0) {
-      alert("Date and at least one symptom are required.");
+    if (!user?.uid) {
+      toast({ title: 'Error', description: 'You must be logged in to delete entries.', variant: 'destructive' });
       return;
     }
-    const newEntry: SymptomEntry = {
-      id: String(Date.now()),
-      date: format(selectedDate, "yyyy-MM-dd"), // Store as YYYY-MM-DD string
-      symptoms: currentSymptoms,
-      notes,
-      photoDataUri: photoPreview || undefined,
-      photoAiHint: photo ? 'medical symptom' : undefined,
-    };
-    setEntries(prevEntries => [newEntry, ...prevEntries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-
-    setSelectedDate(new Date());
-    setCurrentSymptoms([]);
-    setCustomSymptom('');
-    setNotes('');
-    setPhoto(null);
-    setPhotoPreview(null);
+    startTransition(async () => {
+      const result = await deleteSymptomEntry(id, user.uid);
+       if (result.error) {
+        toast({ title: 'Error', description: `Failed to delete entry: ${result.error}`, variant: 'destructive' });
+       } else {
+        toast({ title: 'Success', description: 'Entry deleted.' });
+        // Optimistically update the UI while revalidation happens
+        setEntries(prev => prev.filter(entry => entry.id !== id));
+       }
+    });
   };
 
+  // --- SUBMIT HANDLER (Replaced localStorage with Firestore server action) ---
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.uid) {
+      toast({ title: 'Authentication Error', description: 'You must be logged in to save entries.', variant: 'destructive' });
+      return;
+    }
+    if (!selectedDate || currentSymptoms.length === 0) {
+       toast({ title: 'Missing Information', description: 'Date and at least one symptom are required.', variant: 'destructive' });
+      return;
+    }
+
+    startTransition(async () => {
+        const newEntryData = {
+          date: format(selectedDate, "yyyy-MM-dd"),
+          symptoms: currentSymptoms,
+          notes,
+          photoDataUri: photoPreview || undefined,
+        };
+
+        const result = await saveSymptomEntry(newEntryData, user.uid);
+
+        if (result.error) {
+            toast({ title: 'Error', description: `Failed to save entry: ${result.error}`, variant: 'destructive' });
+        } else {
+            toast({ title: 'Success!', description: 'Your symptom entry has been saved.' });
+            // Reset form after successful submission
+            setSelectedDate(new Date());
+            setCurrentSymptoms([]);
+            setCustomSymptom('');
+            setNotes('');
+            setPhoto(null);
+            setPhotoPreview(null);
+
+            // Optimistically add the new entry to the UI while revalidation happens in the background
+            if (result.newEntry) {
+              setEntries(prev => [result.newEntry as SymptomEntry, ...prev].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+            }
+        }
+    });
+  };
+  
+  if (!user) {
+    return (
+        <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+            <Card className="w-full max-w-md text-center p-8">
+                <CardTitle>Please Log In</CardTitle>
+                <CardDescription className="mt-2">
+                    You need to be logged in to access your symptom journal.
+                </CardDescription>
+                <Button asChild className="mt-4">
+                    <a href="/login">Go to Login</a>
+                </Button>
+            </Card>
+        </div>
+    );
+  }
+
+  // --- RENDERED JSX (Added 'disabled' state for buttons) ---
   return (
     <div className="grid md:grid-cols-2 gap-6">
       <div className="space-y-6">
@@ -184,6 +242,7 @@ export default function SymptomJournalPage() {
                       id="date-picker"
                       variant={"outline"}
                       className="w-full justify-start text-left font-normal"
+                      disabled={isPending}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
@@ -195,6 +254,7 @@ export default function SymptomJournalPage() {
                       selected={selectedDate}
                       onSelect={setSelectedDate}
                       initialFocus
+                      disabled={isPending}
                     />
                   </PopoverContent>
                 </Popover>
@@ -209,6 +269,7 @@ export default function SymptomJournalPage() {
                         id={`symptom-${symptom.toLowerCase().replace(/\s+/g, '-')}`}
                         checked={currentSymptoms.includes(symptom)}
                         onCheckedChange={(checked) => handleCommonSymptomChange(symptom, !!checked)}
+                        disabled={isPending}
                       />
                       <Label htmlFor={`symptom-${symptom.toLowerCase().replace(/\s+/g, '-')}`} className="font-normal text-sm">
                         {symptom}
@@ -226,8 +287,9 @@ export default function SymptomJournalPage() {
                     value={customSymptom}
                     onChange={(e) => setCustomSymptom(e.target.value)}
                     placeholder="e.g., Tingling in hands"
+                    disabled={isPending}
                   />
-                  <Button type="button" variant="outline" size="icon" onClick={handleAddCustomSymptom} aria-label="Add custom symptom">
+                  <Button type="button" variant="outline" size="icon" onClick={handleAddCustomSymptom} aria-label="Add custom symptom" disabled={isPending}>
                     <PlusCircle className="h-4 w-4" />
                   </Button>
                 </div>
@@ -246,6 +308,7 @@ export default function SymptomJournalPage() {
                           className="h-4 w-4 p-0.5 hover:bg-destructive/20"
                           onClick={() => handleRemoveSymptom(symptom)}
                           aria-label={`Remove ${symptom}`}
+                          disabled={isPending}
                         >
                           <X className="h-3 w-3" />
                         </Button>
@@ -257,11 +320,11 @@ export default function SymptomJournalPage() {
 
               <div>
                 <Label htmlFor="notes">Notes</Label>
-                <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any observations, triggers, or context..." />
+                <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any observations, triggers, or context..." disabled={isPending}/>
               </div>
               <div>
                 <Label htmlFor="photo">Attach Photo (optional)</Label>
-                <Input id="photo" type="file" accept="image/*" onChange={handleFileChange} />
+                <Input id="photo" type="file" accept="image/*" onChange={handleFileChange} disabled={isPending}/>
                 {photoPreview && (
                   <div className="mt-2">
                     <Image src={photoPreview} alt="Symptom photo preview" width={150} height={150} className="rounded-md object-cover border" data-ai-hint="medical symptom" />
@@ -270,7 +333,10 @@ export default function SymptomJournalPage() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button type="submit" className="w-full">Add Entry</Button>
+              <Button type="submit" className="w-full" disabled={isPending}>
+                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {isPending ? 'Saving...' : 'Add Entry'}
+              </Button>
             </CardFooter>
           </form>
         </Card>
@@ -281,20 +347,12 @@ export default function SymptomJournalPage() {
             <CardDescription>Visualize your symptom patterns over time. Shows frequency of logged symptoms.</CardDescription>
           </CardHeader>
           <CardContent>
-            {processedChartData.length > 0 ? (
+            {isPending && entries.length === 0 ? (<div className="flex justify-center items-center h-[250px]"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>) :
+            processedChartData.length > 0 ? (
               <ChartContainer config={dynamicChartConfig} className="min-h-[250px] w-full">
                 <BarChart accessibilityLayer data={processedChartData} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
                   <CartesianGrid horizontal={false} />
-                  <YAxis
-                    dataKey="name"
-                    type="category"
-                    tickLine={false}
-                    tickMargin={5}
-                    axisLine={false}
-                    className="text-xs"
-                    width={100}
-                    interval={0}
-                  />
+                  <YAxis dataKey="name" type="category" tickLine={false} tickMargin={5} axisLine={false} className="text-xs" width={100} interval={0} />
                   <XAxis dataKey="count" type="number" hide />
                   <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" nameKey="name" />} />
                   <Bar dataKey="count" layout="vertical" radius={5}>
@@ -305,7 +363,7 @@ export default function SymptomJournalPage() {
                 </BarChart>
               </ChartContainer>
             ) : (
-              <p className="text-muted-foreground text-sm">No symptom data to display in chart. Add some entries first!</p>
+              <p className="text-muted-foreground text-sm text-center py-8">No symptom data to display. Add some entries first!</p>
             )}
           </CardContent>
         </Card>
@@ -317,13 +375,14 @@ export default function SymptomJournalPage() {
           <CardDescription>Review your past symptom logs.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 flex-grow">
-          <ScrollArea className="h-[calc(100vh-16rem)] pr-3"> {/* Adjust height as needed */}
-            {entries.length === 0 && <p className="text-muted-foreground">No entries yet. Add your first one!</p>}
-            {entries.map(entry => (
+          <ScrollArea className="h-[calc(100vh-16rem)] pr-3">
+             {isPending && entries.length === 0 ? (<div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>) :
+            entries.length === 0 ? (<p className="text-muted-foreground text-center pt-8">No entries yet. Add your first one!</p>) :
+            (entries.map(entry => (
               <Card key={entry.id} className="bg-card/50 mb-4">
                 <CardHeader className="pb-2 pt-4 flex flex-row justify-between items-start">
                   <CardTitle className="text-md">{format(parseISO(entry.date), "PPP")}</CardTitle>
-                  <Button variant="ghost" size="icon" onClick={() => handleDeleteEntry(entry.id)} aria-label="Delete entry" className="h-7 w-7">
+                  <Button variant="ghost" size="icon" onClick={() => handleDeleteEntry(entry.id)} aria-label="Delete entry" className="h-7 w-7" disabled={isPending}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </CardHeader>
@@ -337,12 +396,12 @@ export default function SymptomJournalPage() {
                   {entry.notes && <p className="mt-1"><strong>Notes:</strong> {entry.notes}</p>}
                   {entry.photoDataUri && (
                     <div className="mt-2">
-                      <Image src={entry.photoDataUri} alt="Symptom" width={100} height={100} className="rounded-md border object-cover" data-ai-hint={entry.photoDataUri.startsWith('https://placehold.co/') ? entry.photoAiHint : 'medical condition'} />
+                      <Image src={entry.photoDataUri} alt="Symptom" width={100} height={100} className="rounded-md border object-cover" data-ai-hint={'medical condition'} />
                     </div>
                   )}
                 </CardContent>
               </Card>
-            ))}
+            )))}
           </ScrollArea>
         </CardContent>
       </Card>
