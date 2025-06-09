@@ -1,8 +1,116 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // Users can only access their own profile
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId
+        && resource == null
+        && request.resource.data.keys().hasAll(['email', 'points', 'tier', 'createdAt', 'updatedAt'])
+        && request.resource.data.points is number
+        && request.resource.data.tier in ['NONE', 'CONTRIBUTOR', 'BRONZE', 'SILVER', 'GOLD'];
+    }
+    
+    // Users can only access their own monster
+    match /monsters/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId
+        && resource == null
+        && request.resource.data.keys().hasAll(['name', 'imageUrl', 'health', 'generated', 'createdAt', 'updatedAt'])
+        && request.resource.data.health is number
+        && request.resource.data.generated is bool;
+    }
+    
+    // Users can only access their own prescriptions
+    match /prescriptions/{prescriptionId} {
+      allow read, write, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null 
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasAll(['uid', 'prescriptionName', 'userComments', 'benefitScore', 'reasoning', 'isGraded', 'experienceType', 'createdAt', 'updatedAt'])
+        && request.resource.data.benefitScore is number
+        && request.resource.data.isGraded is bool
+        && request.resource.data.experienceType in ['beneficial', 'not-beneficial', 'neutral'];
+    }
+    
+    // Users can only access their own products
+    match /products/{productId} {
+      allow read, write, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null 
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasAll(['uid', 'productName', 'userNotes', 'benefitScore', 'isGraded', 'experienceType', 'createdAt', 'updatedAt'])
+        && request.resource.data.benefitScore is number
+        && request.resource.data.isGraded is bool
+        && request.resource.data.experienceType in ['beneficial', 'not-beneficial', 'neutral'];
+    }
+    
+    // Users can only access their own exercises
+    match /exercises/{exerciseId} {
+      allow read, write, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null 
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasAll(['uid', 'exerciseName', 'duration', 'userNotes', 'benefitScore', 'reasoning', 'isGraded', 'createdAt', 'updatedAt'])
+        && request.resource.data.benefitScore is number
+        && request.resource.data.isGraded is bool;
+    }
+    
+    // Users can only access their own foods
+    match /foods/{foodId} {
+      allow read, write, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null 
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasAll(['uid', 'foodName', 'userNotes', 'grade', 'healthImpact', 'reasoning', 'isGraded', 'createdAt', 'updatedAt'])
+        && request.resource.data.healthImpact is number
+        && request.resource.data.isGraded is bool
+        && request.resource.data.grade in ['good', 'bad', 'neutral'];
+    }
+    
+    // Users can only access their own symptoms
+    match /symptoms/{symptomId} {
+      allow read, write, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null 
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasAll(['uid', 'date', 'symptoms', 'notes', 'createdAt', 'updatedAt'])
+        && request.resource.data.symptoms is list
+        && request.resource.data.date is string
+        && request.resource.data.notes is string;
+    }
+    
+    // Users can only access their own streaks
+    match /streaks/{streakId} {
+      allow read, write: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null 
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasAll(['uid', 'type', 'date', 'count', 'updatedAt'])
+        && request.resource.data.type in ['prescription', 'product', 'exercise', 'food']
+        && request.resource.data.count is number
+        && request.resource.data.date is string;
+    }
+    
+    // Users can only access their own completions
+    match /completions/{completionId} {
+      allow read, write: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null 
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasAll(['uid', 'type', 'date', 'completedAt'])
+        && request.resource.data.type in ['affirmation', 'mindful-moment', 'kindness-challenge']
+        && request.resource.data.date is string;
+    }
+    
+    // Users can only access their own tomb entries
+    match /tomb/{tombId} {
+      allow read, write: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null 
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasAll(['uid', 'name', 'imageUrl', 'cause', 'diedAt'])
+        && request.resource.data.name is string
+        && request.resource.data.imageUrl is string
+        && request.resource.data.cause is string;
+    }
+    
+    // Deny all other access
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
     }
   }
 }
