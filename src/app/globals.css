@@ -165,7 +165,8 @@
   
   /* Button with ripple effect */
   .btn-ripple {
-    @apply relative overflow-hidden;
+    position: relative;
+    overflow: hidden;
     isolation: isolate;
   }
   

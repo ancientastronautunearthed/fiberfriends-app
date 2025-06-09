@@ -1,4 +1,4 @@
-import type {Config} from 'tailwindcss';
+import type { Config } from 'tailwindcss';
 
 export default {
   darkMode: ['class'],
@@ -285,8 +285,9 @@ export default {
   },
   plugins: [
     require('tailwindcss-animate'),
+    require('@tailwindcss/typography'), // Added typography plugin
     // Custom plugin for glass utilities
-    function({ addUtilities }) {
+    function({ addUtilities }: { addUtilities: any }) { // Typed the addUtilities parameter
       addUtilities({
         '.glass-sm': {
           backdropFilter: 'blur(4px)',
@@ -314,7 +315,7 @@ export default {
         },
         '.bg-grid': {
           backgroundImage: `linear-gradient(hsl(var(--border) / 0.2) 1px, transparent 1px),
-                           linear-gradient(90deg, hsl(var(--border) / 0.2) 1px, transparent 1px)`,
+                            linear-gradient(90deg, hsl(var(--border) / 0.2) 1px, transparent 1px)`,
           backgroundSize: '20px 20px',
         },
         '.bg-dots': {

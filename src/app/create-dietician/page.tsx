@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useTransition, useCallback } from 'react';
@@ -7,11 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Apple, ThumbsUp, ThumbsDown, MinusCircle, Info, Sparkles, Skull, Ghost, Sunrise, Sun, Moon, Coffee, ChefHat, ShoppingCart, HelpCircle, FileQuestion, Edit3, UserPlus } from "lucide-react";
+import { Loader2, Apple, ThumbsUp, ThumbsDown, MinusCircle, Info, Sparkles, Skull, Ghost, Sunrise, Sun, Moon, Coffee, ChefHat, ShoppingCart, HelpCircle, FileQuestion, Edit3 } from "lucide-react";
 import Image from "next/image";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { gradeFoodItemAction, suggestMealAction, generateRecipeAction } from './actions';
+import { gradeFoodItemAction, suggestMealAction, generateRecipeAction } from '../food-log/actions';
 import type { FoodGradingOutput } from '@/ai/flows/food-grading-flow';
 import type { MealSuggestionOutput } from '@/ai/flows/meal-suggestion-flow';
 import type { RecipeGenerationOutput } from '@/ai/flows/recipe-generation-flow';
@@ -577,34 +578,20 @@ export default function FoodLogPage() {
           <CardHeader>
             <CardTitle className="font-headline flex items-center gap-2"><ChefHat className="h-6 w-6 text-primary"/>AI Chef: Meal & Recipe Creation</CardTitle>
             <CardDescription>
-              First, create your personalized AI Dietician. Then, ask for meal suggestions and generate recipes.
+              This is where {monsterName}'s "AI Chef" comes into play. First, ask the AI Chef for a meal suggestion (e.g., Breakfast).
+              Once suggested, you can then ask the AI Chef to generate a full recipe for that meal.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex flex-col gap-4">
-              <Button asChild className="w-full">
-                <Link href="/create-dietician">
-                  <UserPlus className="mr-2 h-4 w-4" /> Create or View Your AI Dietician
-                </Link>
-              </Button>
-              
-              <Separator />
-
-              <div>
-                <p className="text-center text-sm text-muted-foreground mb-4">Or get a quick meal suggestion:</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {(["breakfast", "lunch", "dinner", "snack"] as const).map((mealType) => {
-                    const Icon = mealType === "breakfast" ? Sunrise : mealType === "lunch" ? Sun : mealType === "dinner" ? Moon : Coffee;
-                    return (
-                      <Button key={mealType} variant="outline" onClick={() => handleSuggestMeal(mealType)} disabled={isSuggestingMeal || isGeneratingRecipe}>
-                        <Icon className="mr-2 h-4 w-4" />
-                        {mealType.charAt(0).toUpperCase() + mealType.slice(1)}
-                      </Button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+          <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {(["breakfast", "lunch", "dinner", "snack"] as const).map((mealType) => {
+              const Icon = mealType === "breakfast" ? Sunrise : mealType === "lunch" ? Sun : mealType === "dinner" ? Moon : Coffee;
+              return (
+                <Button key={mealType} variant="outline" onClick={() => handleSuggestMeal(mealType)} disabled={isSuggestingMeal || isGeneratingRecipe}>
+                  <Icon className="mr-2 h-4 w-4" />
+                  {mealType.charAt(0).toUpperCase() + mealType.slice(1)}
+                </Button>
+              );
+            })}
           </CardContent>
           {isSuggestingMeal && (
             <CardContent className="flex items-center justify-center p-4">
@@ -810,3 +797,5 @@ export default function FoodLogPage() {
     </TooltipProvider>
   );
 }
+
+    
