@@ -1,61 +1,21 @@
+'use client';
 
-"use client";
-
-import React, { useState, useEffect, useTransition, useCallback } from 'react';
+import React, { useState, useEffect, useTransition, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Trash2, Target, Award, ListChecks, ShieldCheck, Gem, Star, Info, Sparkles, Skull, HeartPulse, HelpCircle, Loader2 } from "lucide-react";
-import { Label } from '@/components/ui/label';
-import { gradeProductEffectAction } from './actions';
-import type { ProductEffectGradingOutput } from '@/ai/flows/product-effect-grading-flow';
-import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Loader2, Sparkles, Skull, HeartPulse, ShieldCheck, VenetianMask, Speaker, HelpCircle, Info } from "lucide-react"; 
+import Image from "next/image";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import Image from "next/image";
-import { showSocialProofToast } from '@/lib/social-proof-toast'; 
-
-
-interface ProductEntryClient extends ProductEffectGradingOutput {
-  id: string;
-  clientNotes?: string;
-  loggedAt: string;
-  isGraded: boolean;
-}
-
-const POINTS_PER_PRODUCT = 10;
-
-const TIERS = {
-  NONE: { name: "Contributor", points: 0, icon: null, benefits: "Keep contributing to unlock rewards!" },
-  BRONZE: { name: "Bronze Tier", points: 250, icon: Gem, benefits: "You've unlocked a 10% site-wide discount (including subscriptions)!" },
-  SILVER: { name: "Silver Tier", points: 500, icon: Star, benefits: "10% site-wide discount + eligible for e-book rewards!" },
-  GOLD: { name: "Gold Tier", points: 1000, icon: Award, benefits: "10% site-wide discount + FREE Premium Month!" },
-};
-
-const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
-const MONSTER_NAME_KEY = 'morgellonMonsterName';
-const MONSTER_HEALTH_KEY = 'morgellonMonsterHealth';
-const MONSTER_GENERATED_KEY = 'morgellonMonsterGenerated';
-const MONSTER_TOMB_KEY = 'morgellonMonsterTomb';
-const WORKING_PRODUCTS_KEY = 'workingProducts';
-const NOT_WORKING_PRODUCTS_KEY = 'notWorkingProducts';
-const USER_POINTS_KEY = 'userPoints';
-const MONSTER_LAST_RECOVERY_DATE_KEY = 'monsterLastRecoveryDate';
-const POSITIVE_PRODUCT_USAGE_STREAK_KEY = 'positiveProductUsageStreak';
-const PRODUCT_LOG_MILESTONE_INTERVAL = 5; 
-
-const PRODUCT_GRADE_CACHE_PREFIX = 'product_grade_cache_';
-const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
-
-interface CachedAIResponse<T> {
-  timestamp: number;
-  data: T;
-}
+import { generateAffirmationAction } from './actions';
+import type { AffirmationOutput } from '@/ai/flows/affirmation-generation-flow';
+import { useAuth } from '@/context/auth-context';
+import { firestoreService, type MonsterData } from '@/lib/firestore-service';
 
 const MONSTER_DEATH_THRESHOLD = -50;
 const MAX_MONSTER_HEALTH = 200;
@@ -63,609 +23,418 @@ const INITIAL_HEALTH_MIN = 80;
 const INITIAL_HEALTH_MAX = 100;
 const MIN_RECOVERY = 10;
 const MAX_RECOVERY = 20;
+const POINTS_FOR_AFFIRMATION = 10;
+const MONSTER_HP_REDUCTION_FOR_AFFIRMATION = 4;
+const AMPLIFY_DURATION_MS = 1500; 
 
-interface TombEntry {
-  name: string;
-  imageUrl: string;
-  diedAt: string;
-}
-
-interface StreakData {
-  date: string; // YYYY-MM-DD
-  count: number;
-}
+const defaultDemonicPitch = () => parseFloat((Math.random() * (0.5 - 0.1) + 0.1).toFixed(2));
+const defaultDemonicRate = () => parseFloat((Math.random() * (0.8 - 0.5) + 0.5).toFixed(2));
 
 function LoadingPlaceholder() {
   return (
-    <div className="flex items-center justify-center min-h-screen">
+    <div className="flex flex-col items-center justify-center min-h-[300px] w-full">
       <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      <p className="ml-3 text-muted-foreground">Loading Gear & Artifacts Tracker...</p>
+      <p className="mt-4 text-muted-foreground">Loading Affirmation Amplifier...</p>
     </div>
   );
 }
 
-
-export default function ProductTrackerPage() {
+export default function AffirmationAmplifierPage() {
   const [isClientReady, setIsClientReady] = useState(false);
   const [isMonsterActuallyGenerated, setIsMonsterActuallyGenerated] = useState(false);
 
-  const [workingProducts, setWorkingProducts] = useState<ProductEntryClient[]>([]);
-  const [notWorkingProducts, setNotWorkingProducts] = useState<ProductEntryClient[]>([]);
+  const [monsterData, setMonsterData] = useState<MonsterData | null>(null);
+  
+  const [affirmationData, setAffirmationData] = useState<AffirmationOutput | null>(null);
+  const [isAmplifying, setIsAmplifying] = useState(false);
+  const [amplificationProgress, setAmplificationProgress] = useState(0);
+  const [hasAmplifiedToday, setHasAmplifiedToday] = useState(false);
 
-  const [currentProductName, setCurrentProductName] = useState('');
-  const [currentProductNotes, setCurrentProductNotes] = useState('');
-
-  const [pastProductName, setPastProductName] = useState('');
-  const [pastProductNotes, setPastProductNotes] = useState('');
-
-  const [userPoints, setUserPoints] = useState(0);
-  const [currentTier, setCurrentTier] = useState(TIERS.NONE);
-
-  const [isGradingProduct, startGradingProductTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [isLoadingAffirmation, startLoadingAffirmationTransition] = useTransition();
+  const [showDamageEffect, setShowDamageEffect] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
-  const [monsterImageUrl, setMonsterImageUrl] = useState<string | null>(null);
-  const [monsterName, setMonsterName] = useState<string | null>(null);
-  const [monsterHealth, setMonsterHealth] = useState<number | null>(null);
-  const [showDamageEffect, setShowDamageEffect] = useState(false);
-  const [positiveProductUsageStreak, setPositiveProductUsageStreak] = useState<StreakData>({ date: '', count: 0});
+  const { user, refreshUserProfile } = useAuth();
 
+  const getCurrentDateString = () => new Date().toISOString().split('T')[0];
 
-  const updateStreak = useCallback((streakKey: string, setStreakState: React.Dispatch<React.SetStateAction<StreakData>>): number => {
-    if (typeof window === 'undefined') return 0;
-    const today = new Date().toISOString().split('T')[0];
-    const storedStreak = localStorage.getItem(streakKey);
-    let currentStreak: StreakData = { date: today, count: 0 };
+  const performNightlyRecovery = useCallback(async () => {
+    if (!user || !monsterData) return;
 
-    if (storedStreak) {
-      currentStreak = JSON.parse(storedStreak);
-      const lastDate = new Date(currentStreak.date);
-      const currentDate = new Date(today);
-
-      const diffTime = Math.abs(currentDate.getTime() - lastDate.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      if (today === currentStreak.date) {
-        // Already counted for today
-      } else if (diffDays === 1) {
-        currentStreak.count += 1; 
-      } else {
-        currentStreak.count = 1; 
-      }
-    } else {
-      currentStreak.count = 1; 
-    }
-    currentStreak.date = today;
-    localStorage.setItem(streakKey, JSON.stringify(currentStreak));
-    setStreakState(currentStreak);
-    return currentStreak.count;
-  }, []);
-
-
-  const performNightlyRecovery = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    const monsterGeneratedCheck = localStorage.getItem(MONSTER_GENERATED_KEY);
-    if (monsterGeneratedCheck !== 'true') return;
-
-    const storedName = localStorage.getItem(MONSTER_NAME_KEY);
-    const storedHealthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
-    if (!storedHealthStr || !storedName) return;
-
-    let currentHealthVal = parseFloat(storedHealthStr);
-    if (isNaN(currentHealthVal) || currentHealthVal <= MONSTER_DEATH_THRESHOLD) return;
-
-    const lastRecoveryDate = localStorage.getItem(MONSTER_LAST_RECOVERY_DATE_KEY);
+    const lastRecoveryDate = monsterData.lastRecoveryDate;
     const todayDateStr = new Date().toDateString();
 
-    if (lastRecoveryDate !== todayDateStr) {
+    if (lastRecoveryDate !== todayDateStr && monsterData.health > MONSTER_DEATH_THRESHOLD) {
       const recoveryAmount = Math.floor(Math.random() * (MAX_RECOVERY - MIN_RECOVERY + 1)) + MIN_RECOVERY;
-      const newHealth = Math.min(currentHealthVal + recoveryAmount, MAX_MONSTER_HEALTH);
+      const newHealth = Math.min(monsterData.health + recoveryAmount, MAX_MONSTER_HEALTH);
 
-      setMonsterHealth(newHealth);
-      localStorage.setItem(MONSTER_HEALTH_KEY, String(newHealth));
-      localStorage.setItem(MONSTER_LAST_RECOVERY_DATE_KEY, todayDateStr);
+      await firestoreService.updateMonsterData(user.uid, {
+        health: newHealth,
+        lastRecoveryDate: todayDateStr
+      });
+
+      setMonsterData(prev => prev ? { ...prev, health: newHealth, lastRecoveryDate: todayDateStr } : null);
 
       toast({
-        title: `${storedName} Stirs...`,
-        description: `Heh. While you slept, I regained ${recoveryAmount} health. I'm now at ${newHealth.toFixed(1)}%.`,
-        variant: "default",
-        duration: 7000,
+        title: `${monsterData.name} Regenerates`,
+        description: `It seems my power grew by ${recoveryAmount}HP overnight. Health: ${newHealth.toFixed(1)}%.`,
+        duration: 7000
       });
     }
+  }, [user, monsterData, toast]);
+
+  const fetchAffirmation = useCallback(() => {
+    setError(null);
+    setAffirmationData(null);
+    startLoadingAffirmationTransition(async () => {
+      try {
+        const result = await generateAffirmationAction();
+        setAffirmationData(result);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to fetch affirmation.");
+        toast({ 
+          title: "Affirmation Error", 
+          description: e instanceof Error ? e.message : "Unknown error fetching affirmation.", 
+          variant: "destructive" 
+        });
+      }
+    });
   }, [toast]);
 
   useEffect(() => {
-    setIsClientReady(true);
-    const isGenerated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
-    setIsMonsterActuallyGenerated(isGenerated);
-
-    if (isGenerated) {
-      const storedMonsterImage = localStorage.getItem(MONSTER_IMAGE_KEY);
-      const storedMonsterName = localStorage.getItem(MONSTER_NAME_KEY);
-      setMonsterImageUrl(storedMonsterImage);
-      setMonsterName(storedMonsterName);
-      const storedHealth = localStorage.getItem(MONSTER_HEALTH_KEY);
-      if (storedHealth) {
-        setMonsterHealth(parseFloat(storedHealth));
-      } else {
-        const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
-        setMonsterHealth(initialHealth);
-        localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
+    const loadData = async () => {
+      setIsClientReady(true);
+      
+      if (!user) {
+        setIsMonsterActuallyGenerated(false);
+        return;
       }
-       performNightlyRecovery();
-    }
 
-    const savedWorkingProducts = localStorage.getItem(WORKING_PRODUCTS_KEY);
-    if (savedWorkingProducts) setWorkingProducts(JSON.parse(savedWorkingProducts));
-
-    const savedNotWorkingProducts = localStorage.getItem(NOT_WORKING_PRODUCTS_KEY);
-    if (savedNotWorkingProducts) setNotWorkingProducts(JSON.parse(savedNotWorkingProducts));
-
-    const savedUserPoints = localStorage.getItem(USER_POINTS_KEY);
-    if (savedUserPoints) setUserPoints(parseInt(savedUserPoints, 10));
-
-    const savedProductUsageStreak = localStorage.getItem(POSITIVE_PRODUCT_USAGE_STREAK_KEY);
-    if (savedProductUsageStreak) setPositiveProductUsageStreak(JSON.parse(savedProductUsageStreak));
-
-  }, [performNightlyRecovery]);
-
-  const checkMonsterDeath = useCallback((currentHealth: number, cause: string) => {
-    if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterName && monsterImageUrl) {
-       if (typeof window === 'undefined') return true; // Avoid further localStorage ops during SSR/build
-       const tomb: TombEntry[] = JSON.parse(localStorage.getItem(MONSTER_TOMB_KEY) || '[]');
-       tomb.unshift({ name: monsterName, imageUrl: monsterImageUrl, diedAt: new Date().toISOString() });
-       localStorage.setItem(MONSTER_TOMB_KEY, JSON.stringify(tomb.slice(0, 50)));
-       localStorage.removeItem(MONSTER_IMAGE_KEY);
-       localStorage.removeItem(MONSTER_NAME_KEY);
-       localStorage.removeItem(MONSTER_HEALTH_KEY);
-       localStorage.removeItem(MONSTER_GENERATED_KEY);
-       setMonsterImageUrl(null); setMonsterName(null); setMonsterHealth(null);
-       setIsMonsterActuallyGenerated(false);
-       toast({
-         title: `${monsterName} Has Perished!`,
-         description: `Its reign of internal terror ends, falling to ${currentHealth.toFixed(1)}% health due to ${cause}. A new shadow will soon take its place... Create it now!`,
-         variant: "destructive", duration: Number.MAX_SAFE_INTEGER
-       });
-       router.push('/create-monster');
-       return true;
-     }
-     return false;
-   // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [monsterName, monsterImageUrl, router, toast]);
-
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && monsterHealth !== null && isMonsterActuallyGenerated && monsterName) {
-      localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
-      checkMonsterDeath(monsterHealth, "its own frail constitution");
-    }
-  }, [monsterHealth, monsterName, isMonsterActuallyGenerated, checkMonsterDeath]);
-
-  useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem(WORKING_PRODUCTS_KEY, JSON.stringify(workingProducts)); }, [workingProducts]);
-  useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem(NOT_WORKING_PRODUCTS_KEY, JSON.stringify(notWorkingProducts)); }, [notWorkingProducts]);
-  useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem(USER_POINTS_KEY, String(userPoints)); }, [userPoints]);
-  useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem(POSITIVE_PRODUCT_USAGE_STREAK_KEY, JSON.stringify(positiveProductUsageStreak)); }, [positiveProductUsageStreak]);
-
-
-  useEffect(() => {
-    if (userPoints >= TIERS.GOLD.points) setCurrentTier(TIERS.GOLD);
-    else if (userPoints >= TIERS.SILVER.points) setCurrentTier(TIERS.SILVER);
-    else if (userPoints >= TIERS.BRONZE.points) setCurrentTier(TIERS.BRONZE);
-    else setCurrentTier(TIERS.NONE);
-  }, [userPoints]);
-
-
-  const addPoints = () => setUserPoints(prevPoints => prevPoints + POINTS_PER_PRODUCT);
-
-  const processProductGradingResult = (
-    productId: string, 
-    aiResult: ProductEffectGradingOutput,
-    isCached: boolean
-) => {
-    setWorkingProducts(prev => prev.map(p => p.id === productId ? {
-      ...p,
-      benefitScore: aiResult.benefitScore,
-      reasoning: aiResult.reasoning,
-      productName: aiResult.productName,
-      isGraded: true,
-    } : p));
-    addPoints();
-    toast({
-      title: `${isCached ? "[Cache] " : ""}AI Analysis: ${aiResult.productName}`,
-      description: `It has a ${aiResult.benefitScore}/5 benefit. ${monsterName || 'The AI'} scoffs: 'As if I'd let that weaken me! ${aiResult.reasoning.substring(0,70)}...'`,
-      duration: Number.MAX_SAFE_INTEGER
-    });
-
-    const totalProductsLogged = workingProducts.length + notWorkingProducts.length;
-    if (totalProductsLogged > 0 && totalProductsLogged % PRODUCT_LOG_MILESTONE_INTERVAL === 0) {
-        if (typeof window !== 'undefined') showSocialProofToast(`${totalProductsLogged} product insights shared`, POINTS_PER_PRODUCT, true);
-    }
-};
-
-
-  const handleAddWorkingProduct = () => {
-    if (!currentProductName.trim() || !monsterName) return;
-    const tempId = Date.now().toString();
-    const productNameForGrading = currentProductName.trim();
-    const productNotesForGrading = currentProductNotes.trim();
-
-    const newProductPending: ProductEntryClient = {
-      id: tempId,
-      productName: productNameForGrading,
-      clientNotes: productNotesForGrading,
-      loggedAt: new Date().toISOString(),
-      benefitScore: 0,
-      reasoning: "Awaiting assessment...",
-      isGraded: false,
-    };
-    setWorkingProducts(prev => [newProductPending, ...prev]);
-
-    const cacheKey = `${PRODUCT_GRADE_CACHE_PREFIX}${productNameForGrading.toLowerCase()}_${(productNotesForGrading || "").toLowerCase()}`;
-    if (typeof window !== 'undefined') {
-        const cachedItemRaw = localStorage.getItem(cacheKey);
-        if (cachedItemRaw) {
-            try {
-                const cachedItem: CachedAIResponse<ProductEffectGradingOutput> = JSON.parse(cachedItemRaw);
-                if (Date.now() - cachedItem.timestamp < CACHE_DURATION_MS) {
-                    processProductGradingResult(tempId, cachedItem.data, true);
-                    setCurrentProductName(''); setCurrentProductNotes('');
-                    return; 
-                } else {
-                    localStorage.removeItem(cacheKey); // Stale
-                }
-            } catch (e) {
-                console.error("Error parsing product cache:", e);
-                localStorage.removeItem(cacheKey);
-            }
-        }
-    }
-
-    startGradingProductTransition(async () => {
       try {
-        const aiResult = await gradeProductEffectAction({
-          productName: productNameForGrading,
-          notes: productNotesForGrading
-        });
-        if (typeof window !== 'undefined') {
-            const newCachedItem: CachedAIResponse<ProductEffectGradingOutput> = { timestamp: Date.now(), data: aiResult };
-            localStorage.setItem(cacheKey, JSON.stringify(newCachedItem));
+        // Load monster data
+        const monster = await firestoreService.getMonsterData(user.uid);
+        if (monster && monster.generated) {
+          setMonsterData(monster);
+          setIsMonsterActuallyGenerated(true);
+
+          // If no health is set, initialize it
+          if (monster.health === undefined || monster.health === null) {
+            const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
+            await firestoreService.updateMonsterData(user.uid, { health: initialHealth });
+            setMonsterData(prev => prev ? { ...prev, health: initialHealth } : null);
+          }
+
+          // Check if user has already amplified today
+          const completion = await firestoreService.getCompletion(user.uid, 'affirmation');
+          if (completion) {
+            setHasAmplifiedToday(true);
+          }
+
+          // Perform nightly recovery
+          await performNightlyRecovery();
+          
+          // Fetch affirmation if not completed today
+          if (!completion) {
+            fetchAffirmation();
+          }
+        } else {
+          setIsMonsterActuallyGenerated(false);
         }
-        processProductGradingResult(tempId, aiResult, false);
-      } catch (e) {
-        const errorMsg = e instanceof Error ? e.message : "AI grading failed.";
-        setWorkingProducts(prev => prev.filter(p => p.id !== tempId));
+      } catch (error) {
+        console.error('Error loading data:', error);
         toast({
-            title: "Grading Error",
-            description: `${monsterName} cackles: 'The AI couldn't handle assessing ${productNameForGrading}! Pathetic! Error: ${errorMsg}'`,
-            variant: "destructive",
-            duration: Number.MAX_SAFE_INTEGER
+          title: "Loading Error",
+          description: "Failed to load your data. Please refresh the page.",
+          variant: "destructive"
         });
       }
-    });
-    setCurrentProductName('');
-    setCurrentProductNotes('');
-  };
-
-  const handleRemoveWorkingProduct = (id: string) => {
-    setWorkingProducts(prev => prev.filter(p => p.id !== id));
-  };
-
-  const handleAddNotWorkingProduct = () => {
-    if (!pastProductName.trim()) return;
-    const newProduct: ProductEntryClient = {
-      id: Date.now().toString(),
-      productName: pastProductName.trim(),
-      clientNotes: pastProductNotes.trim(),
-      loggedAt: new Date().toISOString(),
-      benefitScore: 0,
-      reasoning: 'User marked as "Did not work or had adverse effects".',
-      isGraded: true,
     };
-    setNotWorkingProducts(prev => [newProduct, ...prev]);
-    addPoints();
 
-    const totalProductsLogged = workingProducts.length + notWorkingProducts.length + 1;
-    if (totalProductsLogged > 0 && totalProductsLogged % PRODUCT_LOG_MILESTONE_INTERVAL === 0) {
-        if (typeof window !== 'undefined') showSocialProofToast(`${totalProductsLogged} product insights shared`, POINTS_PER_PRODUCT, true);
-    }
+    loadData();
+  }, [user, performNightlyRecovery, fetchAffirmation, toast]);
 
-    setPastProductName('');
-    setPastProductNotes('');
-  };
-
-  const handleRemoveNotWorkingProduct = (id: string) => {
-    setNotWorkingProducts(prev => prev.filter(p => p.id !== id));
-  };
-
-  const handleUseProduct = (product: ProductEntryClient) => {
-    if (!isMonsterActuallyGenerated || monsterHealth === null || !product.isGraded || !monsterName) return;
-
-    const STREAK_BONUS_PER_DAY = 0.02;
-    const MAX_STREAK_MODIFIER = 0.50;
-
-    const currentStreakCount = updateStreak(POSITIVE_PRODUCT_USAGE_STREAK_KEY, setPositiveProductUsageStreak);
-    const streakModifier = Math.min(currentStreakCount * STREAK_BONUS_PER_DAY, MAX_STREAK_MODIFIER);
-    const finalBenefitScore = product.benefitScore * (1 + streakModifier);
-
-    const healthBefore = monsterHealth;
-    let newHealth = healthBefore - finalBenefitScore;
-    newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth);
-
-    setMonsterHealth(newHealth);
-    setShowDamageEffect(true);
-    setTimeout(() => setShowDamageEffect(false), 700);
-
-    let monsterReact = `${monsterName} screeches! That wretched ${product.productName}! My health plummets to ${newHealth.toFixed(1)}% (-${finalBenefitScore.toFixed(1)}%).`;
-    if (streakModifier > 0) {
-        monsterReact += ` Your ${currentStreakCount}-day consistency (+${(streakModifier * 100).toFixed(0)}% effect) makes it even WORSE!`;
-    }
-
-    if (newHealth <= 0 && newHealth > MONSTER_DEATH_THRESHOLD) monsterReact += " I'm... fading...";
-    else if (newHealth <= MONSTER_DEATH_THRESHOLD / 2 && newHealth > MONSTER_DEATH_THRESHOLD) monsterReact += " Please... stop...";
-
-
-    if (!checkMonsterDeath(newHealth, product.productName)) {
-      toast({
-        title: `${monsterName} Reacts to ${product.productName}`,
-        description: monsterReact,
-        variant: "default",
-        duration: Number.MAX_SAFE_INTEGER,
+  const checkMonsterDeath = useCallback(async (currentHealth: number, cause: string) => {
+    if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterData && user) {
+      // Add to tomb
+      await firestoreService.addToTomb(user.uid, {
+        name: monsterData.name,
+        imageUrl: monsterData.imageUrl,
+        cause
       });
-      if (currentStreakCount >= 5 && currentStreakCount % 5 === 0) { 
-          if (typeof window !== 'undefined') showSocialProofToast(`${currentStreakCount}-day streak using helpful products like ${product.productName}`, undefined, true);
+
+      // Delete current monster
+      await firestoreService.deleteMonster(user.uid);
+
+      setMonsterData(null);
+      setIsMonsterActuallyGenerated(false);
+
+      toast({
+        title: `${monsterData.name} Dissolves!`,
+        description: `Its negativity couldn't withstand ${cause}. Current health: ${currentHealth.toFixed(1)}%.`,
+        variant: "destructive",
+        duration: Number.MAX_SAFE_INTEGER
+      });
+
+      router.push('/create-monster');
+      return true;
+    }
+    return false;
+  }, [monsterData, user, router, toast]);
+
+  const handleInternalizeAffirmation = () => {
+    if (isAmplifying || !affirmationData || !monsterData || hasAmplifiedToday || !user) return;
+    
+    setIsAmplifying(true);
+    setAmplificationProgress(0);
+    
+    const startTime = Date.now();
+    progressIntervalRef.current = setInterval(() => {
+      const elapsedTime = Date.now() - startTime;
+      const progress = Math.min(100, (elapsedTime / AMPLIFY_DURATION_MS) * 100);
+      setAmplificationProgress(progress);
+      if (progress >= 100) {
+        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+        completeAmplification();
       }
+    }, 50);
+  };
+
+  const completeAmplification = async () => {
+    setIsAmplifying(false);
+    setAmplificationProgress(0);
+    if (!monsterData || !user) return;
+
+    try {
+      // Add points
+      await firestoreService.addPoints(user.uid, POINTS_FOR_AFFIRMATION);
+      await refreshUserProfile();
+
+      // Update monster health
+      const newHealth = Math.min(MAX_MONSTER_HEALTH, monsterData.health - MONSTER_HP_REDUCTION_FOR_AFFIRMATION);
+      await firestoreService.updateMonsterData(user.uid, { health: newHealth });
+      setMonsterData(prev => prev ? { ...prev, health: newHealth } : null);
+
+      setShowDamageEffect(true);
+      setTimeout(() => setShowDamageEffect(false), 700);
+
+      // Mark as completed for today
+      await firestoreService.setCompletion(user.uid, 'affirmation');
+      setHasAmplifiedToday(true);
+
+      if (!(await checkMonsterDeath(newHealth, "an internalized affirmation"))) {
+        toast({
+          title: "Affirmation Amplified!",
+          description: `${monsterData.name} recoils! Your inner strength grows. Monster Health: ${newHealth.toFixed(1)}% (-${MONSTER_HP_REDUCTION_FOR_AFFIRMATION}). You earned ${POINTS_FOR_AFFIRMATION} points!`,
+          duration: 7000
+        });
+      }
+
+      fetchAffirmation();
+    } catch (error) {
+      console.error('Error completing amplification:', error);
+      toast({
+        title: "Error",
+        description: "Failed to complete affirmation amplification.",
+        variant: "destructive"
+      });
     }
   };
-
-  const nextTierPoints = () => {
-    if (currentTier.points < TIERS.BRONZE.points) return TIERS.BRONZE.points;
-    if (currentTier.points < TIERS.SILVER.points) return TIERS.SILVER.points;
-    if (currentTier.points < TIERS.GOLD.points) return TIERS.GOLD.points;
-    return TIERS.GOLD.points;
-  };
-
-  const progressToNextTier = () => {
-    if (currentTier === TIERS.GOLD) return 100;
-    const pointsForNext = nextTierPoints();
-    const pointsForCurrent = currentTier.points;
-    const neededForNext = pointsForNext - pointsForCurrent;
-    const earnedTowardsNext = userPoints - pointsForCurrent;
-    return Math.max(0, Math.min((earnedTowardsNext / neededForNext) * 100, 100));
-  };
-
+  
   const getHealthBarValue = () => {
-      if (monsterHealth === null) return 0;
+      if (!monsterData) return 0;
       const range = MAX_MONSTER_HEALTH - MONSTER_DEATH_THRESHOLD;
-      const currentValInRange = monsterHealth - MONSTER_DEATH_THRESHOLD;
+      const currentValInRange = monsterData.health - MONSTER_DEATH_THRESHOLD;
       return Math.max(0, Math.min((currentValInRange / range) * 100, 100));
-  }
+  };
+
+  const speakMonsterRetort = (text: string) => {
+    if (!monsterData?.voiceConfig || isSpeaking || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    if (monsterData.voiceConfig.voiceURI) {
+        const voices = speechSynthesis.getVoices();
+        const selectedVoice = voices.find(v => v.voiceURI === monsterData.voiceConfig.voiceURI);
+        if (selectedVoice) utterance.voice = selectedVoice;
+    }
+    utterance.pitch = monsterData.voiceConfig.pitch;
+    utterance.rate = monsterData.voiceConfig.rate;
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    speechSynthesis.speak(utterance);
+  };
 
   if (!isClientReady) {
     return <LoadingPlaceholder />;
   }
 
+  if (!user) {
+    return (
+      <Card className="max-w-lg mx-auto">
+        <CardHeader>
+          <CardTitle className="font-headline flex items-center gap-2">
+            <HelpCircle className="h-6 w-6 text-primary" />
+            Authentication Required
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-muted-foreground mb-4">Please log in to amplify affirmations!</p>
+          <Button asChild className="w-full">
+            <Link href="/login">Log In</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (!isMonsterActuallyGenerated) {
     return (
       <Card className="max-w-lg mx-auto">
-        <CardHeader><CardTitle className="font-headline flex items-center gap-2"><Info />Nemesis Required</CardTitle></CardHeader>
-        <CardContent><p className="text-center text-muted-foreground mb-4">Create your Nemesis to use Gear & Artifacts and see their impact.</p>
-          <Button asChild className="w-full"><Link href="/create-monster"><Sparkles className="mr-2 h-4 w-4"/>Summon Nemesis</Link></Button>
+        <CardHeader>
+          <CardTitle className="font-headline flex items-center gap-2">
+            <HelpCircle className="h-6 w-6 text-primary" />
+            Monster Required
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-muted-foreground mb-4">Create your monster to amplify affirmations!</p>
+          <Button asChild className="w-full">
+            <Link href="/create-monster">
+              <Sparkles className="mr-2 h-4 w-4"/>
+              Create Your Monster
+            </Link>
+          </Button>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <TooltipProvider>
-    <div className="space-y-8">
-      <Card className="border-primary/50 shadow-lg">
-        <CardHeader>
-          <CardTitle className="font-headline flex items-center gap-2">
-            {currentTier.icon ? <currentTier.icon className="h-7 w-7 text-primary" /> : <Target className="h-6 w-6 text-primary"/>}
-            Your Contribution Score & Tier
-          </CardTitle>
-          <CardDescription>
-            Log products and make other community contributions to earn points and unlock rewards.
-            Higher tiers grant benefits like site-wide discounts!
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="p-4 bg-accent/20 rounded-lg border border-accent">
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-2">
-              <p className="text-lg font-semibold text-accent-foreground">Current Tier: <span className="text-primary">{currentTier.name}</span></p>
-              {currentTier.icon && <currentTier.icon className="h-8 w-8 text-primary hidden sm:block" />}
-            </div>
-            <p className="text-sm text-accent-foreground/80 mb-3">{currentTier.benefits}</p>
-            {currentTier.points >= TIERS.BRONZE.points && (
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-400 font-medium">
-                    <ShieldCheck className="h-5 w-5"/>
-                    <span>10% Site-Wide Discount Active!</span>
-                </div>
-            )}
-          </div>
+    <div className="grid lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-1 space-y-6">
+        {monsterData && (
+          <Card className={cn(showDamageEffect && 'animate-damage-flash')}>
+            <CardHeader className="items-center text-center">
+              <Link href="/my-profile">
+                <Image 
+                  src={monsterData.imageUrl} 
+                  alt={monsterData.name} 
+                  width={100} 
+                  height={100} 
+                  className="rounded-full border-2 border-primary shadow-md mx-auto cursor-pointer hover:opacity-80 transition-opacity" 
+                  data-ai-hint="generated monster"
+                />
+              </Link>
+              <CardTitle className="font-headline text-xl pt-2">{monsterData.name}</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center">
+              <Label htmlFor="monster-health-affirm" className="text-sm font-medium block mb-1">
+                Monster Health: {monsterData.health.toFixed(1)}%
+              </Label>
+              <Progress id="monster-health-affirm" value={getHealthBarValue()} className="w-full h-2.5" />
+              <p className="text-xs text-muted-foreground mt-1">Positive affirmations weaken its negativity.</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
-          <div className="space-y-1">
-             <div className="flex justify-between items-baseline mb-1">
-                <p className="text-sm font-medium text-foreground">Total Points: <span className="font-bold text-primary text-lg">{userPoints}</span></p>
-                {currentTier !== TIERS.GOLD && <p className="text-xs text-muted-foreground">Next Tier: {nextTierPoints()} Points</p>}
-            </div>
-            <Progress value={progressToNextTier()} aria-label={`${progressToNextTier()}% towards next tier`} className="h-3"/>
-            {currentTier !== TIERS.GOLD ?
-                <p className="text-xs text-muted-foreground">Progress towards {TIERS.BRONZE.points > currentTier.points ? TIERS.BRONZE.name : TIERS.SILVER.points > currentTier.points ? TIERS.SILVER.name : TIERS.GOLD.name}.</p>
-                : <p className="text-xs text-green-500">You've reached the highest tier! Congratulations!</p>
-            }
-          </div>
-          <p className="text-xs text-muted-foreground pt-2">Each product logged (working or not) earns {POINTS_PER_PRODUCT} points. Using helpful products consistently also has benefits!</p>
-        </CardContent>
-      </Card>
-
-      {isMonsterActuallyGenerated && monsterName && monsterImageUrl && monsterHealth !== null && (
-        <Card className={cn("lg:col-span-1", showDamageEffect && 'animate-damage-flash')}>
-          <CardHeader className="items-center text-center">
-            <Link href="/my-profile">
-                <Image src={monsterImageUrl} alt={monsterName} width={100} height={100} className="rounded-full border-2 border-primary shadow-md mx-auto cursor-pointer hover:opacity-80 transition-opacity" data-ai-hint="generated monster"/>
-            </Link>
-            <CardTitle className="font-headline text-xl pt-2">{monsterName}</CardTitle>
-             {positiveProductUsageStreak.count > 0 && (
-                <Badge variant="secondary" className="mt-1">
-                    Product Use Streak: {positiveProductUsageStreak.count} day{positiveProductUsageStreak.count > 1 ? 's' : ''}
-                </Badge>
-            )}
-          </CardHeader>
-          <CardContent className="text-center">
-            <Label htmlFor="monster-health-progress" className="text-sm font-medium block mb-1">
-              Nemesis Health: {monsterHealth.toFixed(1)}%
-            </Label>
-            <Progress id="monster-health-progress" value={getHealthBarValue()} className="w-full h-2.5" />
-            <p className="text-xs text-muted-foreground mt-1">Dies at {MONSTER_DEATH_THRESHOLD}%, Max: {MAX_MONSTER_HEALTH}%</p>
-          </CardContent>
-        </Card>
-      )}
-      {!isMonsterActuallyGenerated && isClientReady && (
-         <Card className="p-4 bg-muted/50 text-center">
-            <Info className="mx-auto h-8 w-8 text-primary mb-2" />
-            <CardTitle className="text-md mb-1">No Active Nemesis</CardTitle>
-            <p className="text-sm text-muted-foreground mb-3">Create your Nemesis to use Gear & Artifacts and see their impact.</p>
-            <Button asChild size="sm">
-                <Link href="/create-monster"><Sparkles className="mr-2 h-4 w-4"/>Summon Nemesis</Link>
-            </Button>
-        </Card>
-      )}
-
-
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="lg:col-span-2 space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline">Equip Battle Aid (Currently Using)</CardTitle>
-            <CardDescription>List items that help. AI grades their benefit (1-5 score, cached for 24hrs). "Activate Aid" to apply effect to {monsterName || 'Nemesis'}.</CardDescription>
+            <CardTitle className="font-headline flex items-center gap-2">
+              <HeartPulse className="h-6 w-6 text-primary"/>
+              Affirmation Amplifier
+            </CardTitle>
+            <CardDescription>
+              Focus on a positive affirmation to strengthen your inner resolve and weaken your monster. One internalization per day.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div>
-                <Label htmlFor="current-product-name">Aid Name</Label>
-                <Input
-                  id="current-product-name"
-                  value={currentProductName}
-                  onChange={(e) => setCurrentProductName(e.target.value)}
-                  placeholder="e.g., Specific Vitamin C Serum"
-                  disabled={isGradingProduct || !isMonsterActuallyGenerated}
-                />
+          <CardContent className="space-y-6 text-center">
+            {isLoadingAffirmation && (
+              <div className="flex flex-col items-center justify-center p-10">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                <p className="mt-3 text-muted-foreground">{monsterData?.name || "The AI"} is crafting an affirmation...</p>
               </div>
-              <div>
-                <Label htmlFor="current-product-notes">Notes (Brand, Usage, etc.)</Label>
-                <Textarea
-                  id="current-product-notes"
-                  value={currentProductNotes}
-                  onChange={(e) => setCurrentProductNotes(e.target.value)}
-                  placeholder="e.g., Brand X, Apply nightly"
-                  className="min-h-[60px]"
-                  disabled={isGradingProduct || !isMonsterActuallyGenerated}
-                />
-              </div>
-            </div>
-            <Button onClick={handleAddWorkingProduct} className="w-full sm:w-auto" disabled={isGradingProduct || !currentProductName.trim() || !isMonsterActuallyGenerated}>
-              {isGradingProduct ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-              {isGradingProduct ? `Consulting Oracle for ${currentProductName}...` : 'Equip & Assess Aid'}
-            </Button>
-            <div className="space-y-3 pt-4 max-h-96 overflow-y-auto">
-              {workingProducts.length === 0 && <p className="text-sm text-muted-foreground">No battle aids equipped yet.</p>}
-              {workingProducts.map(product => (
-                <Card key={product.id} className="p-3 bg-card/60">
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="flex-grow">
-                      <h4 className="font-semibold text-foreground">{product.productName}</h4>
-                      {product.clientNotes && <p className="text-xs text-muted-foreground mt-0.5">{product.clientNotes}</p>}
-                       <div className="text-xs mt-1">
-                        {product.isGraded ? (
-                            <div className="flex items-center gap-1">
-                                <Badge variant="default">Benefit: {product.benefitScore}/5</Badge>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-5 w-5"><HelpCircle className="h-3.5 w-3.5 text-muted-foreground"/></Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" className="max-w-xs">
-                                        <p className="text-xs font-medium">{monsterName || 'Oracle'} Reasoning:</p>
-                                        <p className="text-xs">{product.reasoning}</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </div>
-                        ) : (
-                            <Badge variant="outline" className="animate-pulse">Oracle Assessing...</Badge>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                        <Button variant="ghost" size="icon" onClick={() => handleRemoveWorkingProduct(product.id)} aria-label="Remove product" className="h-7 w-7">
-                          <Trash2 className="h-4 w-4 text-destructive" />
+            )}
+            {error && !isLoadingAffirmation && (
+              <Alert variant="destructive">
+                <AlertTitle>Affirmation Error</AlertTitle>
+                <AlertDescription>{error} Please try fetching a new one.</AlertDescription>
+              </Alert>
+            )}
+            {affirmationData && !isLoadingAffirmation && (
+              <div className="space-y-4">
+                <Card className="p-6 bg-gradient-to-br from-primary/10 via-accent/10 to-primary/10 border-primary/30 shadow-lg">
+                    <p className="text-2xl font-semibold text-primary-foreground text-center leading-tight">
+                    "{affirmationData.affirmationText}"
+                    </p>
+                </Card>
+                
+                {affirmationData.monsterCounterAffirmation && (
+                  <Card className="p-3 bg-muted/50 border-dashed border-foreground/30">
+                    <div className="flex items-center justify-center gap-2">
+                        <VenetianMask className="h-5 w-5 text-foreground/70 shrink-0"/>
+                        <p className="italic text-sm text-foreground/70 text-center">
+                           {monsterData?.name || "Monster"} grumbles: "{affirmationData.monsterCounterAffirmation}"
+                        </p>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => speakMonsterRetort(affirmationData.monsterCounterAffirmation!)} 
+                          disabled={isSpeaking || !monsterData?.voiceConfig} 
+                          aria-label="Speak monster retort" 
+                          className="h-6 w-6"
+                        >
+                            <Speaker className="h-4 w-4"/>
                         </Button>
-                        {isMonsterActuallyGenerated && product.isGraded && (
-                            <Button size="sm" variant="outline" onClick={() => handleUseProduct(product)} className="text-xs h-7 px-2" disabled={monsterHealth === null || monsterHealth <= MONSTER_DEATH_THRESHOLD}>
-                                <HeartPulse className="mr-1 h-3 w-3"/> Activate Aid
-                            </Button>
-                        )}
                     </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                  </Card>
+                )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-headline">Discarded Aids (Tried & Failed)</CardTitle>
-            <CardDescription>List aids that didn't help or had adverse effects. For your records.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div>
-                <Label htmlFor="past-product-name">Aid Name</Label>
-                <Input
-                  id="past-product-name"
-                  value={pastProductName}
-                  onChange={(e) => setPastProductName(e.target.value)}
-                  placeholder="e.g., Common Pain Reliever"
-                  disabled={!isMonsterActuallyGenerated}
-                />
-              </div>
-              <div>
-                <Label htmlFor="past-product-notes">Notes (Reason, Side Effects, etc.)</Label>
-                <Textarea
-                  id="past-product-notes"
-                  value={pastProductNotes}
-                  onChange={(e) => setPastProductNotes(e.target.value)}
-                  placeholder="e.g., Caused mild nausea"
-                  className="min-h-[60px]"
-                  disabled={!isMonsterActuallyGenerated}
-                />
-              </div>
-            </div>
-            <Button onClick={handleAddNotWorkingProduct} className="w-full sm:w-auto" disabled={!pastProductName.trim() || !isMonsterActuallyGenerated}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add to Discard Pile
-            </Button>
-            <div className="space-y-3 pt-4 max-h-96 overflow-y-auto">
-              {notWorkingProducts.length === 0 && <p className="text-sm text-muted-foreground">No discarded aids logged yet.</p>}
-              {notWorkingProducts.map(product => (
-                <Card key={product.id} className="p-3 bg-card/60">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-semibold text-foreground">{product.productName}</h4>
-                      {product.clientNotes && <p className="text-xs text-muted-foreground mt-1">{product.clientNotes}</p>}
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={() => handleRemoveNotWorkingProduct(product.id)} aria-label="Remove product" className="h-7 w-7">
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                {isAmplifying && (
+                  <div className="mt-4">
+                    <Progress value={amplificationProgress} className="w-full h-3 transition-all duration-100 ease-linear" />
+                    <p className="text-sm text-primary animate-pulse mt-1">Amplifying affirmation...</p>
                   </div>
-                </Card>
-              ))}
-            </div>
+                )}
+                {hasAmplifiedToday && !isAmplifying && (
+                    <Alert variant="default" className="bg-accent/20 border-accent text-accent-foreground">
+                        <Info className="h-4 w-4"/>
+                        <AlertTitle>Daily Limit Reached</AlertTitle>
+                        <AlertDescription>
+                        You've amplified your affirmation for today. Come back tomorrow for another boost!
+                        </AlertDescription>
+                    </Alert>
+                )}
+              </div>
+            )}
           </CardContent>
+          <CardFooter className="flex flex-col gap-3">
+            <Button 
+              onClick={handleInternalizeAffirmation} 
+              disabled={isLoadingAffirmation || isAmplifying || !affirmationData || hasAmplifiedToday} 
+              className="w-full sm:w-auto text-base py-3 px-6"
+              size="lg"
+            >
+              {isAmplifying ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <ShieldCheck className="mr-2 h-5 w-5"/>}
+              {isAmplifying ? "Amplifying..." : hasAmplifiedToday ? "Amplified Today" : "Internalize Affirmation"}
+            </Button>
+            <Button 
+              onClick={fetchAffirmation} 
+              variant="outline" 
+              disabled={isLoadingAffirmation || isAmplifying} 
+              className="w-full sm:w-auto"
+            >
+              <Sparkles className="mr-2 h-4 w-4"/> Get New Affirmation
+            </Button>
+          </CardFooter>
         </Card>
       </div>
     </div>
-    </TooltipProvider>
   );
 }
-
-    

@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
@@ -13,14 +12,9 @@ import Link from 'next/link';
 import { expandMonsterPromptAction, generateMonsterImageAction } from './actions';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
-
-const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
-const MONSTER_NAME_KEY = 'morgellonMonsterName';
-const MONSTER_GENERATED_KEY = 'morgellonMonsterGenerated';
-const MONSTER_HEALTH_KEY = 'morgellonMonsterHealth';
-const MONSTER_VOICE_CONFIG_KEY = 'monsterVoiceConfig';
-const MONSTER_HAS_SPOKEN_KEY = 'monsterHasSpokenFirstTime';
-
+import { useAuth } from '@/context/auth-context';
+import { firestoreService } from '@/lib/firestore-service';
+import { useRouter } from 'next/navigation';
 
 const INITIAL_HEALTH_MIN = 80;
 const INITIAL_HEALTH_MAX = 100;
@@ -29,7 +23,6 @@ const INITIAL_HEALTH_MAX = 100;
 const generateDemonicPitch = () => parseFloat((Math.random() * (0.5 - 0.1) + 0.1).toFixed(2)); // Deep: 0.1 to 0.5
 const generateDemonicRate = () => parseFloat((Math.random() * (0.8 - 0.5) + 0.5).toFixed(2));  // Slow: 0.5 to 0.8
 
-
 export default function CreateMonsterPage() {
   const [words, setWords] = useState('');
   const [monsterName, setMonsterName] = useState<string | null>(null);
@@ -37,11 +30,31 @@ export default function CreateMonsterPage() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hasGeneratedInSession, setHasGeneratedInSession] = useState(false);
+  const [existingMonster, setExistingMonster] = useState<any>(null);
 
   const [isExpanding, startExpandingTransition] = useTransition();
   const [isGenerating, startGeneratingTransition] = useTransition();
 
   const { toast } = useToast();
+  const { user, refreshUserProfile } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkExistingMonster = async () => {
+      if (!user) return;
+      
+      try {
+        const monsterData = await firestoreService.getMonsterData(user.uid);
+        if (monsterData && monsterData.generated) {
+          setExistingMonster(monsterData);
+        }
+      } catch (error) {
+        console.error('Error checking existing monster:', error);
+      }
+    };
+
+    checkExistingMonster();
+  }, [user]);
 
   const selectAndStoreVoice = () => {
     const voices = speechSynthesis.getVoices();
@@ -51,15 +64,12 @@ export default function CreateMonsterPage() {
     const rate = generateDemonicRate();
 
     if (voices.length === 0) {
-        localStorage.setItem(MONSTER_VOICE_CONFIG_KEY, JSON.stringify({ 
-            voiceURI: null, 
-            pitch: pitch, 
-            rate: rate   
-        }));
-        localStorage.setItem(MONSTER_HAS_SPOKEN_KEY, 'false');
-        return;
+      return {
+        voiceURI: null, 
+        pitch: pitch, 
+        rate: rate   
+      };
     }
-
 
     // Attempt to find a somewhat "monster-like" voice.
     const englishVoices = voices.filter(v => v.lang.startsWith('en-'));
@@ -96,17 +106,26 @@ export default function CreateMonsterPage() {
         selectedVoiceURI = candidateVoices[Math.floor(Math.random() * candidateVoices.length)].voiceURI;
     }
     
-    localStorage.setItem(MONSTER_VOICE_CONFIG_KEY, JSON.stringify({ 
+    return { 
         voiceURI: selectedVoiceURI, 
         pitch: pitch, 
         rate: rate 
-    }));
-    localStorage.setItem(MONSTER_HAS_SPOKEN_KEY, 'false');
+    };
   };
-
 
   const handleWordSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    
+    if (!user) {
+      setError("You must be logged in to create a monster.");
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to create your monster.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setError(null);
     setDetailedPrompt(null);
     setImageUrl(null);
@@ -136,32 +155,60 @@ export default function CreateMonsterPage() {
             setImageUrl(imageResult.imageUrl);
             setHasGeneratedInSession(true);
             
-            localStorage.setItem(MONSTER_GENERATED_KEY, 'true');
-            localStorage.setItem(MONSTER_IMAGE_KEY, imageResult.imageUrl);
-            localStorage.setItem(MONSTER_NAME_KEY, expansionResult.monsterName);
-            
             const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
-            localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
             
+            // Generate voice configuration
+            let voiceConfig;
             if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
                 // Ensure voices are loaded before selecting
                 if (speechSynthesis.getVoices().length === 0) {
                     speechSynthesis.onvoiceschanged = () => {
-                        selectAndStoreVoice();
+                        voiceConfig = selectAndStoreVoice();
                         speechSynthesis.onvoiceschanged = null; // Important to prevent multiple calls
                     };
                 } else {
-                    selectAndStoreVoice();
+                    voiceConfig = selectAndStoreVoice();
                 }
             } else {
                 // Fallback if speech synthesis is not supported
-                localStorage.setItem(MONSTER_VOICE_CONFIG_KEY, JSON.stringify({ 
+                voiceConfig = { 
                     voiceURI: null, 
                     pitch: generateDemonicPitch(), 
                     rate: generateDemonicRate() 
-                }));
-                localStorage.setItem(MONSTER_HAS_SPOKEN_KEY, 'false');
+                };
             }
+
+            // If voiceConfig is still undefined, set fallback
+            if (!voiceConfig) {
+              voiceConfig = { 
+                voiceURI: null, 
+                pitch: generateDemonicPitch(), 
+                rate: generateDemonicRate() 
+              };
+            }
+
+            // Save monster data to Firestore
+            await firestoreService.saveMonsterData(user.uid, {
+              name: expansionResult.monsterName,
+              imageUrl: imageResult.imageUrl,
+              health: initialHealth,
+              generated: true,
+              voiceConfig,
+              hasSpokenFirstTime: false,
+              lastRecoveryDate: new Date().toDateString()
+            });
+
+            // If there was an existing monster, add it to the tomb
+            if (existingMonster) {
+              await firestoreService.addToTomb(user.uid, {
+                name: existingMonster.name,
+                imageUrl: existingMonster.imageUrl,
+                cause: "Replaced by a new monster"
+              });
+            }
+
+            // Refresh user profile to update any related data
+            await refreshUserProfile();
 
              toast({
                 title: "Monster Revealed!",
@@ -191,6 +238,64 @@ export default function CreateMonsterPage() {
       }
     });
   };
+
+  // If user is not logged in
+  if (!user) {
+    return (
+      <Card className="max-w-lg mx-auto">
+        <CardHeader>
+          <CardTitle className="font-headline flex items-center gap-2">
+            <Wand2 className="h-6 w-6 text-primary"/>Authentication Required
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-muted-foreground mb-4">
+            You must be logged in to create your Morgellon Monster.
+          </p>
+          <Button asChild className="w-full">
+            <Link href="/login">Log In</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show existing monster if one exists and we haven't generated a new one in this session
+  if (existingMonster && !hasGeneratedInSession) {
+    return (
+      <Card className="max-w-lg mx-auto">
+        <CardHeader>
+          <CardTitle className="font-headline flex items-center gap-2">
+            <Sparkles className="h-6 w-6 text-primary"/>Your Existing Monster: {existingMonster.name}
+          </CardTitle>
+          <CardDescription>
+            You already have a monster. Creating a new one will retire your current monster to the tomb.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="text-center">
+            <Image 
+              src={existingMonster.imageUrl} 
+              alt={`Your Morgellon Monster: ${existingMonster.name}`} 
+              width={200} 
+              height={200} 
+              className="rounded-lg border object-cover mx-auto shadow-lg mb-4" 
+              data-ai-hint="existing monster" 
+            />
+            <p className="text-sm text-muted-foreground">Current Health: {existingMonster.health.toFixed(1)}%</p>
+        </CardContent>
+        <CardFooter className="flex-col gap-3">
+            <Button onClick={() => setExistingMonster(null)} size="lg" variant="outline">
+                <Wand2 className="mr-2 h-4 w-4" /> Create New Monster
+            </Button>
+            <Button asChild size="lg">
+                <Link href="/">
+                    <Sparkles className="mr-2 h-4 w-4" /> Keep Current Monster
+                </Link>
+            </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
 
   if (hasGeneratedInSession && imageUrl && monsterName) {
     return (
@@ -245,6 +350,11 @@ export default function CreateMonsterPage() {
           This is a special one-time ritual for our valued members.
           Describe your inner Morgellon Monster in exactly 5 words. Our AI will then conjure its image, reveal its name, and give it a unique, randomized deep and demonic voice.
           This image, name, voice, and its initial health will become your unique profile identity. Choose your words wisely.
+          {existingMonster && (
+            <span className="block mt-2 text-amber-600 dark:text-amber-400 font-medium">
+              Note: Creating a new monster will retire your current monster ({existingMonster.name}) to the tomb.
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleWordSubmit}>
