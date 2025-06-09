@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
@@ -12,14 +11,22 @@ import { PieChart, Pie, Cell, Legend, ResponsiveContainer } from 'recharts';
 import type { NutritionDataInput, NutritionAdviceOutput } from '@/ai/flows/nutrition-advice-flow';
 import { getNutritionAdviceAction } from './actions';
 import { useToast } from '@/hooks/use-toast';
-import Link from 'next/link'; // Import Link
-
-// Key for storing all food log entries with nutritional data
-const ALL_NUTRITIONAL_FOOD_ENTRIES_KEY = 'allNutritionalFoodEntries';
+import { useAuth } from '@/context/auth-context';
+import Link from 'next/link';
+import { 
+  collection, 
+  query, 
+  where, 
+  orderBy, 
+  limit, 
+  getDocs,
+  Timestamp
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface NutritionalFoodLogEntry {
   id: string;
-  loggedAt: string; // ISO string
+  loggedAt: Timestamp;
   foodName: string;
   calories?: number;
   proteinGrams?: number;
@@ -56,35 +63,73 @@ const CHART_CONFIG = {
   sodium: { label: 'Sodium (mg)', color: 'hsl(var(--chart-5))' }, // Lighter Cool Blue
 };
 
-
 export default function NutritionTrackerPage() {
   const [allEntries, setAllEntries] = useState<NutritionalFoodLogEntry[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [aggregatedData, setAggregatedData] = useState<AggregatedNutrition | null>(null);
   const [aiAdvice, setAiAdvice] = useState<NutritionAdviceOutput | null>(null);
   const [isLoadingAdvice, startLoadingAdviceTransition] = useTransition();
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
+  // Fetch nutritional food entries from Firestore
   useEffect(() => {
-    const storedEntries = localStorage.getItem(ALL_NUTRITIONAL_FOOD_ENTRIES_KEY);
-    if (storedEntries) {
-      try {
-        const parsedEntries = JSON.parse(storedEntries);
-        if (Array.isArray(parsedEntries)) {
-          setAllEntries(parsedEntries);
-        } else {
-          setAllEntries([]);
-          console.error("Stored nutritional entries are not an array.");
-        }
-      } catch (e) {
-        console.error("Error parsing stored nutritional entries:", e);
-        setAllEntries([]);
+    const fetchNutritionalEntries = async () => {
+      if (!user?.uid || !db) {
+        setIsLoadingData(false);
+        return;
       }
-    } else {
-        setAllEntries([]);
-    }
-  }, []);
+
+      setIsLoadingData(true);
+      setError(null);
+
+      try {
+        // Query food logs that have nutritional information
+        const foodLogsQuery = query(
+          collection(db!, 'foodLogs'),
+          where('userId', '==', user.uid),
+          where('calories', '>', 0), // Only get entries with nutritional data
+          orderBy('calories', 'desc'), // Order by calories to get entries with data first
+          orderBy('loggedAt', 'desc'),
+          limit(200) // Limit to recent entries for performance
+        );
+
+        const foodLogsSnapshot = await getDocs(foodLogsQuery);
+        const entries: NutritionalFoodLogEntry[] = [];
+
+        foodLogsSnapshot.docs.forEach(doc => {
+          const data = doc.data();
+          
+          // Only include entries that have at least some nutritional data
+          if (data.calories || data.proteinGrams || data.carbGrams || data.fatGrams) {
+            entries.push({
+              id: doc.id,
+              loggedAt: data.loggedAt,
+              foodName: data.foodName,
+              calories: data.calories,
+              proteinGrams: data.proteinGrams,
+              carbGrams: data.carbGrams,
+              fatGrams: data.fatGrams,
+              sugarGrams: data.sugarGrams,
+              sodiumMilligrams: data.sodiumMilligrams,
+              servingDescription: data.servingDescription
+            });
+          }
+        });
+
+        setAllEntries(entries);
+      } catch (error) {
+        console.error('Error fetching nutritional entries:', error);
+        setError('Failed to load nutritional data. Please try again.');
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    fetchNutritionalEntries();
+  }, [user]);
 
   useEffect(() => {
     if (allEntries.length >= 0) { // Process even if allEntries is empty to show "no data"
@@ -106,15 +151,14 @@ export default function NutritionTrackerPage() {
     }
 
     const filteredEntries = allEntries.filter(entry => {
-        try {
-            const entryDate = new Date(entry.loggedAt);
-            return !isNaN(entryDate.getTime()) && entryDate >= startDate;
-        } catch (e) {
-            console.warn("Skipping entry with invalid date:", entry);
-            return false;
-        }
+      try {
+        const entryDate = entry.loggedAt.toDate();
+        return !isNaN(entryDate.getTime()) && entryDate >= startDate;
+      } catch (e) {
+        console.warn("Skipping entry with invalid date:", entry);
+        return false;
+      }
     });
-
 
     if (filteredEntries.length === 0) {
       setAggregatedData({
@@ -139,14 +183,13 @@ export default function NutritionTrackerPage() {
 
     const foodFrequency: {[key: string]: number} = {};
     filteredEntries.forEach(entry => {
-        const foodName = entry.foodName ? entry.foodName.toLowerCase().trim() : "unknown food";
-        foodFrequency[foodName] = (foodFrequency[foodName] || 0) + 1;
+      const foodName = entry.foodName ? entry.foodName.toLowerCase().trim() : "unknown food";
+      foodFrequency[foodName] = (foodFrequency[foodName] || 0) + 1;
     });
     const sortedFoodSummary = Object.entries(foodFrequency)
-                                .sort(([,a],[,b]) => b-a)
-                                .slice(0, 5) // Top 5 most frequent
-                                .map(([name]) => name.charAt(0).toUpperCase() + name.slice(1));
-
+                              .sort(([,a],[,b]) => b-a)
+                              .slice(0, 5) // Top 5 most frequent
+                              .map(([name]) => name.charAt(0).toUpperCase() + name.slice(1));
 
     setAggregatedData({ ...totals, entryCount: filteredEntries.length, foodSummary: sortedFoodSummary });
   };
@@ -189,6 +232,51 @@ export default function NutritionTrackerPage() {
     { name: 'Fat', value: aggregatedData.totalFatGrams, fill: MACRO_COLORS.fat },
   ].filter(d => d.value > 0) : [];
 
+  if (!user) {
+    return (
+      <Card className="max-w-lg mx-auto">
+        <CardHeader>
+          <CardTitle className="font-headline flex items-center gap-2">
+            <UtensilsCrossed className="h-6 w-6 text-primary"/>
+            Authentication Required
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-muted-foreground mb-4">
+            Please log in to track your nutrition.
+          </p>
+          <Button asChild className="w-full">
+            <Link href="/login">Log In</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isLoadingData) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Loading your nutritional data...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="max-w-lg mx-auto">
+        <CardHeader>
+          <CardTitle className="text-destructive">Error Loading Data</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()} className="w-full">
+            Try Again
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -210,9 +298,9 @@ export default function NutritionTrackerPage() {
               </SelectContent>
             </Select>
             <Button 
-                onClick={handleGetAIAdvice} 
-                disabled={isLoadingAdvice || !aggregatedData || aggregatedData.entryCount === 0}
-                className="w-full sm:w-auto"
+              onClick={handleGetAIAdvice} 
+              disabled={isLoadingAdvice || !aggregatedData || aggregatedData.entryCount === 0}
+              className="w-full sm:w-auto"
             >
               {isLoadingAdvice ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
               Get AI Coach Advice
@@ -223,68 +311,74 @@ export default function NutritionTrackerPage() {
       </Card>
 
       {!aggregatedData || aggregatedData.entryCount === 0 ? (
-         <Card className="mt-4">
-            <CardContent className="pt-6 text-center text-muted-foreground flex flex-col items-center justify-center min-h-[200px]">
-                <Info className="mx-auto h-10 w-10 mb-3 text-primary" />
-                <p className="text-lg font-medium mb-1">No Nutritional Data Processed</p>
-                <p className="text-sm max-w-md mx-auto">
-                    No food entries with nutritional details found for the selected period. 
-                    Please ensure you've logged foods with these details in your <Button variant="link" asChild className="p-0 h-auto text-sm inline"><Link href="/food-log">Food Log</Link></Button> so they can appear here.
-                </p>
-            </CardContent>
+        <Card className="mt-4">
+          <CardContent className="pt-6 text-center text-muted-foreground flex flex-col items-center justify-center min-h-[200px]">
+            <Info className="mx-auto h-10 w-10 mb-3 text-primary" />
+            <p className="text-lg font-medium mb-1">No Nutritional Data Found</p>
+            <p className="text-sm max-w-md mx-auto">
+              No food entries with nutritional details found for the selected period. 
+              Please ensure you've logged foods with nutritional information in your{' '}
+              <Button variant="link" asChild className="p-0 h-auto text-sm inline">
+                <Link href="/food-log">Food Log</Link>
+              </Button>
+              {' '}so they can appear here.
+            </p>
+            <Button asChild className="mt-4">
+              <Link href="/food-log">Go to Food Log</Link>
+            </Button>
+          </CardContent>
         </Card>
       ) : (
         <>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Card>
+              <CardHeader><CardTitle className="text-lg">Total Calories</CardTitle></CardHeader>
+              <CardContent><p className="text-3xl font-bold text-primary">{aggregatedData.totalCalories.toLocaleString()} kcal</p><p className="text-xs text-muted-foreground">from {aggregatedData.entryCount} entries this {selectedPeriod}</p></CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-lg">Macronutrients</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <p>Protein: <span className="font-semibold">{aggregatedData.totalProteinGrams.toFixed(1)}g</span></p>
+                <p>Carbs: <span className="font-semibold">{aggregatedData.totalCarbGrams.toFixed(1)}g</span></p>
+                <p>Fat: <span className="font-semibold">{aggregatedData.totalFatGrams.toFixed(1)}g</span></p>
+              </CardContent>
+            </Card>
+            <Card className="md:col-span-2 lg:col-span-1">
+              <CardHeader><CardTitle className="text-lg">Other Nutrients</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <p>Sugar: <span className="font-semibold">{aggregatedData.totalSugarGrams.toFixed(1)}g</span></p>
+                <p>Sodium: <span className="font-semibold">{aggregatedData.totalSodiumMilligrams.toFixed(0)}mg</span></p>
+              </CardContent>
+            </Card>
+          </div>
+          
           <Card>
-            <CardHeader><CardTitle className="text-lg">Total Calories</CardTitle></CardHeader>
-            <CardContent><p className="text-3xl font-bold text-primary">{aggregatedData.totalCalories.toLocaleString()} kcal</p><p className="text-xs text-muted-foreground">from {aggregatedData.entryCount} entries this {selectedPeriod}</p></CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle className="text-lg">Macronutrients</CardTitle></CardHeader>
-            <CardContent className="space-y-1 text-sm">
-              <p>Protein: <span className="font-semibold">{aggregatedData.totalProteinGrams.toFixed(1)}g</span></p>
-              <p>Carbs: <span className="font-semibold">{aggregatedData.totalCarbGrams.toFixed(1)}g</span></p>
-              <p>Fat: <span className="font-semibold">{aggregatedData.totalFatGrams.toFixed(1)}g</span></p>
+            <CardHeader>
+              <CardTitle className="font-headline flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary"/>Macro Breakdown (Grams)</CardTitle>
+              <CardDescription>Visual representation of Protein, Carbs, and Fat intake for the period.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {macroChartData.length > 0 ? (
+                <ChartContainer config={CHART_CONFIG} className="min-h-[250px] w-full aspect-video">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                      <Pie data={macroChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} labelLine={false} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>
+                        {macroChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Legend verticalAlign="bottom" wrapperStyle={{paddingTop: "20px"}}/>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              ) : (
+                <p className="text-muted-foreground text-sm text-center py-10">Not enough macronutrient data (protein, carbs, fat {'>'} 0g) to display chart for this period.</p>
+              )}
             </CardContent>
           </Card>
-           <Card className="md:col-span-2 lg:col-span-1">
-            <CardHeader><CardTitle className="text-lg">Other Nutrients</CardTitle></CardHeader>
-            <CardContent className="space-y-1 text-sm">
-              <p>Sugar: <span className="font-semibold">{aggregatedData.totalSugarGrams.toFixed(1)}g</span></p>
-              <p>Sodium: <span className="font-semibold">{aggregatedData.totalSodiumMilligrams.toFixed(0)}mg</span></p>
-            </CardContent>
-          </Card>
-        </div>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-headline flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary"/>Macro Breakdown (Grams)</CardTitle>
-             <CardDescription>Visual representation of Protein, Carbs, and Fat intake for the period.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {macroChartData.length > 0 ? (
-              <ChartContainer config={CHART_CONFIG} className="min-h-[250px] w-full aspect-video">
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                    <Pie data={macroChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} labelLine={false} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>
-                       {macroChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                     <Legend verticalAlign="bottom" wrapperStyle={{paddingTop: "20px"}}/>
-                  </PieChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            ) : (
-              <p className="text-muted-foreground text-sm text-center py-10">Not enough macronutrient data (protein, carbs, fat > 0g) to display chart for this period.</p>
-            )}
-          </CardContent>
-        </Card>
         </>
       )}
-
 
       {isLoadingAdvice && (
         <Card className="mt-4">
@@ -328,12 +422,10 @@ export default function NutritionTrackerPage() {
             )}
           </CardContent>
           <CardFooter>
-             <p className="text-xs text-muted-foreground italic">{aiAdvice.disclaimer}</p>
+            <p className="text-xs text-muted-foreground italic">{aiAdvice.disclaimer}</p>
           </CardFooter>
         </Card>
       )}
     </div>
   );
 }
-
-    
