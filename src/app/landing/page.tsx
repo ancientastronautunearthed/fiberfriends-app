@@ -9,28 +9,28 @@ const features = [
     icon: Atom,
     title: "Your Personal Morgellon Monster",
     description: "Visualize your journey with a unique, AI-generated 'Inner Monster'. Its health dynamically reflects your logged foods, exercises, and product usage, offering a gamified approach to understanding your body's responses.",
-    image: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=600&h=400&fit=crop&crop=center",
+    image: "https://placehold.co/600x400.png",
     imageAiHint: "fantasy monster abstract",
   },
   {
     icon: BrainCircuit,
     title: "AI-Powered Pattern Recognition",
     description: "Leverage cutting-edge AI to analyze your symptom journals, identify potential triggers (including weather correlations), and discover personal or community-wide patterns. Gain insights you might have missed.",
-    image: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=600&h=400&fit=crop&crop=center",
+    image: "https://placehold.co/600x400.png",
     imageAiHint: "ai network data",
   },
   {
     icon: Heart,
     title: "Fiber Singles: Connect Authentically",
     description: "Meet others who understand. Create your 'Romantic Monster' persona and engage in a unique dating experience where AI helps assess message quality and monster essences 'sync' based on mutual desire. (Optional Add-on)",
-    image: "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=600&h=400&fit=crop&crop=center",
+    image: "https://placehold.co/600x400.png",
     imageAiHint: "connected hearts abstract",
   },
   {
     icon: Users,
     title: "Supportive Community Spaces",
     description: "Share your story in the Belief Circle, find camaraderie in the Doctor Forum, validate experiences with Humor Hub elements, and find validated providers in our user-driven directory.",
-    image: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=600&h=400&fit=crop&crop=center",
+    image: "https://placehold.co/600x400.png",
     imageAiHint: "community support group",
   },
 ];
@@ -121,10 +121,16 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="py-16 md:py-24 relative overflow-hidden">
         <div className="absolute inset-0 z-0 opacity-10">
-            <Image src="https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=1920&h=1080&fit=crop&crop=center" alt="Abstract background" layout="fill" objectFit="cover" data-ai-hint="abstract tech background" />
+            <Image src="https://placehold.co/1920x1080.png" alt="Abstract background" layout="fill" objectFit="cover" data-ai-hint="abstract tech background" />
         </div>
         <div className="container mx-auto px-6 text-center relative z-10">
-          <Sparkles className="h-16 w-16 text-primary mx-auto mb-6 animate-pulse" />
+          <Image
+            src="/images/fiberfriends-logo.png"
+            alt="Fiber Friends Logo"
+            width={64}
+            height={64}
+            className="mx-auto mb-6"
+          />
           <h1 className="text-4xl md:text-6xl font-headline font-bold mb-6">
             Navigate Morgellons with <span className="text-primary">Insight & Connection</span>.
           </h1>

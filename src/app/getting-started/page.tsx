@@ -87,7 +87,13 @@ export default function GettingStartedPage() {
     <div className="container mx-auto px-4 py-8 space-y-8">
       <Card className="bg-gradient-to-br from-primary/10 via-card to-accent/10 shadow-xl">
         <CardHeader className="text-center">
-          <Rocket className="h-12 w-12 mx-auto text-primary mb-3" />
+          <Image
+            src="/images/fiberfriends-logo.png"
+            alt="Fiber Friends Logo"
+            width={48}
+            height={48}
+            className="mx-auto mb-3"
+          />
           <CardTitle className="font-headline text-4xl text-primary">Getting Started with Fiber Friends</CardTitle>
           <CardDescription className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Your quick guide to setting up your account and beginning your wellness journey.

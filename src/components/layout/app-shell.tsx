@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -372,12 +371,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <SidebarHeader className="p-4 flex items-center justify-between border-b border-sidebar-border">
             <Link href="/landing" className="flex items-center gap-2 group">
               <Image
-                src="https://placehold.co/32x32.png"
+                src="/images/fiberfriends-logo.png"
                 alt="Fiber Friends Logo"
                 width={32}
                 height={32}
                 className="transition-transform group-hover:scale-110"
-                data-ai-hint="company logo"
               />
               <h1 className="text-xl font-headline font-semibold text-sidebar-foreground group-data-[collapsible=icon]:hidden">Fiber Friends</h1>
             </Link>
@@ -422,7 +420,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                                   isActive={(pathname === child.href.split('#')[0] || (child.href !== '/' && child.href !== '/landing' && pathname.startsWith(child.href.split('#')[0])))}
                                   tooltip={{ children: child.label, side: 'right' }}
                                   className="w-full justify-start text-xs h-[1.875rem] pl-1.5 py-1"
-                                  variant="ghost"
                                 >
                                   <child.icon className="h-3.5 w-3.5 mr-1.5 shrink-0" />
                                   <span>{child.label}</span>
@@ -479,4 +476,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </>
   );
 }
-
