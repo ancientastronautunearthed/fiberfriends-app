@@ -20,23 +20,15 @@ import { format, differenceInMinutes, parse, parseISO } from "date-fns";
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from '@/components/ui/badge';
-import { useAuth } from '@/context/auth-context';
-import { 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
-  getDocs, 
-  addDoc, 
-  deleteDoc, 
-  doc, 
-  updateDoc, 
-  increment,
-  serverTimestamp,
-  Timestamp
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+
+const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
+const MONSTER_NAME_KEY = 'morgellonMonsterName';
+const MONSTER_HEALTH_KEY = 'morgellonMonsterHealth';
+const MONSTER_GENERATED_KEY = 'morgellonMonsterGenerated';
+const MONSTER_TOMB_KEY = 'morgellonMonsterTomb';
+const MONSTER_LAST_RECOVERY_DATE_KEY = 'monsterLastRecoveryDate';
+const SLEEP_LOG_ENTRIES_KEY = 'morgellonSleepLogEntries';
+const USER_POINTS_KEY = 'userPoints';
 
 const POINTS_PER_SLEEP_LOG = 5;
 const MONSTER_DEATH_THRESHOLD = -50;
@@ -54,16 +46,13 @@ interface SleepLogEntry {
   sleepDurationMinutes?: number;
   sleepQuality: number; // 1-5
   notes?: string;
-  loggedAt: Timestamp;
+  loggedAt: string; // ISO timestamp
 }
 
-interface MonsterData {
-  id: string;
+interface TombEntry {
   name: string;
   imageUrl: string;
-  health: number;
-  lastRecoveryDate?: string;
-  generated: boolean;
+  diedAt: string;
 }
 
 function LoadingPlaceholder() {
@@ -78,185 +67,97 @@ function LoadingPlaceholder() {
 export default function SleepLogPage() {
   const [isClientReady, setIsClientReady] = useState(false);
   const [isMonsterActuallyGenerated, setIsMonsterActuallyGenerated] = useState(false);
-  const [monster, setMonster] = useState<MonsterData | null>(null);
+
+  const [monsterImageUrl, setMonsterImageUrl] = useState<string | null>(null);
+  const [monsterName, setMonsterName] = useState<string | null>(null);
+  const [monsterHealth, setMonsterHealth] = useState<number | null>(null);
   const [sleepLogEntries, setSleepLogEntries] = useState<SleepLogEntry[]>([]);
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [timeToBed, setTimeToBed] = useState('');
   const [timeWokeUp, setTimeWokeUp] = useState('');
-  const [sleepQuality, setSleepQuality] = useState<string>('3');
+  const [sleepQuality, setSleepQuality] = useState<string>('3'); // Default to 3 (Neutral)
   const [sleepNotes, setSleepNotes] = useState('');
   
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
-  const { user } = useAuth();
 
-  const performNightlyRecovery = useCallback(async () => {
-    if (!user?.uid || !monster || !db) return;
-    
-    const lastRecoveryDate = monster.lastRecoveryDate;
+  const performNightlyRecovery = useCallback(() => {
+    if (typeof window === 'undefined' || !isMonsterActuallyGenerated) return;
+    const storedName = localStorage.getItem(MONSTER_NAME_KEY);
+    const storedHealthStr = localStorage.getItem(MONSTER_HEALTH_KEY);
+    if (!storedHealthStr || !storedName) return;
+    let currentHealth = parseFloat(storedHealthStr);
+    if (isNaN(currentHealth) || currentHealth <= MONSTER_DEATH_THRESHOLD) return;
+    const lastRecoveryDate = localStorage.getItem(MONSTER_LAST_RECOVERY_DATE_KEY);
     const todayDateStr = new Date().toDateString();
-    
-    if (lastRecoveryDate !== todayDateStr && monster.health > MONSTER_DEATH_THRESHOLD) {
+    if (lastRecoveryDate !== todayDateStr) {
       const recoveryAmount = Math.floor(Math.random() * (MAX_RECOVERY - MIN_RECOVERY + 1)) + MIN_RECOVERY;
-      const newHealth = Math.min(monster.health + recoveryAmount, MAX_MONSTER_HEALTH);
-
-      try {
-        const monsterRef = doc(db, 'monsters', monster.id);
-        await updateDoc(monsterRef, {
-          health: newHealth,
-          lastRecoveryDate: todayDateStr
-        });
-
-        setMonster(prev => prev ? { ...prev, health: newHealth, lastRecoveryDate: todayDateStr } : null);
-
-        toast({
-          title: `${monster.name} Yawns`,
-          description: `During the night, I felt a surge of ${recoveryAmount} health. Now at ${newHealth.toFixed(1)}%.`,
-          duration: 7000
-        });
-      } catch (error) {
-        console.error('Error performing nightly recovery:', error);
-      }
+      const newHealth = Math.min(currentHealth + recoveryAmount, MAX_MONSTER_HEALTH);
+      setMonsterHealth(newHealth); 
+      localStorage.setItem(MONSTER_HEALTH_KEY, String(newHealth));
+      localStorage.setItem(MONSTER_LAST_RECOVERY_DATE_KEY, todayDateStr);
+      toast({ title: `${storedName} Yawns`, description: `During the night, I felt a surge of ${recoveryAmount} health. Now at ${newHealth.toFixed(1)}%.`, duration: 7000 });
     }
-  }, [user, monster, toast]);
-
-  const fetchMonsterData = useCallback(async () => {
-    if (!user?.uid || !db) return;
-
-    try {
-      const monstersQuery = query(
-        collection(db, 'monsters'),
-        where('userId', '==', user.uid),
-        where('generated', '==', true)
-      );
-      
-      const monsterSnapshot = await getDocs(monstersQuery);
-      
-      if (!monsterSnapshot.empty) {
-        const monsterDoc = monsterSnapshot.docs[0];
-        const monsterData = monsterDoc.data() as Omit<MonsterData, 'id'>;
-        
-        const monster: MonsterData = {
-          id: monsterDoc.id,
-          ...monsterData
-        };
-        
-        setMonster(monster);
-        setIsMonsterActuallyGenerated(true);
-
-        // Initialize health if not set
-        if (monster.health === undefined || monster.health === null) {
-          const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
-          const monsterRef = doc(db, 'monsters', monster.id);
-          await updateDoc(monsterRef, { health: initialHealth });
-          setMonster(prev => prev ? { ...prev, health: initialHealth } : null);
-        }
-      } else {
-        setIsMonsterActuallyGenerated(false);
-      }
-    } catch (error) {
-      console.error('Error fetching monster data:', error);
-      setIsMonsterActuallyGenerated(false);
-    }
-  }, [user]);
-
-  const fetchSleepLogEntries = useCallback(async () => {
-    if (!user?.uid || !db) return;
-
-    try {
-      const sleepLogsQuery = query(
-        collection(db, 'sleepLogs'),
-        where('userId', '==', user.uid),
-        orderBy('date', 'desc'),
-        limit(50)
-      );
-      
-      const sleepLogsSnapshot = await getDocs(sleepLogsQuery);
-      const entries: SleepLogEntry[] = [];
-      
-      sleepLogsSnapshot.docs.forEach(doc => {
-        const data = doc.data();
-        entries.push({
-          id: doc.id,
-          date: data.date,
-          timeToBed: data.timeToBed,
-          timeWokeUp: data.timeWokeUp,
-          sleepDurationMinutes: data.sleepDurationMinutes,
-          sleepQuality: data.sleepQuality,
-          notes: data.notes,
-          loggedAt: data.loggedAt
-        });
-      });
-      
-      setSleepLogEntries(entries);
-    } catch (error) {
-      console.error('Error fetching sleep log entries:', error);
-    }
-  }, [user]);
+  }, [toast, isMonsterActuallyGenerated]);
 
   useEffect(() => {
     setIsClientReady(true);
-    if (user?.uid) {
-      fetchMonsterData();
-      fetchSleepLogEntries();
-    }
-  }, [user, fetchMonsterData, fetchSleepLogEntries]);
+    const generated = localStorage.getItem(MONSTER_GENERATED_KEY) === 'true';
+    setIsMonsterActuallyGenerated(generated);
 
-  useEffect(() => {
-    if (isMonsterActuallyGenerated && monster) {
+    if (generated) {
+      setMonsterImageUrl(localStorage.getItem(MONSTER_IMAGE_KEY));
+      setMonsterName(localStorage.getItem(MONSTER_NAME_KEY));
+      const storedHealth = localStorage.getItem(MONSTER_HEALTH_KEY);
+      if (storedHealth) setMonsterHealth(parseFloat(storedHealth));
+      else {
+        const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
+        setMonsterHealth(initialHealth); localStorage.setItem(MONSTER_HEALTH_KEY, String(initialHealth));
+      }
       performNightlyRecovery();
     }
-  }, [isMonsterActuallyGenerated, monster, performNightlyRecovery]);
 
-  const checkMonsterDeath = useCallback(async (currentHealth: number, cause: string) => {
-    if (currentHealth <= MONSTER_DEATH_THRESHOLD && monster && user?.uid && db) {
-      try {
-        // Add to tomb
-        await addDoc(collection(db, 'tomb'), {
-          userId: user.uid,
-          name: monster.name,
-          imageUrl: monster.imageUrl,
-          cause,
-          diedAt: serverTimestamp()
-        });
+    const storedSleepLog = localStorage.getItem(SLEEP_LOG_ENTRIES_KEY);
+    if (storedSleepLog) {
+      setSleepLogEntries(JSON.parse(storedSleepLog));
+    }
+  }, [performNightlyRecovery]);
 
-        // Delete current monster
-        const monsterRef = doc(db, 'monsters', monster.id);
-        await deleteDoc(monsterRef);
+  useEffect(() => {
+    if (typeof window !== 'undefined' && monsterHealth !== null && isMonsterActuallyGenerated && monsterName) {
+      localStorage.setItem(MONSTER_HEALTH_KEY, String(monsterHealth));
+      checkMonsterDeath(monsterHealth, "chronic exhaustion"); 
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monsterHealth, monsterName, isMonsterActuallyGenerated]);
 
-        setMonster(null);
+  useEffect(() => {
+    if (sleepLogEntries.length > 0 || localStorage.getItem(SLEEP_LOG_ENTRIES_KEY)) {
+      localStorage.setItem(SLEEP_LOG_ENTRIES_KEY, JSON.stringify(sleepLogEntries));
+    }
+  }, [sleepLogEntries]);
+
+  const checkMonsterDeath = (currentHealth: number, cause: string) => {
+     if (currentHealth <= MONSTER_DEATH_THRESHOLD && monsterName && monsterImageUrl) {
+        if (typeof window === 'undefined') return true;
+        const tomb: TombEntry[] = JSON.parse(localStorage.getItem(MONSTER_TOMB_KEY) || '[]');
+        tomb.unshift({ name: monsterName, imageUrl: monsterImageUrl, diedAt: new Date().toISOString() });
+        localStorage.setItem(MONSTER_TOMB_KEY, JSON.stringify(tomb.slice(0, 50)));
+        localStorage.removeItem(MONSTER_IMAGE_KEY); localStorage.removeItem(MONSTER_NAME_KEY);
+        localStorage.removeItem(MONSTER_HEALTH_KEY); localStorage.removeItem(MONSTER_GENERATED_KEY);
+        setMonsterImageUrl(null); setMonsterName(null); setMonsterHealth(null);
         setIsMonsterActuallyGenerated(false);
-
-        toast({
-          title: `${monster.name} Fades Away...`,
-          description: `Overcome by ${cause}, its dark energy wanes. Current health: ${currentHealth.toFixed(1)}%.`,
-          variant: "destructive",
-          duration: Number.MAX_SAFE_INTEGER
-        });
-
-        router.push('/create-monster');
-        return true;
-      } catch (error) {
-        console.error('Error handling monster death:', error);
-      }
-    }
-    return false;
-  }, [monster, user, router, toast]);
-
-  const addPoints = async (points: number) => {
-    if (!user?.uid || !db) return;
-
-    try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        points: increment(points)
-      });
-    } catch (error) {
-      console.error('Error adding points:', error);
-    }
+        toast({ title: `${monsterName} Fades Away...`, description: `Overcome by ${cause}, its dark energy wanes. Current health: ${currentHealth.toFixed(1)}%.`, variant: "destructive", duration: Number.MAX_SAFE_INTEGER });
+        router.push('/create-monster'); return true;
+      } return false;
+  };
+  
+  const addPoints = (points: number) => {
+    if (typeof window === 'undefined') return;
+    const currentPoints = parseInt(localStorage.getItem(USER_POINTS_KEY) || '0', 10);
+    localStorage.setItem(USER_POINTS_KEY, String(currentPoints + points));
   };
 
   const calculateSleepDuration = (bedTimeStr: string, wokeUpTimeStr: string, sleepDate: Date): number | undefined => {
@@ -266,6 +167,7 @@ export default function SleepLogPage() {
       const bedDateTime = parse(bedTimeStr, "HH:mm", sleepDate);
       let wokeUpDateTime = parse(wokeUpTimeStr, "HH:mm", sleepDate);
 
+      // If woke up time is earlier than bed time, assume it's the next day
       if (wokeUpDateTime < bedDateTime) {
         wokeUpDateTime = new Date(wokeUpDateTime.setDate(wokeUpDateTime.getDate() + 1));
       }
@@ -278,79 +180,56 @@ export default function SleepLogPage() {
     }
   };
   
-  const handleLogSleep = async (event: React.FormEvent) => {
+  const handleLogSleep = (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedDate || !timeToBed || !timeWokeUp || !sleepQuality) {
       setError("Please fill in all required sleep details.");
       return;
     }
-    if (!isMonsterActuallyGenerated || !user?.uid || !db) {
+    if (!isMonsterActuallyGenerated) {
       setError("Please create your monster first to log sleep.");
       return;
     }
-    
     setError(null);
-    setIsLoading(true);
 
-    try {
-      const durationMinutes = calculateSleepDuration(timeToBed, timeWokeUp, selectedDate);
+    const durationMinutes = calculateSleepDuration(timeToBed, timeWokeUp, selectedDate);
 
-      const newEntry = {
-        userId: user.uid,
-        date: format(selectedDate, "yyyy-MM-dd"),
-        timeToBed,
-        timeWokeUp,
-        sleepDurationMinutes: durationMinutes,
-        sleepQuality: parseInt(sleepQuality, 10),
-        notes: sleepNotes.trim() || undefined,
-        loggedAt: serverTimestamp()
-      };
+    const newEntry: SleepLogEntry = {
+      id: Date.now().toString(),
+      date: format(selectedDate, "yyyy-MM-dd"),
+      timeToBed,
+      timeWokeUp,
+      sleepDurationMinutes: durationMinutes,
+      sleepQuality: parseInt(sleepQuality, 10),
+      notes: sleepNotes.trim() || undefined,
+      loggedAt: new Date().toISOString(),
+    };
+    setSleepLogEntries(prev => [newEntry, ...prev].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 50));
+    addPoints(POINTS_PER_SLEEP_LOG);
 
-      await addDoc(collection(db, 'sleepLogs'), newEntry);
-      await addPoints(POINTS_PER_SLEEP_LOG);
+    toast({
+      title: "Sleep Logged!",
+      description: `Your sleep for ${format(selectedDate, "PPP")} has been recorded. You earned ${POINTS_PER_SLEEP_LOG} points.`,
+    });
 
-      toast({
-        title: "Sleep Logged!",
-        description: `Your sleep for ${format(selectedDate, "PPP")} has been recorded. You earned ${POINTS_PER_SLEEP_LOG} points.`,
-      });
-
-      // Reset form
-      setSelectedDate(new Date());
-      setTimeToBed('');
-      setTimeWokeUp('');
-      setSleepQuality('3');
-      setSleepNotes('');
-
-      // Refresh entries
-      fetchSleepLogEntries();
-    } catch (error) {
-      console.error('Error logging sleep:', error);
-      setError('Failed to log sleep entry. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+    // Reset form
+    setSelectedDate(new Date());
+    setTimeToBed('');
+    setTimeWokeUp('');
+    setSleepQuality('3');
+    setSleepNotes('');
   };
 
-  const handleDeleteEntry = async (id: string) => {
-    if (!db) return;
-
-    try {
-      const entryRef = doc(db, 'sleepLogs', id);
-      await deleteDoc(entryRef);
-      
-      setSleepLogEntries(prev => prev.filter(entry => entry.id !== id));
-      toast({ title: "Sleep Entry Removed", variant: "default" });
-    } catch (error) {
-      console.error('Error deleting sleep entry:', error);
-      toast({ title: "Failed to delete entry", variant: "destructive" });
-    }
+  const handleDeleteEntry = (id: string) => {
+    setSleepLogEntries(prev => prev.filter(entry => entry.id !== id));
+    toast({ title: "Sleep Entry Removed", variant: "default" });
   };
   
   const getHealthBarValue = () => {
-    if (!monster) return 0;
-    const range = MAX_MONSTER_HEALTH - MONSTER_DEATH_THRESHOLD;
-    const currentValInRange = monster.health - MONSTER_DEATH_THRESHOLD;
-    return Math.max(0, Math.min((currentValInRange / range) * 100, 100));
+      if (monsterHealth === null) return 0;
+      const range = MAX_MONSTER_HEALTH - MONSTER_DEATH_THRESHOLD;
+      const currentValInRange = monsterHealth - MONSTER_DEATH_THRESHOLD;
+      return Math.max(0, Math.min((currentValInRange / range) * 100, 100));
   };
 
   const formatDuration = (minutes?: number) => {
@@ -360,7 +239,7 @@ export default function SleepLogPage() {
     return `${hours}h ${mins}m`;
   };
 
-  const sleepQualityMap: {[key: number]: {label: string, color: string}} = {
+  const sleepQualityMap: {[key: number]: {label: string, color: string, icon?: React.ElementType}} = {
     1: { label: 'Very Poor', color: 'text-red-500' },
     2: { label: 'Poor', color: 'text-orange-500' },
     3: { label: 'Neutral', color: 'text-yellow-500' },
@@ -368,29 +247,9 @@ export default function SleepLogPage() {
     5: { label: 'Excellent', color: 'text-green-500' },
   };
 
+
   if (!isClientReady) {
     return <LoadingPlaceholder />;
-  }
-
-  if (!user) {
-    return (
-      <Card className="max-w-lg mx-auto">
-        <CardHeader>
-          <CardTitle className="font-headline flex items-center gap-2">
-            <Info className="h-6 w-6 text-primary"/>
-            Authentication Required
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-center text-muted-foreground mb-4">
-            Please log in to track your sleep.
-          </p>
-          <Button asChild className="w-full">
-            <Link href="/login">Log In</Link>
-          </Button>
-        </CardContent>
-      </Card>
-    );
   }
 
   if (!isMonsterActuallyGenerated) {
@@ -407,16 +266,16 @@ export default function SleepLogPage() {
   return (
     <div className="grid lg:grid-cols-3 gap-6">
       <div className="lg:col-span-1 space-y-6">
-        {monster && (
+        {monsterName && monsterImageUrl && monsterHealth !== null && (
           <Card>
             <CardHeader className="items-center text-center">
               <Link href="/my-profile">
-                <Image src={monster.imageUrl} alt={monster.name} width={100} height={100} className="rounded-full border-2 border-primary shadow-md mx-auto cursor-pointer hover:opacity-80 transition-opacity" data-ai-hint="generated monster"/>
+                <Image src={monsterImageUrl} alt={monsterName} width={100} height={100} className="rounded-full border-2 border-primary shadow-md mx-auto cursor-pointer hover:opacity-80 transition-opacity" data-ai-hint="generated monster"/>
               </Link>
-              <CardTitle className="font-headline text-xl pt-2">{monster.name}</CardTitle>
+              <CardTitle className="font-headline text-xl pt-2">{monsterName}</CardTitle>
             </CardHeader>
             <CardContent className="text-center">
-              <Label htmlFor="monster-health-sleep" className="text-sm font-medium block mb-1">Nemesis Health: {monster.health.toFixed(1)}%</Label>
+              <Label htmlFor="monster-health-sleep" className="text-sm font-medium block mb-1">Nemesis Health: {monsterHealth.toFixed(1)}%</Label>
               <Progress id="monster-health-sleep" value={getHealthBarValue()} className="w-full h-2.5" />
               <p className="text-xs text-muted-foreground mt-1">Consistent sleep might just tire it out... or not.</p>
             </CardContent>
@@ -480,9 +339,8 @@ export default function SleepLogPage() {
               {error && <Alert variant="destructive"><AlertTitle>Input Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
             </CardContent>
             <CardFooter>
-              <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
-                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-                {isLoading ? 'Logging...' : 'Log Sleep Entry'}
+              <Button type="submit" className="w-full sm:w-auto">
+                <PlusCircle className="mr-2 h-4 w-4" /> Log Sleep Entry
               </Button>
             </CardFooter>
           </form>
@@ -499,7 +357,7 @@ export default function SleepLogPage() {
               <Card key={entry.id} className="p-3 bg-card/60">
                 <div className="flex justify-between items-start gap-2">
                   <div>
-                    <h4 className="font-semibold text-foreground">{format(new Date(entry.date + 'T00:00:00'), "PPP")}</h4>
+                    <h4 className="font-semibold text-foreground">{format(parseISO(entry.date + 'T00:00:00'), "PPP")}</h4>
                     <p className="text-xs text-muted-foreground">
                       Bed: {entry.timeToBed} | Woke: {entry.timeWokeUp}
                     </p>
@@ -509,7 +367,7 @@ export default function SleepLogPage() {
                           <Clock className="h-3 w-3" /> {formatDuration(entry.sleepDurationMinutes)}
                         </Badge>
                       )}
-                      <Badge className={cn("text-white", sleepQualityMap[entry.sleepQuality]?.color.replace('text-', 'bg-').replace('-500', '-600'))}>
+                      <Badge className={cn("text-white", sleepQualityMap[entry.sleepQuality]?.color.replace('text-', 'bg-').replace('-500', '-600 dark:replace-600-400'))}>
                         Quality: {sleepQualityMap[entry.sleepQuality]?.label || entry.sleepQuality}
                       </Badge>
                     </div>

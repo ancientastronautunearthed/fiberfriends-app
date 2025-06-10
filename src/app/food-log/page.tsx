@@ -1,409 +1,407 @@
 'use client';
 
-import React, { useState, useEffect, useTransition, useCallback } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState, useEffect, useTransition } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Apple, ThumbsUp, ThumbsDown, MinusCircle, Info, Sparkles, Skull, Ghost, Sunrise, Sun, Moon, Coffee, ChefHat, ShoppingCart, HelpCircle, FileQuestion, Edit3, UserPlus } from "lucide-react";
-import Image from "next/image";
+import { 
+  Calendar, ShoppingCart, Lightbulb, AlertCircle, 
+  Utensils, ArrowLeft, Printer, Download, ChefHat,
+  Sun, Moon, Coffee, Apple, Clock, DollarSign, Loader2
+} from "lucide-react";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import Image from "next/image";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
-import MonsterRiddleModal from '@/components/features/monster-riddle-modal';
-import { Separator } from '@/components/ui/separator';
-import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Textarea } from '@/components/ui/textarea';
-import { useAuth } from '@/context/auth-context';
-import { formatDistanceToNow } from 'date-fns';
+import { generateRecipeAction } from '../actions';
+import type { RecipeGenerationOutput, Ingredient } from '@/ai/flows/recipe-generation-flow';
 
-// Import all actions from the server actions file
-import { 
-  getFoodLogPageData, 
-  processFoodSubmission, 
-  processRiddleResult,
-  mealSuggestionFlow,
-  recipeGenerationFlow 
-} from './actions';
+const AI_DIETICIAN_KEY = 'aiDietician';
+const AI_DIET_PLAN_KEY = 'aiDietPlan';
 
-// Interfaces to type the data fetched from Firestore
-interface Monster {
-  id: string;
+interface AIDietician {
   name: string;
   imageUrl: string;
-  health: number;
-}
-interface FoodLog {
-  id: string;
-  foodName: string;
-  loggedAt: string; // Is now an ISO string
-  grade: 'good' | 'bad' | 'neutral' | 'pending';
-  reasoning: string;
-  healthImpactPercentage: number;
-  healthBefore: number;
-  healthAfter: number;
-  calories?: number;
-  proteinGrams?: number;
-  carbGrams?: number;
-  fatGrams?: number;
-  sugarGrams?: number;
-  sodiumMilligrams?: number;
-  servingDescription?: string;
-  nutritionDisclaimer?: string;
-  clarifyingQuestions?: string[];
-}
-interface Recipe {
-    recipeName: string;
-    prepTime?: string;
-    cookTime?: string;
-    servings?: string;
-    ingredients: { name: string; quantity: number; unit: string; notes?: string; isLinkable?: boolean; }[];
-    instructions: string[];
-    recipeNotes?: string;
+  personality: string;
+  specialization: string;
+  catchphrase: string;
+  communicationStyle: string;
 }
 
-// Constants
-const MONSTER_DEATH_THRESHOLD = -50;
-const MAX_MONSTER_HEALTH = 200;
+interface DietPlan {
+  planName: string;
+  duration: string;
+  meals: {
+    breakfast: string[];
+    lunch: string[];
+    dinner: string[];
+    snacks: string[];
+  };
+  weeklySchedule: {
+    [key: string]: {
+      breakfast: string;
+      lunch: string;
+      dinner: string;
+      snack: string;
+    };
+  };
+  shoppingList: string[];
+  tips: string[];
+  restrictions: string[];
+}
 
-export default function FoodLogPage() {
-    const { user } = useAuth();
-    const router = useRouter();
-    const { toast } = useToast();
+const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const dayLabels: Record<string, string> = {
+  monday: 'Monday',
+  tuesday: 'Tuesday',
+  wednesday: 'Wednesday',
+  thursday: 'Thursday',
+  friday: 'Friday',
+  saturday: 'Saturday',
+  sunday: 'Sunday'
+};
 
-    // Page data state
-    const [monster, setMonster] = useState<Monster | null>(null);
-    const [foodLogs, setFoodLogs] = useState<FoodLog[]>([]);
+const RecipeDialog = ({ mealName, children }: { mealName: string, children: React.ReactNode }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [recipe, setRecipe] = useState<RecipeGenerationOutput | null>(null);
+  const [isLoading, startLoadingTransition] = useTransition();
+  const { toast } = useToast();
 
-    // UI state
-    const [foodInput, setFoodInput] = useState('');
-    const [error, setError] = useState<string | null>(null);
-    const [showDamageEffect, setShowDamageEffect] = useState(false);
-    const [isRiddleModalOpen, setIsRiddleModalOpen] = useState(false);
-    
-    // Suggestion/Recipe state
-    const [suggestedMeal, setSuggestedMeal] = useState<{ suggestedMealName: string, monsterImpactStatement: string, shortDescription: string } | null>(null);
-    const [generatedRecipe, setGeneratedRecipe] = useState<Recipe | null>(null);
-    const [recipePreparationNotes, setRecipePreparationNotes] = useState('');
-    
-    // Transition (loading) states
-    const [isPageLoading, startPageLoadTransition] = useTransition();
-    const [isProcessing, startProcessingTransition] = useTransition();
-    const [isGenerating, startGeneratingTransition] = useTransition();
-
-    // Fetch initial data
-    useEffect(() => {
-        if (user?.uid) {
-            startPageLoadTransition(async () => {
-                const data = await getFoodLogPageData(user.uid);
-                if (data.error) {
-                    toast({ title: "Error", description: data.error, variant: "destructive" });
-                } else {
-                    setMonster(data.monster as Monster | null);
-                    setFoodLogs(data.foodLogs as FoodLog[]);
-                }
-            });
-        }
-    }, [user, toast]);
-
-    const handleFoodSubmit = async (event: React.FormEvent) => {
-        event.preventDefault();
-        if (!user?.uid) { toast({ title: "Not logged in", variant: "destructive" }); return; }
-        const currentFoodInput = foodInput.trim();
-        if (!currentFoodInput) { setError("Please enter a food item."); return; }
-        
-        setError(null);
-        startProcessingTransition(async () => {
-            const result = await processFoodSubmission(currentFoodInput, user.uid);
-            
-            if (result.error) {
-                setError(result.error);
-                toast({ title: "Error", description: result.error, variant: "destructive" });
-            } else if (result.monsterDied && result.monsterName) {
-                toast({
-                    title: `${result.monsterName} Has Perished!`,
-                    description: `Its reign ends at ${result.newHealth.toFixed(1)}% health, due to ${result.cause}. A new shadow stirs...`,
-                    variant: "destructive",
-                    duration: 10000,
-                });
-                router.push('/create-monster');
-            } else if (result.success && result.newHealth !== undefined && result.gradingResult) {
-                setMonster(prev => prev ? { ...prev, health: result.newHealth } : null);
-                // Optimistically add new log
-                const newLog = {
-                    id: String(Date.now()), // temp id
-                    loggedAt: new Date().toISOString(),
-                    healthAfter: result.newHealth,
-                    ...result.gradingResult,
-                    foodName: currentFoodInput,
-                }
-                setFoodLogs(prev => [newLog as unknown as FoodLog, ...prev]);
-
-                if (result.gradingResult.healthImpactPercentage < 0) {
-                     setShowDamageEffect(true);
-                     setTimeout(() => setShowDamageEffect(false), 700);
-                }
-
-                toast({
-                    title: result.gradingResult.grade === 'good' ? `${monster?.name} wails!` : result.gradingResult.grade === 'bad' ? `${monster?.name} rejoices!` : `${monster?.name} is indifferent.`,
-                    description: `${monster?.name} says: "${result.gradingResult.reasoning}". Health is now ${result.newHealth.toFixed(1)}%.`,
-                    variant: result.gradingResult.grade === 'bad' ? 'destructive' : 'default',
-                    duration: 8000
-                });
-                setFoodInput('');
-            }
+  const handleFetchRecipe = () => {
+    if (!mealName) return;
+    startLoadingTransition(async () => {
+      try {
+        const result = await generateRecipeAction({ mealName });
+        setRecipe(result);
+      } catch (error) {
+        toast({
+          title: "Recipe Error",
+          description: error instanceof Error ? error.message : "Could not generate recipe.",
+          variant: "destructive",
         });
-    };
-    
-    const handleRiddleChallengeComplete = (wasCorrect: boolean) => {
-        if (!user?.uid) return;
-        
-        startProcessingTransition(async () => {
-            const result = await processRiddleResult(wasCorrect, user.uid);
-             if (result.error) {
-                toast({ title: "Error", description: result.error, variant: "destructive" });
-            } else if (result.monsterDied && result.monsterName) {
-                toast({
-                    title: `${result.monsterName} Has Perished!`,
-                    description: `Its reign ends at ${result.newHealth.toFixed(1)}% due to a riddle's outcome. A new shadow stirs...`,
-                    variant: "destructive",
-                    duration: 10000,
-                });
-                router.push('/create-monster');
-            } else if (result.success && result.newHealth !== undefined && result.healthChange !== undefined) {
-                 setMonster(prev => prev ? { ...prev, health: result.newHealth } : null);
-                 const toastTitle = result.healthChange < 0 ? `${monster?.name} is FUMING!` : `${monster?.name} exults!`;
-                 const healthDesc = result.healthChange < 0 ? `My health drops to ${result.newHealth.toFixed(1)}%!` : `My health surges to ${result.newHealth.toFixed(1)}%!`
-                 toast({ title: toastTitle, description: `"${healthDesc}"`, variant: result.healthChange > 0 ? "destructive" : "default", duration: 8000 });
-                 
-                 if(result.pointsAwarded && result.pointsAwarded > 0) {
-                     toast({ title: `${monster?.name} grumbles: 'Bonus Points?'`, description: `Hmph. So my first words earned you ${result.pointsAwarded} points. Don't get used to it.`, duration: 7000 });
-                 }
-            }
-        });
-    };
+      }
+    });
+  };
 
-    const handleSuggestMeal = (mealType: "breakfast" | "lunch" | "dinner" | "snack") => {
-        setError(null);
-        setSuggestedMeal(null);
-        setGeneratedRecipe(null);
-        startGeneratingTransition(async () => {
-             try {
-                const result = await mealSuggestionFlow({ mealType });
-                setSuggestedMeal(result);
-             } catch(e) {
-                 const err = e instanceof Error ? e.message : "AI Chef is on strike.";
-                 setError(err);
-             }
-        });
-    };
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if (open && !recipe) handleFetchRecipe(); }}>
+      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{isLoading ? 'Generating Recipe...' : recipe ? recipe.recipeName : 'Recipe'}</DialogTitle>
+          {recipe && <DialogDescription>Prep: {recipe.prepTime} | Cook: {recipe.cookTime} | Servings: {recipe.servings}</DialogDescription>}
+        </DialogHeader>
+        {isLoading ? (
+          <div className="flex items-center justify-center p-10"><Loader2 className="h-8 w-8 animate-spin" /></div>
+        ) : recipe ? (
+          <ScrollArea className="max-h-[60vh] pr-4">
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-semibold">Ingredients</h4>
+                <ul className="list-disc list-inside text-sm mt-1">
+                  {recipe.ingredients.map((ing: Ingredient, i: number) => (
+                    <li key={i}>{ing.quantity} {ing.unit} {ing.name} {ing.notes && `(${ing.notes})`}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold">Instructions</h4>
+                <ol className="list-decimal list-inside text-sm mt-1 space-y-1">
+                  {recipe.instructions.map((step, i) => <li key={i}>{step}</li>)}
+                </ol>
+              </div>
+              {recipe.recipeNotes && (
+                <div>
+                  <h4 className="font-semibold">Notes</h4>
+                  <p className="text-sm italic text-muted-foreground mt-1">{recipe.recipeNotes}</p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        ) : (
+          <p>Could not load recipe.</p>
+        )}
+        <DialogFooter className="sm:justify-start">
+          <Button disabled><ShoppingCart className="mr-2 h-4 w-4" /> Add to Instacart (Coming Soon)</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
-    const handleGenerateRecipe = (mealName: string) => {
-        setError(null);
-        setGeneratedRecipe(null);
-        startGeneratingTransition(async () => {
-            try {
-                const result = await recipeGenerationFlow({ mealName });
-                setGeneratedRecipe(result);
-            } catch(e) {
-                const err = e instanceof Error ? e.message : "The recipe scroll turned to dust.";
-                setError(err);
-            }
-        });
-    };
-    
-    const getMonsterStatusMessage = () => {
-        if (!monster) return "Awaiting its creation...";
-        if (monster.health <= MONSTER_DEATH_THRESHOLD) return `${monster.name} has perished!`;
-        if (monster.health < 0) return `${monster.name} is critically weak at ${monster.health.toFixed(1)}%!`;
-        if (monster.health < 50) return `${monster.name} is feeling quite weak (${monster.health.toFixed(1)}%).`;
-        if (monster.health > 150) return `${monster.name} is overwhelmingly powerful (${monster.health.toFixed(1)}%)!`;
-        return `${monster.name}'s health is ${monster.health.toFixed(1)}%... stable, for now.`;
-    };
-    
-    const getHealthBarValue = () => {
-        if (monster === null) return 0;
-        const range = MAX_MONSTER_HEALTH - MONSTER_DEATH_THRESHOLD;
-        const currentValInRange = monster.health - MONSTER_DEATH_THRESHOLD;
-        return Math.max(0, Math.min((currentValInRange / range) * 100, 100));
-    }
-    
-    // Loading state for initial data fetch
-    if (isPageLoading) {
-        return <div className="flex justify-center items-center min-h-screen"><Loader2 className="h-16 w-16 animate-spin"/></div>
+export default function DietPlanPage() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [dietician, setDietician] = useState<AIDietician | null>(null);
+  const [dietPlan, setDietPlan] = useState<DietPlan | null>(null);
+  const [selectedDay, setSelectedDay] = useState('monday');
+  const [isLogging, startLoggingTransition] = useTransition();
+
+  useEffect(() => {
+    const storedDietician = localStorage.getItem(AI_DIETICIAN_KEY);
+    const storedDietPlan = localStorage.getItem(AI_DIET_PLAN_KEY);
+
+    if (storedDietician) {
+      setDietician(JSON.parse(storedDietician));
     }
 
-    // If no monster exists for the user
-    if (!monster) {
-      return (
-        <Card className="max-w-lg mx-auto">
-          <CardHeader>
-            <CardTitle className="font-headline flex items-center gap-2"><Info className="h-6 w-6 text-primary"/>Monster Not Found or Perished</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center text-muted-foreground mb-4">
-              You need to create your Morgellon Monster, or your previous one has fallen.
-            </p>
-            <Button asChild className="w-full mb-2">
-              <Link href="/create-monster"><Sparkles className="mr-2 h-4 w-4"/>Create a New Monster</Link>
-            </Button>
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/monster-tomb"><Skull className="mr-2 h-4 w-4"/>View Tomb of Monsters</Link>
-            </Button>
+    if (storedDietPlan) {
+      setDietPlan(JSON.parse(storedDietPlan));
+    } else if (storedDietician) {
+      router.push('/food-log/create-dietician');
+    } else {
+      router.push('/food-log/create-dietician');
+    }
+  }, [router]);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleLogTodaysMeals = () => {
+    startLoggingTransition(() => {
+      toast({
+        title: "Meals Logged (Simulation)",
+        description: "Your meals for today have been logged and will be graded.",
+        duration: 3000
+      });
+    });
+  };
+
+  const handleExport = () => {
+    if (!dietPlan) return;
+    const planText = `
+${dietPlan.planName}
+Duration: ${dietPlan.duration}
+Created by: ${dietician?.name || 'Your AI Dietician'}
+
+WEEKLY MEAL SCHEDULE
+${daysOfWeek.map(day => `
+${dayLabels[day].toUpperCase()}
+Breakfast: ${dietPlan.weeklySchedule[day].breakfast}
+Lunch: ${dietPlan.weeklySchedule[day].lunch}
+Dinner: ${dietPlan.weeklySchedule[day].dinner}
+Snack: ${dietPlan.weeklySchedule[day].snack}
+`).join('\n')}
+
+SHOPPING LIST
+${dietPlan.shoppingList.join('\n')}
+
+TIPS FOR SUCCESS
+${dietPlan.tips.map((tip, i) => `${i + 1}. ${tip}`).join('\n')}
+
+FOODS TO AVOID
+${dietPlan.restrictions.join('\n')}
+`;
+    const blob = new Blob([planText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${dietPlan.planName.replace(/\s+/g, '_')}_meal_plan.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  if (!dietPlan || !dietician) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Loader2 className="h-12 w-12 text-primary mx-auto animate-spin mb-4" />
+            <p className="text-muted-foreground">Loading your diet plan...</p>
           </CardContent>
         </Card>
-      );
-    }
-    
-    // Main component render
+      </div>
+    );
+  }
+
+  const MealCard = ({ mealType, mealName }: { mealType: string, mealName: string }) => {
+    const Icon = mealType === 'Breakfast' ? Sun : mealType === 'Lunch' ? Sun : mealType === 'Dinner' ? Moon : Coffee;
     return (
-      <TooltipProvider>
-      <>
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1 space-y-6">
-            <Card className={cn(showDamageEffect && 'animate-damage-flash')}>
-              <CardHeader className="items-center text-center">
-                <Image src={monster.imageUrl} alt={monster.name} width={128} height={128} className="rounded-full border-2 border-primary shadow-md mx-auto" />
-                <CardTitle className="font-headline text-2xl pt-2">{monster.name}</CardTitle>
-                <CardDescription>{getMonsterStatusMessage()}</CardDescription>
+      <RecipeDialog mealName={mealName}>
+        <Card className="hover:bg-accent/50 cursor-pointer transition-colors h-full">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Icon className={`h-5 w-5 ${mealType === 'Breakfast' ? 'text-yellow-500' : mealType === 'Lunch' ? 'text-orange-500' : mealType === 'Dinner' ? 'text-blue-500' : 'text-purple-500'}`} />
+              {mealType}
+            </CardTitle>
+          </CardHeader>
+          <CardContent><p>{mealName}</p></CardContent>
+        </Card>
+      </RecipeDialog>
+    );
+  };
+
+  const InstacartCard = () => (
+    <Card className="mt-6 bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700">
+      <CardHeader className="text-center">
+        <div className="mx-auto bg-gray-200 h-10 w-24 rounded flex items-center justify-center"><span className="text-xs font-semibold text-gray-500">Instacart</span></div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-center text-sm text-green-800 dark:text-green-300">Get your shopping list delivered!</p>
+      </CardContent>
+      <CardFooter>
+        <Button className="w-full bg-green-600 hover:bg-green-700"><ShoppingCart className="mr-2 h-4 w-4" /> Sign Up for Instacart</Button>
+      </CardFooter>
+    </Card>
+  );
+
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <Card className="mb-6">
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <Link href="/food-log" className="text-muted-foreground hover:text-primary"><ArrowLeft className="h-5 w-5" /></Link>
+              <Image src={dietician.imageUrl} alt={dietician.name} width={80} height={80} className="rounded-full border-2 border-primary" />
+              <div>
+                <CardTitle className="font-headline text-2xl">{dietPlan.planName}</CardTitle>
+                <CardDescription>Created by {dietician.name} • {dietPlan.duration}</CardDescription>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handlePrint}><Printer className="h-4 w-4 mr-2" />Print</Button>
+              <Button variant="outline" size="sm" onClick={handleExport}><Download className="h-4 w-4 mr-2" />Export</Button>
+            </div>
+          </div>
+          <div className="mt-4">
+            <Button onClick={handleLogTodaysMeals} disabled={isLogging} className="w-full sm:w-auto">
+              {isLogging ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Apple className="mr-2 h-4 w-4" />}
+              {isLogging ? "Logging..." : "Log Today's Meals"}
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
+
+      <Tabs defaultValue="schedule" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="schedule"><Calendar className="h-4 w-4 mr-2" />Schedule</TabsTrigger>
+          <TabsTrigger value="meals"><Utensils className="h-4 w-4 mr-2" />All Meals</TabsTrigger>
+          <TabsTrigger value="shopping"><ShoppingCart className="h-4 w-4 mr-2" />Shopping</TabsTrigger>
+          <TabsTrigger value="tips"><Lightbulb className="h-4 w-4 mr-2" />Tips</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="schedule">
+          <div className="grid lg:grid-cols-7 gap-2 mb-4">
+            {daysOfWeek.map(day => (
+              <Button key={day} variant={selectedDay === day ? "default" : "outline"} onClick={() => setSelectedDay(day)} className="w-full">{dayLabels[day]}</Button>
+            ))}
+          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">{dayLabels[selectedDay]}<Badge variant="outline"><Clock className="h-3 w-3 mr-1" />Day Schedule</Badge></CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <MealCard mealType="Breakfast" mealName={dietPlan.weeklySchedule[selectedDay].breakfast} />
+                <MealCard mealType="Lunch" mealName={dietPlan.weeklySchedule[selectedDay].lunch} />
+                <MealCard mealType="Dinner" mealName={dietPlan.weeklySchedule[selectedDay].dinner} />
+                <MealCard mealType="Snack" mealName={dietPlan.weeklySchedule[selectedDay].snack} />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="meals">
+          <div className="grid md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader><CardTitle className="flex items-center gap-2"><Sun className="h-5 w-5 text-yellow-500" />Breakfast Options</CardTitle></CardHeader>
+              <CardContent><ul className="space-y-2">{dietPlan.meals.breakfast.map((meal, index) => (<li key={index} className="flex items-start gap-2"><Apple className="h-4 w-4 text-muted-foreground mt-0.5" /><span className="text-sm">{meal}</span></li>))}</ul></CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="flex items-center gap-2"><Sun className="h-5 w-5 text-orange-500" />Lunch Options</CardTitle></CardHeader>
+              <CardContent><ul className="space-y-2">{dietPlan.meals.lunch.map((meal, index) => (<li key={index} className="flex items-start gap-2"><Apple className="h-4 w-4 text-muted-foreground mt-0.5" /><span className="text-sm">{meal}</span></li>))}</ul></CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="flex items-center gap-2"><Moon className="h-5 w-5 text-blue-500" />Dinner Options</CardTitle></CardHeader>
+              <CardContent><ul className="space-y-2">{dietPlan.meals.dinner.map((meal, index) => (<li key={index} className="flex items-start gap-2"><Apple className="h-4 w-4 text-muted-foreground mt-0.5" /><span className="text-sm">{meal}</span></li>))}</ul></CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="flex items-center gap-2"><Coffee className="h-5 w-5 text-purple-500" />Snack Options</CardTitle></CardHeader>
+              <CardContent><ul className="space-y-2">{dietPlan.meals.snacks.map((snack, index) => (<li key={index} className="flex items-start gap-2"><Apple className="h-4 w-4 text-muted-foreground mt-0.5" /><span className="text-sm">{snack}</span></li>))}</ul></CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="shopping">
+          <Card>
+            <CardHeader>
+              <CardTitle>Weekly Shopping List</CardTitle>
+              <CardDescription>All ingredients needed for your meal plan.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-96">
+                <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-2">
+                  {dietPlan.shoppingList.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-accent/20">
+                      <ShoppingCart className="h-4 w-4 text-primary" />
+                      <span className="text-sm">{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+              <InstacartCard />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tips">
+          <div className="space-y-4">
+            <Card>
+              <CardHeader><CardTitle>Tips for Success from {dietician.name}</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                {dietPlan.tips.map((tip, index) => (
+                  <div key={index} className="flex items-start gap-3">
+                    <div className="bg-primary text-primary-foreground rounded-full h-6 w-6 flex items-center justify-center text-sm font-bold flex-shrink-0">{index + 1}</div>
+                    <p className="text-sm">{tip}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+            <Card className="border-destructive/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-destructive"><AlertCircle className="h-5 w-5" />Foods to Avoid or Minimize</CardTitle>
               </CardHeader>
               <CardContent>
-                 <Label htmlFor="monster-health-progress" className="text-sm font-medium text-center block mb-1">
-                   Monster Health: {monster.health.toFixed(1)}%
-                 </Label>
-                 <Progress id="monster-health-progress" value={getHealthBarValue()} className="w-full h-3" />
-                 <p className="text-xs text-muted-foreground text-center mt-1">Bad foods strengthen your monster. Good foods weaken it.</p>
-              </CardContent>
-              <CardFooter className="flex-col gap-2">
-                  <Button variant="outline" onClick={() => setIsRiddleModalOpen(true)} className="w-full">
-                      <Ghost className="mr-2 h-4 w-4"/> My Monster Has a Riddle!
-                  </Button>
-              </CardFooter>
-            </Card>
-          </div>
-
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                  <CardTitle className="font-headline flex items-center gap-2"><Apple className="h-6 w-6 text-primary"/>Log Food Item</CardTitle>
-                  <CardDescription>Enter a food. {monster.name} will react, and the AI may provide nutritional info.</CardDescription>
-              </CardHeader>
-              <form onSubmit={handleFoodSubmit}>
-                  <CardContent>
-                      <Label htmlFor="food-item">Food Item</Label>
-                      <Input id="food-item" value={foodInput} onChange={(e) => setFoodInput(e.target.value)} placeholder="e.g., Spinach, Chocolate Croissant" disabled={isProcessing}/>
-                      {error && <Alert variant="destructive" className="mt-4"><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
-                  </CardContent>
-                  <CardFooter>
-                      <Button type="submit" disabled={isProcessing || !foodInput.trim()} className="w-full">
-                          {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Apple className="mr-2 h-4 w-4" />}
-                          {isProcessing ? `Asking ${monster.name}...` : `Log & See Reaction`}
-                      </Button>
-                  </CardFooter>
-              </form>
-            </Card>
-            
-            <Card>
-                <CardHeader>
-                    <CardTitle className="font-headline flex items-center gap-2"><ChefHat className="h-6 w-6 text-primary"/>AI Chef: Meal & Recipe Creation</CardTitle>
-                    <CardDescription>
-                      First, create your personalized AI Dietician. Then, ask for meal suggestions and generate recipes.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex flex-col gap-4">
-                        <Button asChild className="w-full">
-                            <Link href="/create-dietician">
-                                <UserPlus className="mr-2 h-4 w-4" /> Create or View Your AI Dietician
-                            </Link>
-                        </Button>
-                        <Separator />
-                        <div>
-                            <p className="text-center text-sm text-muted-foreground mb-4">Or get a quick meal suggestion:</p>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                {(["breakfast", "lunch", "dinner", "snack"] as const).map((mealType) => {
-                                    const Icon = mealType === "breakfast" ? Sunrise : mealType === "lunch" ? Sun : mealType === "dinner" ? Moon : Coffee;
-                                    return (
-                                        <Button key={mealType} variant="outline" onClick={() => handleSuggestMeal(mealType)} disabled={isGenerating}>
-                                            <Icon className="mr-2 h-4 w-4" />
-                                            {mealType.charAt(0).toUpperCase() + mealType.slice(1)}
-                                        </Button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </div>
-                    {isGenerating && <div className="flex items-center justify-center p-4"><Loader2 className="mr-2 h-5 w-5 animate-spin"/> AI Chef is thinking...</div>}
-                    
-                    {suggestedMeal && !generatedRecipe && (
-                      <Card className="mt-4 p-4 bg-accent/10">
-                        <CardTitle className="text-lg mb-1">{suggestedMeal.suggestedMealName}</CardTitle>
-                        <CardDescription className="mb-2">{suggestedMeal.shortDescription}</CardDescription>
-                        <p className="italic text-sm text-muted-foreground mb-3">"{suggestedMeal.monsterImpactStatement}"</p>
-                        <Button onClick={() => handleGenerateRecipe(suggestedMeal.suggestedMealName)} disabled={isGenerating}>
-                            {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ChefHat className="mr-2 h-4 w-4"/>}
-                            Get Recipe
-                        </Button>
-                      </Card>
-                    )}
-
-                    {generatedRecipe && (
-                      <Card className="mt-4"> 
-                        <CardHeader><CardTitle>{generatedRecipe.recipeName}</CardTitle></CardHeader>
-                        <CardContent>
-                             <h4 className="font-semibold mb-1">Ingredients:</h4>
-                             <ul className="list-disc list-inside space-y-1 text-sm">
-                                 {generatedRecipe.ingredients.map((ing, idx) => <li key={idx}>{ing.quantity} {ing.unit} {ing.name}</li>)}
-                             </ul>
-                             <Separator className="my-3"/>
-                             <h4 className="font-semibold mb-1">Instructions:</h4>
-                             <ol className="list-decimal list-inside space-y-1 text-sm">
-                                 {generatedRecipe.instructions.map((step, idx) => <li key={idx}>{step}</li>)}
-                             </ol>
-                        </CardContent>
-                      </Card>
-                    )}
-                </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-headline">Recent Food Log</CardTitle>
-                <CardDescription>Your last 20 food entries and their impact.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 max-h-96 overflow-y-auto">
-                  {foodLogs.length === 0 && <p className="text-sm text-muted-foreground">No food logged yet.</p>}
-                  {foodLogs.map(entry => (
-                    <Card key={entry.id} className="p-3 bg-card/60">
-                      <div className="flex justify-between items-start gap-2">
-                          <div>
-                            <h4 className="font-semibold flex items-center gap-1.5">
-                              {entry.grade === 'good' && <ThumbsUp className="h-4 w-4 text-green-500" />}
-                              {entry.grade === 'bad' && <ThumbsDown className="h-4 w-4 text-red-500" />}
-                              {entry.grade === 'neutral' && <MinusCircle className="h-4 w-4 text-muted-foreground" />}
-                              {entry.foodName}
-                            </h4>
-                            <p className="text-xs text-muted-foreground">Logged: {formatDistanceToNow(new Date(entry.loggedAt), { addSuffix: true })}</p>
-                          </div>
-                          <p className="text-xs text-right flex-shrink-0">Health: {entry.healthAfter.toFixed(1)}%</p>
-                      </div>
-                      <p className="text-sm text-foreground/80 mt-1 pl-1 border-l-2">"{entry.reasoning}"</p>
-                    </Card>
+                <ul className="grid sm:grid-cols-2 gap-2">
+                  {dietPlan.restrictions.map((restriction, index) => (
+                    <li key={index} className="flex items-center gap-2">
+                      <div className="h-2 w-2 bg-destructive rounded-full" />
+                      <span className="text-sm">{restriction}</span>
+                    </li>
                   ))}
+                </ul>
               </CardContent>
             </Card>
           </div>
-        </div>
+        </TabsContent>
+      </Tabs>
 
-        <MonsterRiddleModal
-            isOpen={isRiddleModalOpen}
-            onClose={() => setIsRiddleModalOpen(false)}
-            onChallengeComplete={handleRiddleChallengeComplete}
-        />
-      </>
-      </TooltipProvider>
-    );
+      {/* Bottom navigation card */}
+      <Card className="mt-6">
+        <CardContent className="pt-6">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button asChild>
+              <Link href="/food-log">
+                <Utensils className="mr-2 h-4 w-4" />
+                Return to Main Log
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/food-log/create-dietician">
+                <ChefHat className="mr-2 h-4 w-4" />
+                Update Diet Plan
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
