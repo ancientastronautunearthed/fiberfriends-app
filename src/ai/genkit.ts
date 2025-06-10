@@ -1,22 +1,16 @@
 // src/ai/genkit.ts
-import { configureGenkit } from '@genkit-ai/core';
+import { genkit, z } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
 
-// Configure Genkit with Google AI plugin
-configureGenkit({
+// Create and export the Genkit instance
+export const ai = genkit({
   plugins: [
     googleAI({
-      apiKey: process.env.GOOGLE_GENAI_API_KEY || '',
-    }),
+      apiKey: process.env.GOOGLE_GENAI_API_KEY,
+    })
   ],
-  logLevel: process.env.NODE_ENV === 'development' ? 'debug' : 'info',
+  model: 'googleai/gemini-2.0-flash',
 });
 
-// CRITICAL: Export runFlow for use in server actions
-export { runFlow } from '@genkit-ai/flow';
-
-// Export generate for use in flows
-export { generate } from '@genkit-ai/ai';
-
-// Re-export AI models for use in flows
-export { gemini20Flash, gemini15Flash } from '@genkit-ai/googleai';
+// CRITICAL: Also export z for use in flow files
+export { z };

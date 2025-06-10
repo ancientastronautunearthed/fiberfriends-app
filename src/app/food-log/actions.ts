@@ -1,10 +1,9 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { runFlow } from '@/ai/genkit';
-import { foodGradingFlow } from '@/ai/flows/food-grading-flow';
-import { mealSuggestionFlow } from '@/ai/flows/meal-suggestion-flow';
-import { recipeGenerationFlow } from '@/ai/flows/recipe-generation-flow';
+import { suggestMeal } from '@/ai/flows/meal-suggestion-flow';
+import { gradeFood } from '@/ai/flows/food-grading-flow';
+import { generateRecipe } from '@/ai/flows/recipe-generation-flow';
 import { firestoreService } from '@/lib/firestore-service';
 
 // --- Constants ---
@@ -16,37 +15,6 @@ const POINTS_PER_FOOD_LOG = 5;
 const MIN_RECOVERY = 10;
 const MAX_RECOVERY = 20;
 
-// --- Type Definitions ---
-interface ProcessFoodResult {
-  error?: string;
-  monsterDied?: boolean;
-  monsterName?: string;
-  cause?: string;
-  newHealth?: number;
-  success?: boolean;
-  gradingResult?: any;
-}
-
-interface ProcessRiddleResult {
-  error?: string;
-  monsterDied?: boolean;
-  monsterName?: string;
-  cause?: string;
-  newHealth?: number;
-  success?: boolean;
-  healthChange?: number;
-  pointsAwarded?: number;
-}
-
-interface NightlyRecoveryResult {
-  error?: string;
-  success?: boolean;
-  recoveryAmount?: number;
-  newHealth?: number;
-  monsterName?: string;
-  noRecoveryNeeded?: boolean;
-}
-
 // --- AI Flow Action Wrappers ---
 
 /**
@@ -54,7 +22,8 @@ interface NightlyRecoveryResult {
  */
 export async function gradeFoodItemAction(input: { foodItem: string }) {
   try {
-    const result = await runFlow(foodGradingFlow, {
+    // Call the flow directly with the correct input format
+    const result = await gradeFood({
       foodName: input.foodItem
     });
     return result;
@@ -69,7 +38,8 @@ export async function gradeFoodItemAction(input: { foodItem: string }) {
  */
 export async function suggestMealAction(input: { mealType: "breakfast" | "lunch" | "dinner" | "snack" }) {
   try {
-    const result = await runFlow(mealSuggestionFlow, {
+    // Call the flow directly
+    const result = await suggestMeal({
       mealType: input.mealType
     });
     return result;
@@ -84,7 +54,8 @@ export async function suggestMealAction(input: { mealType: "breakfast" | "lunch"
  */
 export async function generateRecipeAction(input: { mealName: string }) {
   try {
-    const result = await runFlow(recipeGenerationFlow, {
+    // Call the flow directly
+    const result = await generateRecipe({
       mealDescription: input.mealName
     });
     return result;
@@ -139,7 +110,7 @@ export async function getFoodLogPageData(userId: string) {
 /**
  * Processes a food submission: grades it, updates monster health, and logs it
  */
-export async function processFoodSubmission(foodItem: string, userId: string): Promise<ProcessFoodResult> {
+export async function processFoodSubmission(foodItem: string, userId: string) {
   if (!userId) return { error: 'User not authenticated.' };
 
   try {
@@ -151,8 +122,8 @@ export async function processFoodSubmission(foodItem: string, userId: string): P
 
     const healthBefore = monster.health;
     
-    // Grade the food with AI using runFlow
-    const gradingResult = await runFlow(foodGradingFlow, {
+    // Grade the food with AI
+    const gradingResult = await gradeFood({
       foodName: foodItem
     });
 
@@ -218,7 +189,7 @@ export async function processFoodSubmission(foodItem: string, userId: string): P
 /**
  * Processes the result of a riddle challenge
  */
-export async function processRiddleResult(wasCorrect: boolean, userId: string): Promise<ProcessRiddleResult> {
+export async function processRiddleResult(wasCorrect: boolean, userId: string) {
   if (!userId) return { error: 'User not authenticated.' };
 
   try {
@@ -232,9 +203,6 @@ export async function processRiddleResult(wasCorrect: boolean, userId: string): 
     newHealth = Math.min(MAX_MONSTER_HEALTH, newHealth);
 
     let pointsAwarded = 0;
-
-    // Check if this is the first time the monster has "spoken"
-    // You can implement this by adding a hasSpoken field to your MonsterData interface if needed
     
     // Update monster health
     await firestoreService.updateMonsterData(userId, { health: newHealth });
@@ -274,7 +242,7 @@ export async function processRiddleResult(wasCorrect: boolean, userId: string): 
 /**
  * Performs nightly health recovery for the monster
  */
-export async function performNightlyRecovery(userId: string): Promise<NightlyRecoveryResult> {
+export async function performNightlyRecovery(userId: string) {
   if (!userId) return { error: 'User not authenticated.' };
 
   try {
@@ -380,6 +348,3 @@ export async function addUserPoints(userId: string, points: number) {
     return { error: 'Failed to add user points.' };
   }
 }
-
-// --- Export all server actions ---
-// This ensures all functions are available for import in page components
