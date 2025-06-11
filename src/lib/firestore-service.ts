@@ -164,14 +164,20 @@ class FirestoreService {
       const docRef = this.getDocument('users', uid);
       const now = Timestamp.now();
       
-      await setDoc(docRef, {
+      const profileData: any = {
         email,
-        displayName,
         points: 0,
         tier: 'NONE',
         createdAt: now,
         updatedAt: now
-      });
+      };
+      
+      // Only add displayName if it's defined
+      if (displayName !== undefined && displayName !== null) {
+        profileData.displayName = displayName;
+      }
+      
+      await setDoc(docRef, profileData);
     } catch (error) {
       console.error('Error creating user profile:', error);
       throw error;

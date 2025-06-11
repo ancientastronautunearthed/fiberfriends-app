@@ -88,12 +88,11 @@ const productSuggestionFlow = ai.defineFlow(
     outputSchema: ProductSuggestionOutputSchema,
   },
   async (input) => {
-    const {output, history} = await prompt(input); // Added history
+    const {output} = await prompt(input);
     if (!output) {
       console.error("AI Error: Product suggestion output was null.");
       // Avoid logging potentially large 'allProducts' directly unless necessary for deep debug
       // console.error("Input to AI (symptoms only for brevity):", JSON.stringify({ userSymptoms: input.userSymptoms }, null, 2));
-      // console.error("AI Call History:", JSON.stringify(history, null, 2));
       throw new Error("The AI model did not return valid product suggestions. Please check server logs if issue persists.");
     }
     return output;

@@ -22,6 +22,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { showSocialProofToast } from '@/lib/social-proof-toast';
 import { useAuth } from '@/context/auth-context';
 import { firestoreService, type MonsterData, type PrescriptionEntry, type StreakData } from '@/lib/firestore-service';
+import { Timestamp } from 'firebase/firestore';
 
 const MONSTER_DEATH_THRESHOLD = -50;
 const MAX_MONSTER_HEALTH = 200;
@@ -441,7 +442,7 @@ export default function PrescriptionTrackerPage() {
         type: 'prescription', 
         date: new Date().toISOString().split('T')[0], 
         count: currentStreakCount, 
-        updatedAt: new Date() as any 
+        updatedAt: Timestamp.now()
       };
       setPrescriptionUsageStreak(updatedStreak);
 
