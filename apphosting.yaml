@@ -1,23 +1,24 @@
-# Settings for Backend (on Cloud Run).
-# See https://firebase.google.com/docs/app-hosting/configure#cloud-run
+env:
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyC3AhSg8eAklY-Df6PcDkWqO3OMmTjzhEg
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: fiber-friends-9b614.firebaseapp.com
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: fiber-friends
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: fiber-friends.firebasestorage.app
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "202818399028"
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:202818399028:web:225a88b017a6b584cfd361
+  - variable: FIREBASE_PROJECT_ID
+    value: fiber-friends
+  - variable: FIREBASE_CLIENT_EMAIL
+    value: firebase-adminsdk-fbsvc@fiber-friends.iam.gserviceaccount.com
+  - variable: FIREBASE_PRIVATE_KEY
+    value: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC8aucqa6v/nQ5c\ndMLl4UcBF7OwZbNVFkfu74u2CA3ZdiBUd0D9+UsNUyVnOEWUpIIu7PaQYyhA0wuQ\ntYwXat58zikiIN8ShtcEVwk1HuDLmC69Aij74Ea4aMr92u3l4GfHBL0VRZKYRT6Z\ng9M9G7XdcJyQJh26lXoarYPSV8WvrElpWrwPyUueLpL9acdkJ2RzRcRi0FKjKTSk\n+Gb6Fd1md2cshKJHBK9CpFTyvltJiG2OHfnqMLN4Lq58tysF0bRR4n33IqWbdqL2\nHW3155pvgztMYv6v4nMKakdSm3I8V3y9RouOHhY4PvQC722bwiwqTyyGMtEuzr/a\nnFLqVUPLAgMBAAECggEANO2q5mW8uV97K0m5fi4cbhgkaAcJq3tI1bwA+S+mBFKE\nnnWpki63gJS8yxQpp6nW0CvMz56rLhqbAxmcsu9YdKLNN0MYpvGt8RAqC/wSld64\nMmwq6yaDd0Yoz8ryTUMOo/+WxiT3G0NIZIN9kYr5Oa1qraunakSXOmtHvozdgY1e\nkTbqqXsQLMOyPZgIJECzj0ic6ZD8FXWP3iIjYisWAHBEGF6/je0BHs0jjwvKgUMS\npzfZ1Sq13/DNoiywGMHfBLX50fS5U7+hivACh1JLA6JZ+Agk1JdtvUaIO5ufIuQh\nw2qGq/BEydyeAS1+m/SK+TC0SpumGO5xGWJPHw7WEQKBgQDsSyYt4O9s/nyrfcag\n5jxykOSfj1Va0W8CK7JPvWr1qDhkjqT2c5GPlYOeSciu0JjYllnYbcoPV//74bUe\nMgrV41Fed1dctvf+qRL+4lIR5l6F3L1BpOkKwCGgVfolqy0PgVny0EJbFBfRu6zc\nEJKddxAa5chg/1GeTcYyQjdRvQKBgQDMIZr8JF7BV1xCpR9p2Jj9EIP14PE5pELl\nv1t7764oIdVgcSt1B2uvBEilIvKXy1Fd0IuwDwNJLL5Y5snXIcl8eTuDc+lGYgxD\n31UrXbd8YiIn2FqqJiRXydlU8UkER3oRdtLl6R5+u+XV6YtE9b3MMabWu4hFA8pO\nWyV+OLwQJwKBgGo+Q9VfDOgp6K5G6DdSLh2pDlK75Lnn7wy/zvXRijUYRPrZtExn\nnCw+IqbaMBSCECdaOt14R+DsRVngm0oPYBXZlq1t5Wb3kbv8E2FtK0+HEDsKDEJm\nvq2pw7TO06F6PNF67JGjmCJRf4A67TcpcHLCpQgjBxytz+nouFPCuBLVAoGAFIt9\nUctHTiZAvuRnmPuXykCTR3fwT2Dc6sqrpnmlCZz+IMrDGPA6Qk8oEJbH28c21T5c\nEMgyCHdcYQ45WlGoOcLp3n0YCWFs4pfjto2kHfyye1gnJ+DW348NNKNkOe4HtyJC\nb6lazF6U70amIbap95c3t30AZhHPlrtNtrp3ExkCgYEAvGJkhjaoFr8tCttWSzcb\nhxasoQqC0jhqcQAas+V+XjyoXjYt7UBHS0rwQv1zV7MGYgDY815AWkH330/zmoEz\n/1lMqwnfoDhT3m495enb3jgWj6SOnSz7kCkjx4H2ipcvdBxpowvTcBrVkuRBnYNd\n1D70MnZq2Qb8cPrk8fSl1nM=\n-----END PRIVATE KEY-----\n"
+  - variable: GEMINI_API_KEY
+    value: AIzaSyApD38IBmtCZE8qL4-2A7_pz2zy4GzQSNc
+
 runConfig:
-  minInstances: 0
-  # maxInstances: 100
-  # concurrency: 80
-  # cpu: 1
-  # memoryMiB: 512
-
-# Environment variables and secrets.
-# env:
-  # Configure environment variables.
-  # See https://firebase.google.com/docs/app-hosting/configure#user-defined-environment
-  # - variable: MESSAGE
-  #   value: Hello world!
-  #   availability:
-  #     - BUILD
-  #     - RUNTIME
-
-  # Grant access to secrets in Cloud Secret Manager.
-  # See https://firebase.google.com/docs/app-hosting/configure#secret-parameters
-  # - variable: MY_SECRET
-  #   secret: mySecretRef
+  runtime: nodejs20
