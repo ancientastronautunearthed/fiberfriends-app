@@ -89,16 +89,32 @@ export default function CreateMonsterPage() {
         
         startGeneratingTransition(async () => {
           try {
-            const imageResult = await generateMonsterImageAction({ detailedPrompt: expansionResult.detailedPrompt });
-            setImageUrl(imageResult.imageUrl);
+            const imageResult = await generateMonsterImageAction({ 
+ detailedPrompt: expansionResult.detailedPrompt,
+              name: expansionResult.monsterName, // Include monsterName
+ description: expansionResult.detailedPrompt, // Use detailedPrompt as description
+ userId: user.uid, // Include userId
+            });
+            setImageUrl(imageResult.imageUrl ?? null);
             setHasGeneratedInSession(true);
             
             const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
+
+            // Ensure imageUrl is not null before saving to Firestore
+            if (!imageUrl) {
+ console.error('Image URL is null or undefined after generation attempt.');
+ toast({
+ title: "Image Generation Error",
+ description: "Could not get a valid image URL. Please try again.",
+ variant: "destructive",
+ });
+ return; // Exit the function if imageUrl is null
+            }
             
             // Save monster data to Firestore
             await firestoreService.createMonster(user.uid, {
               name: expansionResult.monsterName,
-              imageUrl: imageResult.imageUrl,
+              imageUrl: imageResult.imageUrl || '', // Provide default empty string
               health: initialHealth,
               generated: true,
               lastRecoveryDate: new Date().toDateString()

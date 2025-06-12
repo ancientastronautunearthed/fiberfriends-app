@@ -17,7 +17,7 @@ const MonsterImageInputSchema = z.object({
 export type MonsterImageInput = z.infer<typeof MonsterImageInputSchema>;
 
 const MonsterImageOutputSchema = z.object({
-  imageUrl: z.string().url().describe('The generated image as a data URI.'),
+  imageData: z.string().describe('The generated image as a data URI or base64 string.'),
 });
 export type MonsterImageOutput = z.infer<typeof MonsterImageOutputSchema>;
 
@@ -51,6 +51,6 @@ const monsterImageGenerationFlow = ai.defineFlow(
       throw new Error('Image generation failed or did not return an image URL.');
     }
     
-    return { imageUrl: media.url };
+    return { imageData: media.url }; // Returning the data URL as imageData
   }
 );
