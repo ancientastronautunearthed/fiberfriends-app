@@ -16,6 +16,9 @@ export async function generateDieticianAction(input: {
   type: string;
   communicationStyle: string;
   additionalTraits: string;
+  age: number;
+  height: number;
+  weight: number;
   symptoms: string[];
 }) {
   // We no longer pass a separate 'specialization'.
@@ -34,6 +37,9 @@ export async function createDietPlanAction(input: {
     healthGoals: string;
     mealPrepTime: string;
     budget: string;
+  age: number;
+  height: number;
+  weight: number;
     dieticianName: string;
     symptoms: string[];
 }) {

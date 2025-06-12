@@ -8,8 +8,6 @@
 - Matching: "I've Been There" Matching: Connects users with similar symptom profiles, treatments, and challenges to foster mutual support through one-on-one or small group chats.
 - Provider Directory: Validated Provider Directory: A user-driven resource listing medical professionals treating Morgellons with credibility, including provider reviews and filtered search options.
 - Doctor Forum: "You Wouldn’t Believe What My Doctor Said" Forum: A moderated space to share dismissive or bizarre doctor comments, transforming frustration into camaraderie through humor and support.
-- Humor Integration: Humor Integration: Incorporate humor (Belief Badges, Translation Guide, Invisible Illness Bingo) to normalize and validate shared experiences of disbelief.
-
 ## Style Guidelines:
 
 - Primary color: Soft lavender (#D0B8FF) to promote calmness and healing.
