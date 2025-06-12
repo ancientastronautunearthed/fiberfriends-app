@@ -50,18 +50,25 @@ export async function generateMonsterImageAction(
       metadata: { contentType: 'image/png' },
     });
 
-    const publicUrl = await storageRef.getPublicUrl();
+    // Generate a signed URL with an expiration time
+    const [publicUrl] = await storageRef.getSignedUrl({
+      action: 'read',
+ expires: '03-01-2026', // Set the expiration date to 03-01-2026
+    });
 
     // Save monster data to Firestore
-    await firestore.collection('monsters').add({
+    // You may want to update an existing monster document instead of adding a new one each time
+    // based on your application logic for when a new monster replaces an old one.
+    // For now, I'm keeping the add operation as in the original code.
+ await firestore.collection('monsters').add({
       name: input.name,
       description: input.description,
-      imageUrl: publicUrl[0],
+      imageUrl: publicUrl,
       userId: input.userId,
       createdAt: Timestamp.now(),
     });
 
-    return { success: true, imageUrl: publicUrl[0] };
+    return { success: true, imageUrl: publicUrl };
   } catch (error) {
     console.error("Error in generateMonsterImageAction:", error);
     if (error instanceof Error) {

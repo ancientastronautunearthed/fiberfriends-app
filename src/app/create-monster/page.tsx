@@ -96,20 +96,13 @@ export default function CreateMonsterPage() {
  userId: user.uid, // Include userId
             });
             setImageUrl(imageResult.imageUrl ?? null);
+            console.log("Image result URL:", imageResult.imageUrl); // Add this
+            console.log("Updated imageUrl state:", imageUrl); // Add this
             setHasGeneratedInSession(true);
             
             const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
 
-            // Ensure imageUrl is not null before saving to Firestore
-            if (!imageUrl) {
- console.error('Image URL is null or undefined after generation attempt.');
- toast({
- title: "Image Generation Error",
- description: "Could not get a valid image URL. Please try again.",
- variant: "destructive",
- });
- return; // Exit the function if imageUrl is null
-            }
+            // The imageUrl state is set above, and the render logic handles the null state
             
             // Save monster data to Firestore
             await firestoreService.createMonster(user.uid, {
@@ -230,7 +223,21 @@ export default function CreateMonsterPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="text-center">
-            <Image src={imageUrl} alt={`Your Morgellon Monster: ${monsterName}`} width={512} height={512} className="rounded-lg border object-cover mx-auto shadow-lg" data-ai-hint="generated monster" />
+          {imageUrl ? (
+ <Image
+ src={imageUrl}
+ alt={`Your Morgellon Monster: ${monsterName}`}
+ width={512}
+ height={512}
+ className="rounded-lg border object-cover mx-auto shadow-lg"
+ data-ai-hint="generated monster"
+ />
+ ) : (
+ <div className="flex flex-col items-center justify-center p-6 bg-muted/30 rounded-md">
+ <Loader2 className="h-12 w-12 animate-spin text-primary mb-3" />
+ <p className="text-sm text-foreground">Loading monster image...</p>
+ </div>
+ )}
             <p className="text-sm text-muted-foreground mt-4">You can view it on your profile page and track its health in the Meal Log. It might even have a riddle for you...</p>
         </CardContent>
         <CardFooter className="flex-col gap-3 pt-4 items-center">
@@ -260,7 +267,7 @@ export default function CreateMonsterPage() {
                 Create a Different Monster
             </Button>
         </CardFooter>
-      </Card>
+    </Card>
     );
   }
   
