@@ -137,6 +137,7 @@ function DailyBattlePlanCard({ monsterName, monsterImageUrl, monsterHealth }: { 
       try {
         const logEntries = JSON.parse(logRaw);
         if (!Array.isArray(logEntries)) return;
+        // Correctly filter and count entries for the current key
         totalCount += logEntries.filter((entry: any) => {
           if (dateField === 'loggedAt' && entry.loggedAt && typeof entry.loggedAt === 'string') {
             return entry.loggedAt.startsWith(todayStr);
@@ -145,11 +146,10 @@ function DailyBattlePlanCard({ monsterName, monsterImageUrl, monsterHealth }: { 
           }
           return false;
         }).length;
-      } catch { /* ignore parse errors for a single key */ }
+      } catch { /* ignore parse errors for a single key */ } // TODO: Consider more robust error handling/logging
     });
-    return totalCount;
-  }, [getCurrentDateString]);
-
+ return totalCount;
+  }, [getCurrentDateString]); // Move closing parenthesis here
   const checkTaskCompletion = useCallback(() => {
     if (typeof window === 'undefined') return;
     setTasksLoading(true);
@@ -362,7 +362,9 @@ function DailyBattlePlanCard({ monsterName, monsterImageUrl, monsterHealth }: { 
         {generatedSlayingImage && !isGeneratingSlayingImage && (
           <div className="mt-4 p-4 border rounded-md bg-muted/30">
             <h3 className="font-semibold text-lg text-center mb-2">Your {monsterName}'s Victory Pose!</h3>
-            <Image src={generatedSlayingImage} alt={`${monsterName} Slaying Image`} width={512} height={512} className="rounded-md object-cover mx-auto border-2 border-primary shadow-lg" data-ai-hint="generated monster victory pose" />
+            {generatedSlayingImage && ( // Conditional rendering for Image
+              <Image src={generatedSlayingImage} alt={`${monsterName} Slaying Image`} width={512} height={512} className="rounded-md object-cover mx-auto border-2 border-primary shadow-lg" data-ai-hint="generated monster victory pose" />
+            )}
             <p className="text-xs text-muted-foreground text-center mt-2">This image has been saved to your Monster Slaying Image Vault (accessible via My Profile in future).</p>
           </div>
         )}
@@ -411,7 +413,7 @@ export default function BeliefCirclePage() {
     
   }, []);
 
-  const handlePostStory = (e: React.FormEvent) => {
+  const handlePostStory = (e: React.FormEvent) => {    e.preventDefault();
     e.preventDefault();
     if (!newStoryContent.trim()) {
       toast({
@@ -485,7 +487,7 @@ export default function BeliefCirclePage() {
   if (!userMonsterName || !userMonsterImageUrl) {
       console.log("[DEBUG] BeliefCirclePage: Rendering 'Nemesis Data Incomplete' card.");
       return (
-        <Card className="max-w-lg mx-auto my-10" data-testid="nemesis-data-incomplete-card">
+        <Card className="max-w-lg mx-auto my-10">
           <CardHeader className="text-center">
             <AlertTriangle className="h-12 w-12 mx-auto text-destructive mb-2" />
             <CardTitle className="font-headline text-xl">DEBUG: YOU ARE SEEING THE 'NEMESIS DATA INCOMPLETE' CARD.</CardTitle>
