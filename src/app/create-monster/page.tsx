@@ -18,11 +18,6 @@ import { useRouter } from 'next/navigation';
 
 const INITIAL_HEALTH_MIN = 80;
 const INITIAL_HEALTH_MAX = 100;
-
-// Function to generate demonic pitch and rate
-const generateDemonicPitch = () => parseFloat((Math.random() * (0.5 - 0.1) + 0.1).toFixed(2)); // Deep: 0.1 to 0.5
-const generateDemonicRate = () => parseFloat((Math.random() * (0.8 - 0.5) + 0.5).toFixed(2));  // Slow: 0.5 to 0.8
-
 export default function CreateMonsterPage() {
   const [words, setWords] = useState('');
   const [monsterName, setMonsterName] = useState<string | null>(null);
@@ -55,63 +50,6 @@ export default function CreateMonsterPage() {
 
     checkExistingMonster();
   }, [user]);
-
-  const selectAndStoreVoice = () => {
-    const voices = speechSynthesis.getVoices();
-    
-    let selectedVoiceURI: string | null = null;
-    const pitch = generateDemonicPitch();
-    const rate = generateDemonicRate();
-
-    if (voices.length === 0) {
-      return {
-        voiceURI: null, 
-        pitch: pitch, 
-        rate: rate   
-      };
-    }
-
-    // Attempt to find a somewhat "monster-like" voice.
-    const englishVoices = voices.filter(v => v.lang.startsWith('en-'));
-    // Prefer non-standard, male, or deeper sounding voices if possible
-    const nonStandardEnglishVoices = englishVoices.filter(v => 
-        !v.name.toLowerCase().includes('standard') && 
-        !v.name.toLowerCase().includes('default') &&
-        !v.name.toLowerCase().includes('natural') && 
-        !v.name.toLowerCase().includes('google us english') && 
-        !v.name.toLowerCase().includes('microsoft david') && 
-        !v.name.toLowerCase().includes('microsoft zira') &&
-        !v.name.toLowerCase().includes('female') && // try to avoid explicitly female voices
-        !(v as any).gender?.toLowerCase().includes('female')
-    );
-    
-    const maleEnglishVoices = englishVoices.filter(v => 
-        v.name.toLowerCase().includes('male') || 
-        (v as any).gender?.toLowerCase().includes('male')
-    );
-    
-    let candidateVoices: SpeechSynthesisVoice[] = [];
-
-    if (nonStandardEnglishVoices.length > 0) {
-        candidateVoices = nonStandardEnglishVoices;
-    } else if (maleEnglishVoices.length > 0) {
-        candidateVoices = maleEnglishVoices;
-    } else if (englishVoices.length > 0) {
-        candidateVoices = englishVoices;
-    } else {
-        candidateVoices = voices; // Fallback to any available voice
-    }
-
-    if (candidateVoices.length > 0) {
-        selectedVoiceURI = candidateVoices[Math.floor(Math.random() * candidateVoices.length)].voiceURI;
-    }
-    
-    return { 
-        voiceURI: selectedVoiceURI, 
-        pitch: pitch, 
-        rate: rate 
-    };
-  };
 
   const handleWordSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -157,44 +95,12 @@ export default function CreateMonsterPage() {
             
             const initialHealth = Math.floor(Math.random() * (INITIAL_HEALTH_MAX - INITIAL_HEALTH_MIN + 1)) + INITIAL_HEALTH_MIN;
             
-            // Generate voice configuration
-            let voiceConfig;
-            if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-                // Ensure voices are loaded before selecting
-                if (speechSynthesis.getVoices().length === 0) {
-                    speechSynthesis.onvoiceschanged = () => {
-                        voiceConfig = selectAndStoreVoice();
-                        speechSynthesis.onvoiceschanged = null; // Important to prevent multiple calls
-                    };
-                } else {
-                    voiceConfig = selectAndStoreVoice();
-                }
-            } else {
-                // Fallback if speech synthesis is not supported
-                voiceConfig = { 
-                    voiceURI: null, 
-                    pitch: generateDemonicPitch(), 
-                    rate: generateDemonicRate() 
-                };
-            }
-
-            // If voiceConfig is still undefined, set fallback
-            if (!voiceConfig) {
-              voiceConfig = { 
-                voiceURI: null, 
-                pitch: generateDemonicPitch(), 
-                rate: generateDemonicRate() 
-              };
-            }
-
             // Save monster data to Firestore
-            await firestoreService.saveMonsterData(user.uid, {
+            await firestoreService.createMonster(user.uid, {
               name: expansionResult.monsterName,
               imageUrl: imageResult.imageUrl,
               health: initialHealth,
               generated: true,
-              voiceConfig,
-              hasSpokenFirstTime: false,
               lastRecoveryDate: new Date().toDateString()
             });
 
@@ -347,7 +253,7 @@ export default function CreateMonsterPage() {
       <CardHeader>
         <CardTitle className="font-headline flex items-center gap-2"><Wand2 className="h-6 w-6 text-primary"/>Create Your Morgellon Monster</CardTitle>
         <CardDescription>
-          This is a special one-time ritual for our valued members.
+ This is a special one-time ritual for our valued members.
           Describe your inner Morgellon Monster in exactly 5 words. Our AI will then conjure its image, reveal its name, and give it a unique, randomized deep and demonic voice.
           This image, name, voice, and its initial health will become your unique profile identity. Choose your words wisely.
           {existingMonster && (
