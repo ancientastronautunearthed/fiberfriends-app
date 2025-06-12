@@ -6,7 +6,6 @@ import { gradeFood } from '@/ai/flows/food-grading-flow';
 import { generateRecipe } from '@/ai/flows/recipe-generation-flow';
 import { firestoreService } from '@/lib/firestore-service';
 
-// Around line 6-7, after the imports, add:
 export { generateRecipe } from '@/ai/flows/recipe-generation-flow';
 
 // --- Constants ---
