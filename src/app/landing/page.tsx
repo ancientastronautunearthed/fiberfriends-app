@@ -29,7 +29,7 @@ const features = [
   {
     icon: Users,
     title: "Supportive Community Spaces",
-    description: "Share your story in the Belief Circle, find camaraderie in the Doctor Forum, validate experiences with Humor Hub elements, and find validated providers in our user-driven directory.",
+    description: "Share your story in the Belief Circle and find validated providers in our user-driven directory.",
     image: "https://placehold.co/600x400.png",
     imageAiHint: "community support group",
   },

@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { generateMonsterSlayingImageAction } from './actions';
 import { Progress } from '@/components/ui/progress';
 import LoadingPlaceholder from '@/components/ui/loading-placeholder';
 import { cn } from '@/lib/utils';
@@ -33,7 +32,6 @@ const PRESCRIPTION_TRACKER_OTHER_KEY = 'otherPrescriptionsLog';
 const SYMPTOM_JOURNAL_ENTRIES_KEY = 'fiberFriendsSymptomJournalEntries';
 const SLEEP_LOG_ENTRIES_KEY = 'morgellonSleepLogEntries';
 const KNOWLEDGE_NUGGET_LAST_ATTEMPT_DATE_KEY = 'knowledgeNuggetQuizLastAttemptDate';
-const AFFIRMATION_AMPLIFIER_LAST_COMPLETED_DATE_KEY = 'affirmationAmplifierLastCompletedDate';
 const MINDFUL_MOMENT_DAILY_USAGE_KEY = 'mindfulMomentDailyUsage';
 const KINDNESS_CHALLENGE_CURRENT_TASK_KEY = 'kindnessChallengeCurrentTask';
 const TRUSTED_DOCTOR_NAME = "Dr. Anya Sharma, MD";
@@ -163,7 +161,6 @@ function DailyBattlePlanCard({ monsterName, monsterImageUrl, monsterHealth }: { 
     const sleepEntriesToday = countEntriesForToday(SLEEP_LOG_ENTRIES_KEY, 'date');
 
     const quizCompletedToday = localStorage.getItem(KNOWLEDGE_NUGGET_LAST_ATTEMPT_DATE_KEY) === todayStr;
-    const affirmationCompletedToday = localStorage.getItem(AFFIRMATION_AMPLIFIER_LAST_COMPLETED_DATE_KEY) === todayStr;
     
     let mindfulCompletedToday = false;
     const mindfulUsageRaw = localStorage.getItem(MINDFUL_MOMENT_DAILY_USAGE_KEY);
@@ -195,7 +192,6 @@ function DailyBattlePlanCard({ monsterName, monsterImageUrl, monsterHealth }: { 
       { id: 'symptoms', label: "Log Symptoms", href: "/symptom-journal", isCompleted: symptomEntriesToday > 0 },
       { id: 'sleep', label: "Log Sleep", href: "/sleep-log", isCompleted: sleepEntriesToday > 0 },
       { id: 'quiz', label: "Knowledge Quiz", href: "/knowledge-nugget-quiz", isCompleted: quizCompletedToday },
-      { id: 'affirmation', label: "Amplify Affirmation", href: "/affirmation-amplifier", isCompleted: affirmationCompletedToday },
       { id: 'mindful', label: "Mindful Moment", href: "/mindful-moment", isCompleted: mindfulCompletedToday },
       { id: 'kindness', label: "Kindness Challenge", href: "/kindness-challenge", isCompleted: kindnessCompletedToday },
     ];
