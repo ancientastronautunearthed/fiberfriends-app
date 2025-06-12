@@ -74,10 +74,6 @@ export default function CreateDieticianPage() {
   const [isCreatingPlan, startCreatingPlanTransition] = useTransition();
   const [dietician, setDietician] = useState<AIDietician | null>(null);
   const [dietPlan, setDietPlan] = useState<DietPlan | null>(null);
-
-  const [age, setAge] = useState<number | ''>('');
-  const [height, setHeight] = useState<number | ''>('');
-  const [weight, setWeight] = useState<number | ''>('');
   
   const [gender, setGender] = useState('');
   const [dieticianType, setDieticianType] = useState('');
@@ -92,9 +88,6 @@ export default function CreateDieticianPage() {
   const [healthGoals, setHealthGoals] = useState('');
   const [mealPrepTime, setMealPrepTime] = useState('');
   const [budget, setBudget] = useState('');
-  const [ongoingSymptoms, setOngoingSymptoms] = useState('');
-  const [mealsPerDay, setMealsPerDay] = useState<number | ''>('');
-  const [waterPerDay, setWaterPerDay] = useState<number | ''>('');
   
   const [error, setError] = useState<string | null>(null);
   
@@ -133,7 +126,7 @@ export default function CreateDieticianPage() {
   }, []);
 
   const handleCreateDietician = () => {
-    if (!gender || !dieticianType || !communicationStyle || !age || !height || !weight) {
+    if (!gender || !dieticianType || !communicationStyle) {
       setError('Please fill in all required fields');
       return;
     }
@@ -142,9 +135,6 @@ export default function CreateDieticianPage() {
     startGeneratingTransition(async () => {
       try {
         const result = await generateDieticianAction({
- age: Number(age),
- height: Number(height),
- weight: Number(weight),
           gender,
           type: dieticianType,
           communicationStyle,
@@ -184,9 +174,6 @@ export default function CreateDieticianPage() {
     startCreatingPlanTransition(async () => {
       try {
         const result = await createDietPlanAction({
- age: Number(age),
- height: Number(height),
- weight: Number(weight),
           dietaryRestrictions,
           allergies,
           favoriteFoods,
@@ -265,6 +252,28 @@ export default function CreateDieticianPage() {
       );
   }
 
+  if (symptoms.length === 0 && !dietician) {
+      return (
+          <div className="container mx-auto max-w-2xl py-8">
+              <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Log Your Symptoms First!</AlertTitle>
+                  <AlertDescription>
+                      To create a diet plan that truly helps, your AI Dietician needs to know what symptoms you're facing. Please go to the Symptom Journal to log how you're feeling.
+                  </AlertDescription>
+                  <div className="mt-4">
+                      <Button asChild>
+                          <Link href="/symptom-journal">
+                              <NotebookPen className="mr-2 h-4 w-4" />
+                              Go to Symptom Journal
+                          </Link>
+                      </Button>
+                  </div>
+              </Alert>
+          </div>
+      );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <Card className="mb-6">
@@ -326,30 +335,6 @@ export default function CreateDieticianPage() {
             </div>
 
             <div>
-              <Label htmlFor="age">Age *</Label>
-              <Input id="age" type="number" placeholder="Enter your age" value={age} onChange={(e) => setAge(Number(e.target.value))} required />
-            </div>
-
-            <div>
-              <Label htmlFor="height">Height (in cm) *</Label>
-              <Input id="height" type="number" placeholder="Enter your height" value={height} onChange={(e) => setHeight(Number(e.target.value))} required />
-            </div>
-
-            <div>
-              <Label htmlFor="weight">Weight (in kg) *</Label>
-              <Input id="weight" type="number" placeholder="Enter your weight" value={weight} onChange={(e) => setWeight(Number(e.target.value))} required />
-            </div>
-
-            <div>
-              <Label htmlFor="type" className="text-base font-semibold mb-3 block">
-                Dietician Type *
-              </Label>
-              <Select value={dieticianType} onValueChange={setDieticianType} required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select dietician type" />
-                </SelectTrigger>
-                <SelectContent>
-            <div>
               <Label htmlFor="type" className="text-base font-semibold mb-3 block">
                 Dietician Type *
               </Label>
@@ -357,7 +342,7 @@ export default function CreateDieticianPage() {
                 <SelectTrigger>
                   <SelectValue placeholder="Select dietician type" />
                 </SelectTrigger>
- <SelectContent>
+                <SelectContent>
                   <SelectItem value="human-professional">Professional Human</SelectItem>
                   <SelectItem value="human-friendly">Friendly Neighbor</SelectItem>
                   <SelectItem value="fantasy-elf">Fantasy - Woodland Elf</SelectItem>
@@ -374,7 +359,7 @@ export default function CreateDieticianPage() {
           <CardFooter>
             <Button 
               onClick={() => setCurrentStep(2)} 
-              disabled={!gender || !dieticianType || !age || !height || !weight}
+              disabled={!gender || !dieticianType}
               className="w-full"
             >
               Next Step
@@ -511,7 +496,7 @@ export default function CreateDieticianPage() {
               <Tabs defaultValue="basics" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="basics">Basics</TabsTrigger>
-                  <TabsTrigger value="preferences">Food Preferences</TabsTrigger>
+                  <TabsTrigger value="preferences">Preferences</TabsTrigger>
                   <TabsTrigger value="lifestyle">Lifestyle</TabsTrigger>
                 </TabsList>
                 

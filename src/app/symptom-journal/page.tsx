@@ -52,7 +52,7 @@ const staticChartConfig = {
 
 
 export default function SymptomJournalPage() {
-  const { user } = useAuth(); // Get the authenticated user
+  const { user, loading } = useAuth(); // Get the authenticated user and loading state
   const { toast } = useToast();
 
   // State for form inputs remains the same
@@ -73,8 +73,8 @@ export default function SymptomJournalPage() {
 
   // --- DATA FETCHING (Replaced localStorage with Firestore) ---
   useEffect(() => {
-    // Only fetch data if the user is logged in
-    if (user?.uid) {
+    // Only fetch data if authentication state is resolved and user is logged in
+    if (!loading && user?.uid) {
       startTransition(async () => {
         const fetchedEntries = await getSymptomEntries(user.uid);
         if (Array.isArray(fetchedEntries)) {
@@ -82,7 +82,8 @@ export default function SymptomJournalPage() {
         }
       });
     }
-  }, [user]); // Rerun this effect when the user object changes
+    // The effect should not run when loading is true (auth state is not yet known)
+  }, [user, loading]); // Add loading to the dependency array
 
   // --- CHART DATA PROCESSING (No changes needed) ---
   // This useEffect still works perfectly as it just depends on the 'entries' state
