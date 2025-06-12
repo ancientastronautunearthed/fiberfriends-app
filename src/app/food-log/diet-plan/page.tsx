@@ -154,8 +154,9 @@ export default function DietPlanPage() {
       setDietPlan(JSON.parse(storedDietPlan));
     } else if (storedDietician) {
       router.push('/food-log/create-dietician');
+ router.push('/create-dietician');
     } else {
-      router.push('/food-log/create-dietician');
+ router.push('/create-dietician');
     }
   }, [router]);
 

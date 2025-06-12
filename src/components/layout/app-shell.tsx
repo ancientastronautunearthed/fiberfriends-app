@@ -49,6 +49,7 @@ interface NavItem {
 }
 
 const navItemsConfig: NavItem[] = [
+  { href: '/symptom-journal', label: 'Symptom Journal', icon: BookText, pageTitle: 'Symptom Journal', authRequired: true },
   { href: '/landing', label: 'About Fiber Friends', icon: LayoutDashboard, pageTitle: 'Welcome to Fiber Friends' },
   { href: '/getting-started', label: 'Getting Started', icon: Wand2, pageTitle: 'Getting Started Guide' },
   { href: '/tutorial', label: 'User Guide', icon: TutorialIcon, pageTitle: 'Fiber Friends User Guide' },
@@ -59,17 +60,14 @@ const navItemsConfig: NavItem[] = [
     isParent: true,
     authRequired: true,
     children: [
-      { href: '/affirmation-amplifier', label: 'Affirmations', icon: AffirmationIcon, pageTitle: 'Positive Affirmations' },
+      { href: '/symptom-journal', label: 'Symptom Journal', icon: BookText, pageTitle: 'Symptom Journal' },
       { href: '/exercise-log', label: 'Exercise Log', icon: Dumbbell, pageTitle: 'Exercise Log' },
       { href: '/food-log', label: 'Meal Log', icon: Apple, pageTitle: 'Meal Log' },
-      { href: '/kindness-challenge', label: 'Kindness Challenge', icon: HandHeart, pageTitle: 'Kindness Challenge' },
       { href: '/knowledge-nugget-quiz', label: 'Wellness Quiz', icon: Lightbulb, pageTitle: 'Wellness Quiz' },
       { href: '/prescription-tracker', label: 'Medication Log', icon: Pill, pageTitle: 'Medication Log' },
       { href: '/mindful-moment', label: 'Mindful Moments', icon: Wind, pageTitle: 'Mindful Moments' },
       { href: '/product-tracker', label: 'Product Log', icon: ListChecks, pageTitle: 'Product Log' },
       { href: '/sleep-log', label: 'Sleep Log', icon: BedDouble, pageTitle: 'Sleep Log' },
-      { href: '/symptom-journal', label: 'Symptom Journal', icon: BookText, pageTitle: 'Symptom Journal' },
-      { href: '/workout-plan-creator', label: 'Workout Plan Creator', icon: Settings2Icon, pageTitle: 'AI Workout Plan Creator', authRequired: true },
     ]
   },
   {
@@ -173,7 +171,6 @@ const infoTips = [
   "Exercise Tip: Even gentle movement like stretching or a short walk can be beneficial.",
   "Quiz Tip: Boost your knowledge (and weaken your monster!) with the Knowledge Nugget Quiz.",
   "Affirmation Tip: Amplify positive thoughts with the Affirmation Amplifier. It's a small act with big impact.",
-  "Kindness Tip: Completing a small act of kindness in the 'Kindness Connection' can brighten your day and someone else's!",
   "Sleep Tip: Consistent sleep schedules can improve overall well-being. Try the new Sleep Log!"
 ];
 
@@ -343,13 +340,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let activeParentLabel: string | undefined = undefined;
-    for (const item of filteredNavItems) {
+    // Find the parent item of the current active child page
+ for (const item of filteredNavItems) {
       if (item.isParent && item.children) {
-        for (const child of item.children) {
-          if (child.href && (pathname === child.href.split('#')[0] || (child.href !== '/' && pathname.startsWith(child.href.split('#')[0])))) {
-            activeParentLabel = item.label;
-            break;
-          }
+ for (const child of item.children) {
+ if (child.href && (pathname === child.href.split('#')[0] || (child.href !== '/' && pathname.startsWith(child.href.split('#')[0])))) {
+ activeParentLabel = item.label;
+ break; // Found the active child, no need to check other children
+ }
         }
       }
       if (activeParentLabel) break;
