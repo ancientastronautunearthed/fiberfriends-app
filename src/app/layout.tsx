@@ -6,10 +6,14 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { AuthProvider } from '@/context/auth-context';
 import { ClientEffects } from '@/components/ui/client-effects';
 
+export const viewport = {
+  themeColor: '#0066FF',
+};
+
 export const metadata: Metadata = {
   title: 'Fiber Friends',
   description: 'Community Support & Validation Platform for Morgellons',
-  themeColor: '#0066FF',
+  // themeColor moved to viewport export
   viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
   openGraph: {
     title: 'Fiber Friends',

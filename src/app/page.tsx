@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useTransition, useCallback, useRef } from 'react';
@@ -14,6 +13,7 @@ import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
 import LoadingPlaceholder from '@/components/ui/loading-placeholder';
 import { cn } from '@/lib/utils';
+import { generateMonsterImageAction } from '@/app/create-monster/actions';
 
 const MONSTER_NAME_KEY = 'morgellonMonsterName';
 const MONSTER_IMAGE_KEY = 'morgellonMonsterImageUrl';
@@ -226,17 +226,15 @@ function DailyBattlePlanCard({ monsterName, monsterImageUrl, monsterHealth }: { 
         description: `Generating a slaying image for ${monsterName}... This may take a moment.`,
         duration: 5000,
       });
-      console.log("[DEBUG] DailyBattlePlan: Calling generateMonsterSlayingImageAction");
+      console.log("[DEBUG] DailyBattlePlan: Calling generateMonsterImageAction");
       try {
         if (typeof window !== 'undefined') {
             const currentPoints = parseInt(localStorage.getItem(USER_POINTS_KEY) || '0', 10);
             localStorage.setItem(USER_POINTS_KEY, String(currentPoints + DAILY_VICTORY_BONUS_POINTS));
         }
 
-        const imageResult = await generateMonsterSlayingImageAction({
-          monsterName: monsterName,
-          monsterInitialImageUrl: monsterImageUrl,
-          achievement: `Victory! ${monsterName} completed the Daily Battle Plan!`,
+        const imageResult = await generateMonsterImageAction({
+          detailedPrompt: `${monsterName} in a victorious pose after completing the Daily Battle Plan. The monster should look defeated but in an epic, dramatic way. Achievement: Victory! ${monsterName} completed all daily wellness tasks!`,
         });
         console.log("[DEBUG] DailyBattlePlan: Image generation result:", imageResult);
 
@@ -584,4 +582,3 @@ export default function BeliefCirclePage() {
     </div>
   );
 }
-    

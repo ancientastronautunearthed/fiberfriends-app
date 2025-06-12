@@ -17,8 +17,8 @@ import { useRouter } from 'next/navigation';
 import Image from "next/image";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { generateRecipeAction } from '../actions';
-import type { RecipeGenerationOutput, Ingredient } from '@/ai/flows/recipe-generation-flow';
+import { generateRecipe } from './actions';
+import type { RecipeGenerationOutput, Ingredient } from '@/ai/flows/recipe-generation-flow'; // Assuming this is correct
 
 const AI_DIETICIAN_KEY = 'aiDietician';
 const AI_DIET_PLAN_KEY = 'aiDietPlan';
@@ -75,7 +75,7 @@ const RecipeDialog = ({ mealName, children }: { mealName: string, children: Reac
     if (!mealName) return;
     startLoadingTransition(async () => {
       try {
-        const result = await generateRecipeAction({ mealName });
+        const result = await generateRecipe({ mealName });
         setRecipe(result);
       } catch (error) {
         toast({

@@ -55,8 +55,8 @@ export async function suggestMealAction(input: { mealType: "breakfast" | "lunch"
 export async function generateRecipeAction(input: { mealName: string }) {
   try {
     // Call the flow directly
-    const result = await generateRecipe({
-      mealDescription: input.mealName
+    const result = await generateRecipe({ // This is line 59
+      mealName: input.mealName
     });
     return result;
   } catch (error) {

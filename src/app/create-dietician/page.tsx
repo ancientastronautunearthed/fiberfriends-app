@@ -18,6 +18,10 @@ import { generateDieticianAction, createDietPlanAction } from './actions';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+export const viewport = {
+  viewport: 'width=device-width, initial-scale=1'
+};
+
 const AI_DIETICIAN_KEY = 'aiDietician';
 const AI_DIET_PLAN_KEY = 'aiDietPlan';
 // This key now matches the one used in the Symptom Journal page.
